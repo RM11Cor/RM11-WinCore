@@ -16,12 +16,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Locale;
-import java.util.PriorityQueue;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -55,13 +53,6 @@ public final class GameAssemblyCodeBridge {
         }
     }
 
-    private static final class Function {
-        final long begin,end,unwind,rank;
-        Function(long b,long e,long u) {
-            begin=b;end=e;unwind=u;rank=mix64((b<<32)^e^u);
-        }
-    }
-
     public static final class ExportStats {
         public int originalPdataEntries;
         public int eligibleExecutableFunctions;
@@ -73,13 +64,6 @@ public final class GameAssemblyCodeBridge {
         public int chainedUnwindReferences;
         public long originalAssemblyLength;
         public long exceptionDirectorySize;
-    }
-
-    private static long mix64(long input) {
-        long z=input+0x9e3779b97f4a7c15L;
-        z=(z^(z>>>30))*0xbf58476d1ce4e5b9L;
-        z=(z^(z>>>27))*0x94d049bb133111ebL;
-        return z^(z>>>31);
     }
 
     private static void check(boolean truth,String why)throws IOException {
@@ -211,8 +195,11 @@ public final class GameAssemblyCodeBridge {
             long exceptionOffset=rvaToFile(
                     sections,exceptionRva,exceptionSize,fileSize,false);
             int total=(int)(exceptionSize/12);
-            PriorityQueue<Function> chosen=new PriorityQueue<>(MAX_SAMPLES,
-                    (a,b)->Long.compareUnsigned(b.rank,a.rank));
+            // Native method-diverse source selection: group first by actual
+            // xdata/UNWIND RVA, never allow duplicated source metadata to
+            // consume multiple scarce original-code sample slots.
+            Win64UnwindDiverseSampler chosen=
+                    new Win64UnwindDiverseSampler(MAX_SAMPLES);
             int eligible=0;
             for(int base=0;base<total;base+=CHUNK_ENTRIES) {
                 int batch=Math.min(CHUNK_ENTRIES,total-base);
@@ -230,18 +217,13 @@ public final class GameAssemblyCodeBridge {
                         rvaToFile(sections,begin,length,fileSize,true);
                     }catch(IOException ignored) {continue;}
                     eligible++;
-                    Function f=new Function(begin,end,unwind);
-                    if(chosen.size()<MAX_SAMPLES)chosen.offer(f);
-                    else if(Long.compareUnsigned(f.rank,chosen.peek().rank)<0) {
-                        chosen.poll();
-                        chosen.offer(f);
-                    }
+                    chosen.accept(begin,end,unwind);
                 }
             }
-            check(!chosen.isEmpty(),
+            check(chosen.distinctUnwindRvasSelected()>0,
                     "no bounded executable RUNTIME_FUNCTION bodies found in original game");
-            ArrayList<Function> selected=new ArrayList<>(chosen);
-            selected.sort(Comparator.comparingLong(f->f.begin));
+            List<Win64UnwindDiverseSampler.Range> selected=
+                    chosen.chosenByBeginRva();
 
             ExportStats stats=new ExportStats();
             stats.originalPdataEntries=total;
@@ -252,7 +234,12 @@ public final class GameAssemblyCodeBridge {
 
             JSONObject manifest=new JSONObject();
             manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v2");
-            manifest.put("version","1.1");
+            manifest.put("version","1.2-source-diverse");
+            manifest.put("sampler_policy","one_source_function_per_distinct_unwind_rva");
+            manifest.put("sampled_distinct_unwind_rva_count",
+                    chosen.distinctUnwindRvasSelected());
+            manifest.put("does_not_identify_distinct_gameplay_methods",true);
+            manifest.put("same_unwind_rva_does_not_necessarily_mean_same_method",true);
             manifest.put("includes_actual_win64_unwind_info_records",true);
             manifest.put("unwind_metadata_record_source","original GameAssembly.dll PE .xdata RVA");
             manifest.put("win64_unwind_data_is_not_executable_game_logic",true);
@@ -273,7 +260,7 @@ public final class GameAssemblyCodeBridge {
             JSONArray entries=new JSONArray();
             try(ZipOutputStream zip=new ZipOutputStream(destination)) {
                 Set<Long> emittedUnwindRvas=new HashSet<>();
-                for(Function f:selected) {
+                for(Win64UnwindDiverseSampler.Range f:selected) {
                     int n=(int)(f.end-f.begin);
                     long rawAt=rvaToFile(sections,f.begin,n,fileSize,true);
                     byte[] code=readExact(fd,fileSize,rawAt,n);
