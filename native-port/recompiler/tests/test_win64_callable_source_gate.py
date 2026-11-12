@@ -94,6 +94,12 @@ class Win64XdataPlusCfgAdmissionTests(unittest.TestCase):
         self.assertIn(
             "original_win64_stack_exceeds_current_aot_guest_memory",r.blockers)
 
+    def test_realistic_epilogue_fragment_was_not_a_whole_carx_method(self):
+        r=source(hexbytes="48 83 c4 30 5b c3")
+        self.assertIn(
+            "unbalanced_stack_epilogue_without_source_prologue",r.blockers)
+        self.assertFalse(r.confirmed_original_il2cpp_method)
+
     def test_mismatched_cfg_rva_fails(self):
         cfg=inspect_cfg(b"\xc3",BASE)
         with self.assertRaises(ValueError):
