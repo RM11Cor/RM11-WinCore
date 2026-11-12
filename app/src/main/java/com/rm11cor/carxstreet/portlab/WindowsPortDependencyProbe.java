@@ -145,12 +145,16 @@ public final class WindowsPortDependencyProbe {
         BundleCatalogReconciler.Summary compared=reconciler.summarize(
                 sourceFileListingComplete,catalog.optBoolean("full_file_parsed"));
         JSONObject diff=new JSONObject();
-        diff.put("schema","rm11carx.physical-vs-catalog-windows64-bundle-names.v1");
+        diff.put("schema","rm11carx.physical-vs-catalog-windows64-bundle-names.v2");
         diff.put("fully_comparable",compared.fullReconciliationValid);
         diff.put("audit_status",compared.status);
         diff.put("physical_windows64_bundle_entries",compared.physicalEntries);
         diff.put("distinct_physical_windows64_filenames",compared.distinctPhysicalFilenames);
         diff.put("casefold_duplicate_physical_names",compared.physicalDuplicateCasefoldNames);
+        diff.put("unsupported_physical_bundle_basename_count",compared.unsupportedPhysicalBasenameCount);
+        diff.put("unsupported_physical_name_safe_examples",new JSONArray(compared.unsupportedPhysicalNameExamples));
+        diff.put("ambiguous_catalog_windows_name_safe_examples",new JSONArray(compared.ambiguousCatalogNameExamples));
+        diff.put("physical_and_catalog_unmatched_are_not_integrity_corruption_proof",true);
         diff.put("catalog_windows64_reference_entries",compared.catalogWindowsReferences);
         diff.put("distinct_catalog_windows64_bundle_names",compared.distinctCatalogReferencedFilenames);
         diff.put("duplicate_catalog_reference_entries",compared.catalogDuplicateReferenceEntries);
@@ -166,7 +170,7 @@ public final class WindowsPortDependencyProbe {
         diff.put("android_target_asset_compatibility_proven",false);
         diff.put("original_windows_unity_assetbundle_contents_inspected",false);
         diff.put("match_granularity","casefolded_basenames_only_not_hashes_or_asset_dependencies");
-        diff.put("note","808 vs 807 total entries alone never proves missing data; compare distinct source filenames.");
+        diff.put("note","v0.8 unmatched source had one unsupported physical name and one ambiguous Windows catalog ref. These are parse/classification gaps, NOT a confirmed missing asset.");
         result.put("windows64_asset_bundle_filename_reconciliation",diff);
         result.put("native_android_carx_game_code_gate","BLOCKED_NO_PROVEN_ANDROID_ARM64_IL2CPP_BINARY");
         result.put("native_android_carx_asset_gate","BLOCKED_NO_PROVEN_ANDROID_PLATFORM_GAME_ASSETS");
