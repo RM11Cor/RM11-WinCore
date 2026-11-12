@@ -1,0 +1,55 @@
+name: CarX Street PortLab - one-time private permanent Android signing identity
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-signing-bootstrap.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  generate-carx-signing-key-once:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate once and encrypt dedicated CarX signing identity at rest
+        shell: bash
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_PASSWORD" || { echo "Missing protected RM11_RELEASE_PASSWORD; signing identity must never fall back to debug"; exit 1; }
+          output=carx-signing/carx-release.p12.enc.b64
+          if test -s "$output"; then
+            echo "Existing encrypted CarX signing identity retained. No key rotation."
+            exit 0
+          fi
+          umask 077
+          mkdir -p carx-signing
+          keytool -genkeypair -noprompt \
+            -alias carx-release -keyalg RSA -keysize 3072 \
+            -sigalg SHA256withRSA -validity 10950 \
+            -dname "CN=CarX Street PC PortLab,O=RM11Cor,OU=Android Port Development" \
+            -keystore "$RUNNER_TEMP/carx-release.p12" -storetype PKCS12 \
+            -storepass "$RM11_RELEASE_PASSWORD" -keypass "$RM11_RELEASE_PASSWORD"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 250000 -salt \
+            -in "$RUNNER_TEMP/carx-release.p12" -out "$RUNNER_TEMP/carx-release.p12.enc" \
+            -pass env:RM11_RELEASE_PASSWORD
+          base64 -w 0 "$RUNNER_TEMP/carx-release.p12.enc" >"$output"
+          printf '\n' >>"$output"
+          keytool -list -v -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/carx-release.p12" -storepass "$RM11_RELEASE_PASSWORD" \
+            -alias carx-release | grep -E "SHA256:"
+          echo "Dedicated CarX private key encrypted; storing ciphertext only in git."
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$output"
+          git commit -m 'CarX: persist own encrypted permanent signing identity (no plaintext key)'
+          git push origin HEAD:carx-street-pc-port-v1
+          echo "Permanent CarX signing identity bootstrap completed."
