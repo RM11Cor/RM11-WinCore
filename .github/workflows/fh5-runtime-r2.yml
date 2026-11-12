@@ -1,0 +1,40 @@
+name: FH5 Runtime R2 Minimal Boot Smoke Tests
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - fh5-runtime/boot_r2_stage.py
+      - fh5-runtime/R2_BOOT_TEST.bat
+      - fh5-runtime/run_r2.sh
+      - fh5-runtime/manifest_r2.txt
+      - .github/workflows/fh5-runtime-r2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  r2-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: R2 Python syntax, CRC staging and log privacy tests
+        working-directory: fh5-runtime
+        run: |
+          python -m py_compile boot_r2_stage.py
+          python -m unittest -v boot_r2_stage.Tests
+      - name: Single-command Termux script shell checks
+        run: |
+          if test -f fh5-runtime/run_r2.sh; then bash -n fh5-runtime/run_r2.sh; fi
+      - name: R2 file SHA256 manifest check
+        run: |
+          if test -f fh5-runtime/manifest_r2.txt; then
+            test "$(sed -n '1p' fh5-runtime/manifest_r2.txt)" = "R2"
+            test "$(sha256sum fh5-runtime/boot_r2_stage.py | cut -d' ' -f1)" = "$(sed -n '2p' fh5-runtime/manifest_r2.txt)"
+            test "$(sha256sum fh5-runtime/R2_BOOT_TEST.bat | cut -d' ' -f1)" = "$(sed -n '3p' fh5-runtime/manifest_r2.txt)"
+          fi
