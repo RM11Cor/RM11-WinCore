@@ -1,6 +1,25 @@
 plugins { id 'com.android.application' }
 
+// Stable signing is provided by GitHub Actions using existing protected repository
+// secrets; never put the PKCS#12 private key or password in source control.
+def stableKeyPath = System.getenv('FH5_STABLE_KEYSTORE')
+def stableKeyPassword = System.getenv('FH5_STABLE_PASSWORD')
+
 android {
+    signingConfigs {
+        if (stableKeyPath && stableKeyPassword) {
+            stableRelease {
+                storeFile file(stableKeyPath)
+                storePassword stableKeyPassword
+                keyAlias 'rm11-autocore'
+                keyPassword stableKeyPassword
+                storeType 'pkcs12'
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
     namespace 'com.fh5.port'
     compileSdk 36
 
@@ -8,8 +27,8 @@ android {
         applicationId 'com.fh5.port'
         minSdk 29
         targetSdk 35
-        versionCode 3
-        versionName 'P2-x64-proof'
+        versionCode 4
+        versionName 'P2.1-stable-signed'
         ndk { abiFilters 'arm64-v8a' }
     }
     ndkVersion '27.2.12479018'
@@ -19,7 +38,12 @@ android {
     packaging { jniLibs { useLegacyPackaging true } }
     buildTypes {
         debug { minifyEnabled false }
-        release { minifyEnabled false }
+        release {
+            minifyEnabled false
+            if (stableKeyPath && stableKeyPassword) {
+                signingConfig signingConfigs.stableRelease
+            }
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
