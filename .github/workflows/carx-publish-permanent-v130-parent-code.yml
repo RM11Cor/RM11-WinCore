@@ -1,0 +1,119 @@
+name: Publish CarX v1.3 signed original Win64 CHAININFO parent code source bridge
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v130-parent-code.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable source-built and signed Android PortLab v1.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=43246845113
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq '.conclusion')" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V120_BUILD_AND_INDEPENDENT_SIGNATURE_STEP_VERIFIED
+      - name: Retrieve exact signed v1.2 immutable build artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43243017442
+          name: CarXStreet-v1.3.0-Bounded-Original-GameAssembly-Chained-Parent-Code-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently check original signature, version 12 and actual ARM64 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v1.3.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          sig=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$sig"
+          info=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='13' versionName='1.3.0-carx-real-win64-parent-code-export'" <<<"$info"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V130_STABLE_CERT_SAME_PACKAGE_MONOTONIC_VCODE13_NATIVE_ARM64_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v1.3 — real Win64 CHAININFO parent code extraction
+
+          This is a source-code bridge for static ARM64 recompilation,
+          NOT a playable CarX Street game or a runtime CPU emulator.
+
+          Analysis of the owner's actual source v1.2 ZIP verified:
+          - 256 distinct original GameAssembly Windows x86-64 code ranges
+          - 429 unique Win64 UNWIND_INFO source records
+          - 256/256 complete unwind metadata chains
+          - 228 source regions have CHAININFO to parent function fragments
+          - 258 distinct original chained parent ranges whose executable
+            bytes were absent from v1.2.
+          - Those 258 referenced parent code ranges total only 31,738
+            bytes; maximum original declared parent region 1,148 bytes.
+
+          What v1.3 changes:
+          - Reuses existing Android SAF approval for user's CarX folder.
+          - Retains v1.2 diversity: up to 256 distinct unwind RVAs.
+          - Along with code and unwind members, reads the *actual*
+            Win64 parent RUNTIME_FUNCTION code bytes using original
+            BeginAddress/EndAddress and PE executable section mapping.
+          - Adds parents/rva_XXXXXXXX.bin members and per-source SHA256,
+            with a strict 4096-byte limit per fragment and 2MiB total
+            parent code export budget.
+          - Fails closed on missing/broken/out-of-bounds source memory.
+          - User chooses where to save the new offline ZIP:
+            CarX_GameAssembly_AOT_ParentCode_v1.3.zip
+          - Original game installation and original GameAssembly.dll
+            remain read-only. The full Windows DLL and 22GB game contents
+            are NOT copied into the APK or published to GitHub.
+          - The local companion Python analyzer verifies original
+            source parent-code SHA and original Win64 metadata.
+          - Never infers whole callable Unity method or gameplay from
+            a parent stack-unwind range alone.
+
+          Build is signed by the SAME permanent CarX certificate with
+          com.rm11cor.carxstreet.portlab and versionCode 13.
+          Install directly OVER v1.2 without uninstalling.
+
+          The original user's v1.3 ZIP still requires phone-side
+          export and actual source analysis. The already proven 330/330
+          x86-vs-AArch64 synthetic reference comparisons do not count
+          as original CarX gameplay execution or game first frame.
+          EOF
+      - name: Publish tested signed v1.2 artifact to permanent GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v1.3.0-original-chained-parent-code-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.3.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.3.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX PortLab v1.3 - Original Win64 CHAININFO Parent Code (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
