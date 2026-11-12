@@ -1,20 +1,54 @@
 plugins {
     id 'com.android.application'
 }
+
+// Permanent CarX-only key; CI decrypts the AES-256 encrypted keystore
+// exclusively into a protected runner temp file. NEVER put plain text
+// signing keys, private keystore or password in this public repository.
+def carxStableKeyPath = System.getenv('CARX_STABLE_KEYSTORE')
+def carxStablePassword = System.getenv('CARX_STABLE_PASSWORD')
+
 android {
+    signingConfigs {
+        if (carxStableKeyPath && carxStablePassword) {
+            carxPermanent {
+                storeFile file(carxStableKeyPath)
+                storePassword carxStablePassword
+                keyAlias 'carx-release'
+                keyPassword carxStablePassword
+                storeType 'pkcs12'
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
     namespace 'com.rm11cor.carxstreet.portlab'
     compileSdk 35
+
     defaultConfig {
+        // Keep this identifier unchanged across ALL CarX Street updates.
         applicationId 'com.rm11cor.carxstreet.portlab'
         minSdk 29
         targetSdk 35
-        versionCode 2
-        versionName '0.2.0-unity-header-probe'
+        // v0.1.0=1 and v0.2.0=2. Future CarX releases MUST monotonically increase.
+        versionCode 3
+        versionName '0.3.0-permanent-signing-baseline'
         resConfigs 'ar', 'en'
     }
     buildTypes {
-        debug { debuggable true }
-        release { minifyEnabled false }
+        debug {
+            debuggable true
+            // Debug APKs are for local tests only and must NEVER be published
+            // to the permanent-signing update channel.
+        }
+        release {
+            minifyEnabled false
+            if (carxStableKeyPath && carxStablePassword) {
+                signingConfig signingConfigs.carxPermanent
+            }
+            // GitHub release CI fails closed if these env vars are absent.
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
