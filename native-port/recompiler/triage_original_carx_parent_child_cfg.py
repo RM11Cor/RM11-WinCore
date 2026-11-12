@@ -25,7 +25,12 @@ def owner_source_parent_child_cfg(source_zip:Path)->dict:
         raise ValueError("requires original phone-export PortLab v1.3 parent-code ZIP")
     report={
         "schema":"rm11carx.user-owner-original-gameassembly-parent-child-cfg.v1",
-        "source_zip_version":"1.3-parent-code-bounded",
+        "source_zip_version":(
+            "1.4-inter-region-executable-source-gaps"
+            if upstream.get("original_executable_gap_archive_schema_v4")
+            else "1.3-parent-code-bounded"),
+        "raw_executable_gap_bytes_owner_source_verified":
+            upstream.get("original_executable_gap_archive_schema_v4",False),
         "source_code_sha256_validated":True,
         "source_unwind_sha256_validated":True,
         "source_parent_code_sha256_validated":True,
@@ -73,6 +78,19 @@ def owner_source_parent_child_cfg(source_zip:Path)->dict:
                                 if x.get("chained_runtime_function")):
                 counters["source_groups_with_missing_parent_bytes"]+=1
                 continue
+            gaps_mapped=0
+            gaps_missing=0
+            for gap in f.get("inter_region_gaps",[]):
+                if gap.get("gap_source_status")==(
+                        "EXPORTED_RAW_PE_EXECUTABLE_INTERVAL"):
+                    begin=gap["begin_rva"]
+                    raw=z.read(gap["zip_member"])
+                    if begin in seg and seg[begin]!=raw:
+                        raise ValueError("original interval-gap source RVA collision")
+                    seg[begin]=raw
+                    gaps_mapped+=1
+                else:
+                    gaps_missing+=1
             root=parents[-1] if parents else child_rva
             # Two *separate* entry experiments: entering a parent does
             # NOT imply that original execution naturally reaches child.
@@ -94,6 +112,10 @@ def owner_source_parent_child_cfg(source_zip:Path)->dict:
                 cfg_root.cross_segment_direct_call_edges
             )
             counters["source_groups_verified"]+=1
+            counters["source_groups_with_verified_raw_gap_bytes"]+=gaps_mapped>0
+            counters["source_groups_with_missing_executable_gap_bytes"]+=gaps_missing>0
+            counters["verified_raw_executable_gap_regions"]+=gaps_mapped
+            counters["missing_raw_executable_gap_regions"]+=gaps_missing
             counters["groups_with_chained_parent_code"]+=bool(parents)
             counters["groups_with_cross_segment_x86_control_flow_from_root"]+=mapped_cross_edges>0
             counters["groups_with_unmapped_calls_from_root"]+=cfg_root.unmapped_direct_call_edges>0
@@ -107,6 +129,9 @@ def owner_source_parent_child_cfg(source_zip:Path)->dict:
                 "child_source_rva_hex":hex(child_rva),
                 "parent_source_rvas_hex":[hex(x) for x in parents],
                 "parent_metadata_chain_depth":len(parents),
+                "verified_original_executable_gap_fragments":gaps_mapped,
+                "missing_original_executable_gap_fragments":gaps_missing,
+                "source_gap_contents_not_proven_owned_by_same_method":True,
                 "root_source_entry_rva_hex":hex(root),
                 "actual_root_entry_reachable_cfg":cfg_root.safe_report(),
                 "original_child_entry_reachable_cfg":cfg_child.safe_report(),
