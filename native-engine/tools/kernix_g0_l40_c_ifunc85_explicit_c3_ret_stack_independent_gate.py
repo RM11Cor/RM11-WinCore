@@ -67,6 +67,9 @@ def verify(log,src):
     callerpos=ev[CALLER][0][0]
     writepos=ev[WRITE][0][0]
     finalpos,final=ev[FINAL][0]
+    need(log.count(PREFIX+"IFUNC85_OTHER_TWO_SOURCE_WATCHES_SUSPENDED_FOR_C3_READ ")==1
+         and log.count(PREFIX+"IFUNC85_OTHER_TWO_SOURCE_WATCHES_RESTORED_AFTER_C3_READ ")==1,
+         "two earlier source watchpoints must be isolated and resumed around hardware read")
     need(entrypos<armpos<readpos<callerpos<writepos<finalpos,
          "actual original FEX resolver entry followed by guest C3 hardware read then source caller and native zero store")
     for pos,x in ev.get("IFUNC85_RET_STACK_ACCESS_UNCLASSIFIED",[]):
@@ -77,6 +80,7 @@ def verify(log,src):
         "expected_return":"0x80100fd5c",
         "source_guest_C3_RET":hex(RET_ADDR),
         "original_ret_hardware_read_proven_yet":False,
+        "other_two_source_watchpoints_temporarily_suspended":True,
     },"dynamic authentic guest RSP return slot source watch arming")
     expected_keys={
         "pid","read_ordinal","slot","return_value","pc","native_instruction",
