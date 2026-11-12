@@ -1,6 +1,6 @@
 /* Educational, bounded PE32+ entry-point translator.
  * NOT FEXCore, NOT a Windows loader, and NOT support for real games.
- * Only a six-opcode, register-only subset is translated. No syscalls/imports.
+ * Only a tiny explicitly bounded subset is translated. No syscalls/imports.
  */
 #include "pe64_micro_core.h"
 #include <string.h>
@@ -25,42 +25,96 @@ static int emit_imm32(rm11_micro_program *out, unsigned rd, uint32_t value) {
   return emit(out, 0x52800000u | ((value & 0xffffu) << 5) | rd) &&
       emit(out, 0x72a00000u | (((value >> 16) & 0xffffu) << 5) | rd);
 }
+/* Return a precise prefix offset to the caller without accepting unsupported
+ * Windows/x86 instructions or trying to execute real game bytes. */
+static rm11_micro_status unsupported_at(rm11_micro_program *out,size_t at) {
+  out->unsupported_offset=at;
+  return RM11_MICRO_UNSUPPORTED_X86;
+}
+/* Instruction-set expansion for the small, synthetic-execution JIT:
+ * 48 83 EC xx  SUB RSP,+imm8  => SUB SP,SP,#imm
+ * 48 83 C4 xx  ADD RSP,+imm8  => ADD SP,SP,#imm
+ * 48 81 EC/C4 imm32 (only 1..4095)
+ * x86 stack arithmetic is restricted to strictly balanced return paths.
+ * It does NOT implement Windows call ABI, interrupts, imports or memory APIs.
+ */
 rm11_micro_status rm11_micro_translate_x86(const uint8_t *x86, size_t length,
                                              rm11_micro_program *out) {
-  if (!x86 || !out || length == 0) return RM11_MICRO_UNSUPPORTED_X86;
-  memset(out, 0, sizeof(*out));
-  size_t pc = 0;
-  unsigned instructions = 0;
-  while (pc < length && instructions++ < 32) {
-    uint8_t op = x86[pc++];
+  if (!out) return RM11_MICRO_UNSUPPORTED_X86;
+  memset(out,0,sizeof(*out));
+  if (!x86 || length == 0) return RM11_MICRO_UNSUPPORTED_X86;
+  size_t pc=0;
+  while (pc<length && out->x86_instructions<32) {
+    size_t start=pc;
+    uint8_t op=x86[pc++];
     switch (op) {
+      case 0x48: { /* REX.W prefix: restricted RSP stack immediate */
+        if (!within(length,pc,2))
+          return unsupported_at(out,start);
+        uint8_t mode=x86[pc++];
+        uint8_t reg=x86[pc++];
+        if ((mode!=0x83 && mode!=0x81) || (reg!=0xec && reg!=0xc4))
+          return unsupported_at(out,start);
+        size_t immBytes=mode==0x83?1u:4u;
+        if(!within(length,pc,immBytes))
+          return unsupported_at(out,start);
+        uint32_t imm=mode==0x83?x86[pc]:u32(x86+pc);
+        pc+=immBytes;
+        /* x86 83 uses SIGNED imm8; reject negative, not reinterpret it. */
+        if (imm==0 || imm>4095 ||
+            (mode==0x83 && imm>=0x80))
+          return unsupported_at(out,start);
+        if(reg==0xec) {
+          if(out->stack_bytes>4096u-imm)
+            return unsupported_at(out,start);
+          out->stack_bytes+=imm;
+          if(!emit(out,0xd10003ffu|(imm<<10)))
+            return RM11_MICRO_TOO_LARGE;
+        } else {
+          if(out->stack_bytes<imm)
+            return unsupported_at(out,start);
+          out->stack_bytes-=imm;
+          if(!emit(out,0x910003ffu|(imm<<10)))
+            return RM11_MICRO_TOO_LARGE;
+        }
+        break;
+      }
       case 0xB8: /* mov eax, imm32 */
-        if (!within(length, pc, 4)) return RM11_MICRO_UNSUPPORTED_X86;
-        if (!emit_imm32(out, 0, u32(x86 + pc))) return RM11_MICRO_TOO_LARGE;
-        pc += 4;
+        if (!within(length,pc,4)) return unsupported_at(out,start);
+        if (!emit_imm32(out,0,u32(x86+pc))) return RM11_MICRO_TOO_LARGE;
+        pc+=4;
         break;
       case 0x05: /* add eax, imm32 */
       case 0x2D: /* sub eax, imm32 */
-        if (!within(length, pc, 4)) return RM11_MICRO_UNSUPPORTED_X86;
-        if (!emit_imm32(out, 1, u32(x86 + pc)) ||
-            !emit(out, op == 0x05 ? 0x0b010000u : 0x4b010000u))
+        if (!within(length,pc,4)) return unsupported_at(out,start);
+        if (!emit_imm32(out,1,u32(x86+pc)) ||
+            !emit(out,op==0x05?0x0b010000u:0x4b010000u))
           return RM11_MICRO_TOO_LARGE;
-        pc += 4;
+        pc+=4;
         break;
-      case 0x31: /* xor eax, eax only */
-        if (!within(length, pc, 1) || x86[pc++] != 0xc0) return RM11_MICRO_UNSUPPORTED_X86;
-        if (!emit_imm32(out, 0, 0)) return RM11_MICRO_TOO_LARGE;
+      case 0x31: /* xor eax,eax only */
+        if (!within(length,pc,1) || x86[pc]!=0xc0)
+          return unsupported_at(out,start);
+        pc++;
+        if (!emit_imm32(out,0,0)) return RM11_MICRO_TOO_LARGE;
         break;
       case 0x90: /* nop */
-        if (!emit(out, 0xd503201fu)) return RM11_MICRO_TOO_LARGE;
+        if (!emit(out,0xd503201fu)) return RM11_MICRO_TOO_LARGE;
         break;
-      case 0xC3: /* ret */
-        if (!emit(out, 0xd65f03c0u)) return RM11_MICRO_TOO_LARGE;
-        out->x86_bytes = pc;
+      case 0xC3: /* ret: only with SP restored exactly */
+        if (out->stack_bytes!=0)
+          return unsupported_at(out,start);
+        if (!emit(out,0xd65f03c0u)) return RM11_MICRO_TOO_LARGE;
+        out->x86_bytes=pc;
+        out->x86_instructions++;
+        out->unsupported_offset=pc;
         return RM11_MICRO_OK;
       default:
-        return RM11_MICRO_UNSUPPORTED_X86;
+        return unsupported_at(out,start);
     }
+    out->x86_bytes=pc;
+    out->x86_instructions++;
+    out->unsupported_offset=pc;
   }
   return RM11_MICRO_NO_RET;
 }
