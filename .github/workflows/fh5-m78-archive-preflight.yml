@@ -1,0 +1,27 @@
+name: FH5 M78 Archive Preflight Tests
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - fh5-auto/m78_zip_source_preflight.py
+      - .github/workflows/fh5-m78-archive-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and 17 local self tests
+        working-directory: fh5-auto
+        run: |
+          python -m py_compile m78_zip_source_preflight.py
+          python -m unittest -v m78_zip_source_preflight.Checks
