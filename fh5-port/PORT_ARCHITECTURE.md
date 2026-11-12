@@ -10,7 +10,7 @@
 
 ## Research findings (2026-11-12)
 
-1. [XHYN V (GTA V)](https://github.com/XHYN-PH/XHYN-V-reborn/docs/SOURCE.md):
+1. [XHYN V (GTA V)](https://github.com/XHYN-PH/XHYN-V-reborn/blob/main/docs/SOURCE.md):
    The described Android port loads an ARM64 `libgtav.so` game engine through Android/SDL, and uses a native DXVK path from D3D11 to Vulkan.
    The modification-layer repo does **not** publish the original Android port engine source or its complete reproducible build.
    We cannot use that proprietary ARM64 engine as a drop-in conversion method for Forza.
