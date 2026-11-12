@@ -67,3 +67,34 @@ Java_com_fh5_port_X64Proof_nativeRun(JNIEnv *env, jclass unused, jbyteArray arr)
     translated ? prog.entry_rva : 0);
   return (*env)->NewStringUTF(env, report);
 }
+
+/* P2.3: translation-only probe of a bounded REAL x86-64 game entrypoint
+ * excerpt. CRITICAL: no mmap, mprotect, function call, or game execution. */
+JNIEXPORT jstring JNICALL
+Java_com_fh5_port_X64Proof_nativeInspectBlock(JNIEnv *env, jclass unused,
+                                               jbyteArray arr) {
+  (void)unused;
+  char report[640];
+  if (!arr) return (*env)->NewStringUTF(env,
+    "{\"status\":\"no-entry-bytes\",\"executed\":false}");
+  jsize n = (*env)->GetArrayLength(env, arr);
+  if (n < 1 || n > 512) return (*env)->NewStringUTF(env,
+    "{\"status\":\"bounded-entry-sample-required\",\"executed\":false}");
+  jbyte *bytes = (*env)->GetByteArrayElements(env, arr, NULL);
+  if (!bytes) return (*env)->NewStringUTF(env,
+    "{\"status\":\"memory-unavailable\",\"executed\":false}");
+  rm11_micro_program out;
+  rm11_micro_status result=rm11_micro_translate_x86(
+    (const uint8_t *)bytes, (size_t)n, &out);
+  (*env)->ReleaseByteArrayElements(env, arr, bytes, JNI_ABORT);
+  snprintf(report,sizeof(report),
+    "{\"status\":\"%s\",\"microTranslatorAccepted\":%s,"
+    "\"armWords\":%zu,\"x86BytesTranslated\":%zu,"
+    "\"translationOnly\":true,\"executed\":false,"
+    "\"originalGameCodeExecuted\":false,\"fullX64RuntimeReady\":false}",
+    rm11_micro_status_name(result),
+    result==RM11_MICRO_OK ? "true" : "false",
+    result==RM11_MICRO_OK ? out.word_count : 0u,
+    result==RM11_MICRO_OK ? out.x86_bytes : 0u);
+  return (*env)->NewStringUTF(env,report);
+}
