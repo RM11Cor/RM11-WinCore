@@ -15,6 +15,7 @@ import re
 import zipfile
 
 from win64_unwind_boundary import UnsupportedWin64Unwind, decode_unwind_info
+from x64_control_flow_gate import inspect_cfg
 
 ZIP_SCHEMA="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
 MAX_SIZE=8*1024*1024
@@ -73,6 +74,7 @@ def analyze(source:Path)->dict:
         decoded=0
         unsupported=Counter()
         chain_types=Counter()
+        cfg_totals=Counter()
         per_function=[]
         for function in functions:
             rva=function.get("relative_rva")
@@ -80,6 +82,16 @@ def analyze(source:Path)->dict:
                     "original PE function RVA malformed")
             sample=verify_member(z,function,CODE,rva)
             require(4<=len(sample)<=320,"original PE code region bound exceeded")
+            cfg=inspect_cfg(sample,base=rva)
+            cfg_totals["source_function_samples"]+=1
+            cfg_totals["with_external_direct_calls"]+=cfg.external_direct_calls>0
+            cfg_totals["with_indirect_calls"]+=cfg.indirect_calls>0
+            cfg_totals["with_rip_relative_original_pe_references"]+=cfg.rip_relative_memory_instructions>0
+            cfg_totals["with_unreachable_or_padding_bytes"]+=cfg.unreachable_bytes>0
+            cfg_totals["with_overlapping_instruction_reachability"]+=cfg.overlapping_decode_attempts>0
+            cfg_totals["with_unresolved_external_branches"]+=cfg.external_branches>0
+            cfg_totals["with_reachable_ret"]+=cfg.return_instructions>0
+            cfg_totals["local_control_flow_candidates_NOT_proven_methods"]+=cfg.structurally_self_contained_candidate
             require(function["zip_member"] not in used,
                     "duplicate code sample RVA")
             used.add(function["zip_member"])
@@ -151,6 +163,7 @@ def analyze(source:Path)->dict:
                 "original_function_code_bytes":len(sample),
                 "unwind_metadata_status":status,
                 "independently_decoded_unwind_count":decoded_for_function,
+                "reachable_original_x64_cfg":cfg.safe_report(),
                 "chain":chain_record,
                 "complete_callable_il2cpp_method_proven":False,
             })
@@ -166,6 +179,8 @@ def analyze(source:Path)->dict:
             "independently_decoded_win64_unwind_records":decoded,
             "unsupported_unwind_records":dict(sorted(unsupported.items())),
             "source_chain_observations":dict(sorted(chain_types.items())),
+            "source_reachable_x64_cfg_categories":dict(sorted(cfg_totals.items())),
+            "reachable_cfg_does_not_prove_whole_original_function":True,
             "reported_complete_unwind_chains":sum(x["unwind_metadata_status"]==
                                                    "COMPLETE_UNWIND_CHAIN_READ"
                                                    for x in per_function),
