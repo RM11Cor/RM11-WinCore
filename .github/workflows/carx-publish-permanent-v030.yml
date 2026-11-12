@@ -1,0 +1,84 @@
+name: Publish CarX v0.3 permanent-signed inspector APK from immutable verified CI
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v030.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-verified-v030:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the independent stable CarX build passed all signing, package and version checks
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+          GH_${{ github.repository }}: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          run=43182076967
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run/jobs --jq '.jobs[0].steps[] | select(.name == "Verify identical pinned CarX certificate package ID and higher versionCode") | .conclusion')" = success
+          echo CARX_PERMANENT_APK_SOURCE_SIGNER_PACKAGE_VERSION_AUDITED_PASS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43182076967
+          name: CarXStreet-v0.3.0-PERMANENT-SIGNED-update-baseline
+          github-token: ${{ github.token }}
+          path: release
+      - name: Recheck exact signed release artifact matches original SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
+          test -s release/SHA256.txt
+          cd release
+          sha256sum --check SHA256.txt
+          cat >release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.3.0 — permanent-signing baseline
+
+          **Inspector only, not a playable CarX Street Android game port.**
+
+          New dedicated permanent release certificate. App ID:
+          com.rm11cor.carxstreet.portlab ; versionCode 3.
+
+          Certificate SHA256:
+          73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
+
+          The previous v0.1/v0.2 debug versions were signed with
+          ephemeral, unavailable private keys. Android cannot install
+          this new signing identity on top of them. Export your JSON
+          report and uninstall the old inspector ONCE before v0.3.
+          Your actual game files are never deleted or modified.
+
+          Future CarX APKs signed with this same dedicated certificate,
+          same applicationId, and higher versionCode can be installed
+          directly OVER v0.3 without uninstalling.
+
+          No Windows x86-64 game code execution or native ARM64 gameplay yet.
+          EOF
+      - name: Publish immutable verified APK to official GitHub Releases
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+          GH_${{ github.repository }}: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.3.0-permanent-signing-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PC PortLab v0.3.0 - Permanent Signing Baseline (Inspector Only)' \
+              --notes-file release/release-notes.md
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
