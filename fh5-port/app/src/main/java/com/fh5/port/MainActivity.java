@@ -100,7 +100,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(gpuButton);
         x64Button = button("اختبار تنفيذ x64 داخل APK — برنامج مصغّر", () -> testX64());
         root.addView(x64Button);
-        realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
+        realExeButton = button("فحص رأس ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
         entryButton = button("تحليل Forza EXE مباشرة (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
@@ -215,7 +215,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             }
             archiveBusy = true;
             final Uri selectedUri = uri;
-            prefs.edit().putString(GAME_ARCHIVE, selectedUri.toString()).apply();
+            prefs.edit().putString(GAME_ARCHIVE, selectedUri.toString())
+                .remove(GAME_DIRECT_EXE).apply();
             updateStatus("جاري قراءة فهرس ZIP/ZIP64 من الملفات الأصلية... بدون استخراج.");
             Thread worker = new Thread(() -> {
                 JSONObject info = new JSONObject();
@@ -337,14 +338,17 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             updateStatus("أكمل فهرسة الأرشيف أولاً قبل اختبار EXE.");
             return;
         }
-        String saved=prefs.getString(GAME_ARCHIVE,"");
+        boolean directMode=!prefs.getString(GAME_DIRECT_EXE,"").isEmpty();
+        String saved=directMode?prefs.getString(GAME_DIRECT_EXE,""):
+            prefs.getString(GAME_ARCHIVE,"");
         if (saved.isEmpty()) {
-            updateStatus("أولاً اختر أرشيف Forza ZIP من داخل التطبيق.");
+            updateStatus("اختَر EXE المستخرج أو أرشيف Forza ZIP من داخل التطبيق.");
             return;
         }
         exeBusy=true;
         realExeButton.setEnabled(false);
-        updateStatus("نفحص PE64 الحقيقي من داخل ZIP64 مباشرةً، دون استخراج أو تنفيذ...");
+        updateStatus(directMode?"نفحص PE64 المستخرج مباشرةً بدون ZIP أو تنفيذ...":
+            "نفحص PE64 من داخل ZIP64 دون استخراج أو تنفيذ...");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -352,8 +356,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     .openFileDescriptor(Uri.parse(saved),"r")) {
                 if(pfd==null)throw new java.io.IOException("zip_document_unavailable");
                 try(FileInputStream stream=new FileInputStream(pfd.getFileDescriptor())) {
-                    GameExeHeaderProbe.Result r=GameExeHeaderProbe.inspect(stream.getChannel());
+                    GameCodeSource codeSource=new GameCodeSource(stream.getChannel(),directMode);
+                    GameExeHeaderProbe.Result r=codeSource.inspectHeader();
                     info.put("stage",r.stage);
+                    info.put("code_source",codeSource.kind());
+                    info.put("direct_random_access_mode",directMode);
+                    info.put("source_file_size_bytes",stream.getChannel().size());
                     info.put("status","P2_2_REAL_EXE_HEADER_VERIFIED");
                     info.put("amd64",r.amd64);
                     info.put("pe32plus",r.pe32plus);
