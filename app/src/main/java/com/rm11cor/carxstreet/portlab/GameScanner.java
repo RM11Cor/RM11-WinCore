@@ -60,6 +60,7 @@ public final class GameScanner {
         final Set<String> visited=new HashSet<>();
         final HashMap<String,String> found=new HashMap<>();
         final HashMap<String,Uri> documentsToProbe=new HashMap<>();
+        final HashMap<String,Long> sourceDocumentSizes=new HashMap<>();
         final ArrayList<Uri> bundleSampleUris=new ArrayList<>();
         final ArrayList<String> bundleSamplePaths=new ArrayList<>();
         int windowsBundleCount=0;
@@ -117,8 +118,17 @@ public final class GameScanner {
                         long length=cursor.isNull(size)?-1:cursor.getLong(size);
                         if(length>=0) totalBytes+=length; else unknownSizes++;
                         String basename=n.toLowerCase(Locale.ROOT);
-                        // Select only bounded source headers, never whole 22+ GB
-                        // contents. SAF document URIs are never sent anywhere.
+                        // Select only source file descriptors, never copy 22+ GB.
+                        // Android SAF works even when Termux cannot search /sdcard.
+                        if(basename.equals("gameassembly.dll") ||
+                                basename.equals("unityplayer.dll")) {
+                            String key=basename.equals("gameassembly.dll")?
+                                    "game_assembly":"unity_player";
+                            documentsToProbe.put(key,
+                                    DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                            sourceDocumentSizes.put(key,length);
+                        }
+                        // Select bounded Unity headers; no game file transfer.
                         if(basename.equals("global-metadata.dat")) {
                             documentsToProbe.put("il2cpp_metadata",
                                 DocumentsContract.buildDocumentUriUsingTree(tree,id));
@@ -241,7 +251,7 @@ public final class GameScanner {
         machine.put("gameassembly_relative_path",assemblyPath);
         JSONObject report=new JSONObject();
         report.put("schema","rm11carx.pc-port-readonly-inspector.v1");
-        report.put("inspector_version","0.6.0");
+        report.put("inspector_version","0.7.0");
         report.put("source_game","CarX Street PC (Unity IL2CPP)");
         report.put("user_selected_folder_name",rootName);
         report.put("game_files_transmitted",false);
@@ -260,6 +270,9 @@ public final class GameScanner {
                 resolver,documentsToProbe,bundleSampleUris,bundleSamplePaths,
                 windowsBundleCount,windowsBundleBytes));
         report.put("notes",notes);
+        report.put("windows_source_dependency_probe",
+                WindowsPortDependencyProbe.inspect(
+                        resolver,documentsToProbe,sourceDocumentSizes));
         report.put("device",device(context));
         report.put("native_arm64_vulkan_preflight",NativeVulkanProbe.inspect());
         report.put("next_gate","Independent ARM64 Vulkan offscreen GPU clear/readback is tested. It is NOT a displayed game frame or original CarX logic. Native Android game code, platform-correct Unity assets, and gameplay remain unproven.");
