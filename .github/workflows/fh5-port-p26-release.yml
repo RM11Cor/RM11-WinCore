@@ -1,0 +1,79 @@
+name: Publish FH5 Native Port P2.6 - First Control Transfer
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p26-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Get verified permanently signed P2.6 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43174814878 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.6-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'c47694c0ce08d2979de49fc800a88fb024dce69b00bc646336079d368a9e7208' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.6-Permanent-Signed.apk
+      - name: Release P2.6 as experimental update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-6-control-flow-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.6 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.6 — First Control-Transfer and Call Target (Experimental)
+
+          **Standalone Android ARM64 APK; read-only game code analysis, not a playable FH5 game port.**
+          Original game instructions are **not executed**.
+
+          ## Improvements
+          - Keeps Vulkan surface test, read-only ZIP64 archive inventory, PE32+ header probe,
+            synthetic x64-to-ARM64 smoke test and Capstone 5.0.9 disassembler.
+          - Classifies the first CALL/JMP/conditional branch/RET from the actual game's
+            entrypoint into a separately identified, bounded first code segment.
+          - Reports the first direct control transfer's target RVA only if within the
+            PE virtual image; indirect calls are explicitly unresolved.
+          - **When safe and resolvable:** maps at most one target RVA back to the archived
+            EXE's executable section, streams 128 bytes under fixed memory limits,
+            and disassembles that target without executing it or extracting the EXE.
+          - Follow-up target analysis is bounded to one hop; no CPU emulation, Windows
+            API loader, Steam runtime, DirectX 12 renderer or game boot.
+          - Unverified linear disassembly after the first control transfer is labeled
+            as such to avoid treating every mnemonic as actually executed.
+          - Sanitized JSON report: `FH5_PORT_P2_6_REPORT.json`. Never exports
+            game instructions as raw bytes or user storage paths.
+
+          ## In-place Android update
+          - App ID: `com.fh5.port`, versionCode `9` (P2.5 used 8).
+          - Permanent signing certificate unchanged since P2.1:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA256: `c47694c0ce08d2979de49fc800a88fb024dce69b00bc646336079d368a9e7208`.
+          - Install P2.6 directly **on top of P2.5** without uninstalling.
+
+          ## Test on phone
+          1. Install the APK over the permanent-signed P2.5 test app.
+          2. Select your Forza ZIP64 archive in the app.
+          3. Tap `تحليل تدفق تعليمات فورزا (بدون تشغيل)`.
+          4. Export `FH5_PORT_P2_6_REPORT.json` and send that JSON only.
+
+          Build + regressions verified: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43174814878
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.6-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.6 - First x64 Call Target (Experimental)' \
+            --notes-file notes.md --prerelease
