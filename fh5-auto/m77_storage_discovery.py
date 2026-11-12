@@ -48,15 +48,40 @@ def magic(p):
     return 'unknown'
 
 
-def valid_m76(path):
-    try:
-        if not path.is_file() or path.stat().st_size > 30000: return False
-        v = json.loads(path.read_text(encoding='utf8'))
-    except (OSError, ValueError, UnicodeError): return False
-    return (v.get('stage') == 'M76'
+def _valid_m76_doc(v):
+    return (isinstance(v, dict)
+            and v.get('stage') == 'M76'
             and v.get('status') == 'M76_SOURCE_PREFLIGHT_COMPLETE'
             and v.get('m75_input_verified') is True
             and v.get('read_only') is True)
+
+
+def valid_m76(path):
+    """Allow the M76 unzipped report OR the public M76 report ZIP.
+
+    Source discovery is independent from M76: absent prior evidence is
+    recorded as a warning, never used to skip the storage scan.
+    """
+    try:
+        if path.is_file() and path.stat().st_size <= 30000:
+            if _valid_m76_doc(json.loads(path.read_text(encoding='utf8'))):
+                return True
+    except (OSError, ValueError, UnicodeError): pass
+    for bundle in (Path('/sdcard/Download/FH5_M76_REPORTS.zip'),
+                   Path('/storage/emulated/0/Download/FH5_M76_REPORTS.zip')):
+        try:
+            if not bundle.is_file(): continue
+            with zipfile.ZipFile(bundle) as z:
+                for name in ('FH5_M76/M76_SOURCE_REPORT.json',
+                             'M76_SOURCE_REPORT.json'):
+                    try: item = z.getinfo(name)
+                    except KeyError: continue
+                    if item.file_size > 30000: continue
+                    if _valid_m76_doc(json.loads(z.read(item).decode('utf8'))):
+                        return True
+        except (OSError, ValueError, UnicodeError, zipfile.BadZipFile,
+                RuntimeError, MemoryError): continue
+    return False
 
 
 def find_roots():
@@ -247,7 +272,27 @@ class Tests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/'m76.json';p.write_text('{}')
-            self.assertFalse(valid_m76(p))
+            self.assertFalse(_valid_m76_doc({}))
+
+    def test_m76_document_gate(self):
+        self.assertTrue(_valid_m76_doc({
+            'stage':'M76', 'status':'M76_SOURCE_PREFLIGHT_COMPLETE',
+            'm75_input_verified':True, 'read_only':True}))
+        self.assertFalse(_valid_m76_doc({
+            'stage':'M76', 'status':'M76_SOURCE_PREFLIGHT_COMPLETE',
+            'm75_input_verified':False, 'read_only':True}))
+
+    def test_m76_zip_shape(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as t:
+            p=Path(t)/'FH5_M76_REPORTS.zip'
+            with zipfile.ZipFile(p,'w') as z:
+                z.writestr('FH5_M76/M76_SOURCE_REPORT.json',json.dumps({
+                    'stage':'M76','status':'M76_SOURCE_PREFLIGHT_COMPLETE',
+                    'm75_input_verified':True, 'read_only':True}))
+            with zipfile.ZipFile(p) as z:
+                self.assertTrue(_valid_m76_doc(
+                    json.loads(z.read('FH5_M76/M76_SOURCE_REPORT.json').decode('utf8'))))
     def test_zip_census(self):
         import tempfile
         with tempfile.TemporaryDirectory() as t:
@@ -303,15 +348,15 @@ def main():
     (OUT/'M77_LOCAL_TESTS.txt').write_text(stream.getvalue(),encoding='utf8')
     if not res.wasSuccessful():
         public={'stage':'M77','status':'M77_SELFTEST_FAILED'}
-    elif not valid_m76(PRIOR):
-        public={'stage':'M77','status':'M77_REQUIRES_VERIFIED_M76',
-                'next_gate':'Run M76 first on the same phone.'}
     else:
+        m76_ok = valid_m76(PRIOR)
         roots=find_roots()
         for extra in args.extra_root:
             p=Path(extra)
             if p.is_dir() and p not in roots: roots.append(p)
         public,private=discover(roots)
+        public['m76_input_verified'] = m76_ok
+        public['prior_dependency_gate'] = 'M76_REUSABLE_REPORT_VERIFIED' if m76_ok else 'M76_REPORT_UNAVAILABLE_SCAN_INDEPENDENT'
         PRIVATE.parent.mkdir(parents=True,exist_ok=True)
         PRIVATE.write_text(json.dumps(private,indent=2)+'\n',encoding='utf8')
         try: PRIVATE.chmod(0o600)
