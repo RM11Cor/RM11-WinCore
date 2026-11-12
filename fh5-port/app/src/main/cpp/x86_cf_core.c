@@ -23,6 +23,15 @@ static int is_call(csh h,const cs_insn *ins) {
 static int is_return(csh h,const cs_insn *ins) {
     return cs_insn_group(h,ins,CS_GRP_RET)!=0;
 }
+/* Observable register families only; not a complete CPU feature guarantee. */
+static void mark_vector(csh h,x86_reg reg,int *xmm,int *ymm,int *zmm) {
+    if(reg==X86_REG_INVALID)return;
+    const char *name=cs_reg_name(h,(unsigned int)reg);
+    if(!name)return;
+    if(strncmp(name,"xmm",3)==0)*xmm=1;
+    else if(strncmp(name,"ymm",3)==0)*ymm=1;
+    else if(strncmp(name,"zmm",3)==0)*zmm=1;
+}
 
 int fh5_cf_analyze(const uint8_t *sample,size_t n,
                    uint64_t rva,uint64_t image_size,fh5_cf_result *out) {
@@ -61,13 +70,25 @@ int fh5_cf_analyze(const uint8_t *sample,size_t n,
         if(branch)out->branch_count++;
         if(call)out->call_count++;
         if(ret)out->return_count++;
+        if(item->id==X86_INS_PUSH)out->push_count++;
+        if(item->id==X86_INS_POP)out->pop_count++;
         if(item->detail) {
             const cs_x86 *details=&item->detail->x86;
+            int mem=0,xmm=0,ymm=0,zmm=0;
             for(unsigned k=0;k<details->op_count;k++) {
-                if(details->operands[k].type==X86_OP_MEM) {
-                    out->memory_operand_count++;break;
+                const cs_x86_op *operand=&details->operands[k];
+                if(operand->type==X86_OP_MEM) {
+                    mem=1;
+                    mark_vector(handle,operand->mem.base,&xmm,&ymm,&zmm);
+                    mark_vector(handle,operand->mem.index,&xmm,&ymm,&zmm);
+                } else if(operand->type==X86_OP_REG) {
+                    mark_vector(handle,operand->reg,&xmm,&ymm,&zmm);
                 }
             }
+            if(mem)out->memory_operand_count++;
+            if(xmm)out->vector_xmm_count++;
+            if(ymm)out->vector_ymm_count++;
+            if(zmm)out->vector_zmm_count++;
         }
         if(!out->transfer_found) {
             safe_name(item->mnemonic,out->first_block_mnemonics[i]);
