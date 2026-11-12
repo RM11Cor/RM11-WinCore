@@ -39,6 +39,7 @@ int fh5_cf_analyze(const uint8_t *sample,size_t n,
     memset(out,0,sizeof(*out));
     strcpy(out->transfer_kind,"none");
     strcpy(out->target_kind,"none");
+    strcpy(out->fallthrough_jump_target_kind,"none");
     if(!sample || n<1 || n>FH5_CF_SAMPLE_MAX || image_size<1 || rva>=image_size)
         return -2;
     csh handle=0;
@@ -103,6 +104,14 @@ int fh5_cf_analyze(const uint8_t *sample,size_t n,
                 else if(ret)strcpy(out->transfer_kind,"return");
                 else if(item->id==X86_INS_JMP)strcpy(out->transfer_kind,"unconditional_jump");
                 else strcpy(out->transfer_kind,"conditional_jump");
+                if(branch && item->id!=X86_INS_JMP) {
+                    out->first_transfer_is_conditional=1;
+                    const uint64_t next=item->address+(uint64_t)item->size;
+                    if(next>item->address && next<image_size) {
+                        out->fallthrough_rva_valid=1;
+                        out->fallthrough_rva=next;
+                    }
+                }
                 if(!ret && item->detail && item->detail->x86.op_count>0) {
                     const cs_x86_op *operand=&item->detail->x86.operands[0];
                     if(operand->type==X86_OP_IMM) {
@@ -121,6 +130,31 @@ int fh5_cf_analyze(const uint8_t *sample,size_t n,
                     } else if(operand->type==X86_OP_MEM) {
                         strcpy(out->target_kind,"memory_indirect");
                     } else strcpy(out->target_kind,"unresolved");
+                }
+            }
+        } else if(out->first_transfer_is_conditional &&
+                  out->fallthrough_rva_valid &&
+                  i==out->transfer_insn_index+1 &&
+                  item->address==out->fallthrough_rva) {
+            /* Only adjacent instruction is the known not-taken successor. */
+            out->fallthrough_next_insn_present=1;
+            safe_name(item->mnemonic,out->fallthrough_next_mnemonic);
+            if(item->id==X86_INS_JMP) {
+                out->fallthrough_next_is_jump=1;
+                if(item->detail && item->detail->x86.op_count>0) {
+                    const cs_x86_op *op=&item->detail->x86.operands[0];
+                    if(op->type==X86_OP_IMM) {
+                        const uint64_t target=(uint64_t)op->imm;
+                        if(target<image_size) {
+                            strcpy(out->fallthrough_jump_target_kind,"direct");
+                            out->fallthrough_jump_direct_target_valid=1;
+                            out->fallthrough_jump_direct_target_rva=target;
+                        } else strcpy(out->fallthrough_jump_target_kind,"direct_outside_image");
+                    } else if(op->type==X86_OP_REG) {
+                        strcpy(out->fallthrough_jump_target_kind,"register_indirect");
+                    } else if(op->type==X86_OP_MEM) {
+                        strcpy(out->fallthrough_jump_target_kind,"memory_indirect");
+                    } else strcpy(out->fallthrough_jump_target_kind,"unresolved");
                 }
             }
         }
