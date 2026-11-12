@@ -1,0 +1,67 @@
+name: KERNIX G0 C genuine GNU IRELATIVE85 resolver source SHA 12 adversarial checks NOT native
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_irelative85_original_resolver_source_gate.py'
+      - '.github/workflows/kernix-g0-l40-c-genuine-irelative85-source-resolver-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-classify-real-GNU-irelative85-resolver-ELF-source-not-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original immutable SHA GNU main libc and ld-linux source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download audited individual 147 original relocation target source ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Verify exact x86-64 original IRELATIVE85 ELF r_addend candidate, executable PT_LOAD and 12 falsifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_c_irelative85_original_resolver_source_gate.py
+          python3 native-engine/tools/kernix_g0_l40_c_irelative85_original_resolver_source_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            dist/C-original-85
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("dist/C-original-85/KERNIX-G0-C-Original-IRELATIVE85-Source-Resolver-Entry-NO-FEX-EXECUTION.json").read_text())
+          assert d["source_index"]==85
+          assert d["source_table"]=="DT_RELA"
+          assert d["relocation"]=="R_X86_64_IRELATIVE"
+          assert d["symbol_index"]==0
+          assert d["original_slot_file_qword"]=="0x0"
+          assert len(d["twelve_forged_IFUNC85_source_claims_rejected"])==12
+          assert d["native_original_resolver_entry_trap_proven"] is False
+          assert d["native_original_resolver_return_or_zero_result_proven"] is False
+          assert d["zero_to_zero_actual_native_slot_store_proven"] is False
+          assert d["full_original_GNU_loader_closure_proven"] is False
+          assert d["Android_Bionic_Wine_Proton_games_proven"] is False
+          print("KERNIX_G0_C_85_ORIGINAL_SHA_SOURCE_RESOLVER_CANDIDATE_VALIDATED_NO_NATIVE_PROOF")
+          PY
+      - name: Archive GNU source-only IFUNC85 resolver candidate; keep C and loader gates OPEN
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-Original-GNU-IRELATIVE85-ELF-Resolver-Source-SHA-12-Forged-NO-Native-Proof
+          path: dist/C-original-85/KERNIX-G0-C-Original-IRELATIVE85-Source-Resolver-Entry-NO-FEX-EXECUTION.json
+          retention-days: 30
+          if-no-files-found: warn
