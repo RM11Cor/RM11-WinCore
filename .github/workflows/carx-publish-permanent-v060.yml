@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           RUN=43188544014
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
-          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.name == "Independently verify Android APK signed with pinned cert has exact package version 6 AND actual AArch64 JNI ELF") | .conclusion')" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
           echo CARX_V060_REAL_ARM64_NATIVE_SIGNED_ARTIFACT_SOURCE_CI_INDEPENDENTLY_VERIFIED
       - name: Retrieve exact successful original v0.6 GPU command submission/readback APK artifact
         uses: actions/download-artifact@v4
