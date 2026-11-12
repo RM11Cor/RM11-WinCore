@@ -1,0 +1,95 @@
+name: Publish FH5 Native Port P3.4 - Static Windows DLL Imports
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p34-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify exact permanent signed P3.4 APK from tested CI run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43194004470 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.4-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'eef960d1b5222151746b941bd2db994815bfab271213fc39d9bcb50952283057' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.4-Permanent-Signed.apk
+      - name: Publish P3.4 experimental PE64 import scanner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-4-pe-imports-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.4 release already exists'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.4 — Windows DLL Static Imports (Experimental)
+
+          **Read-only analysis APK. This does not execute Forza Horizon 5.**
+
+          ## P3.3 REAL phone test confirmed
+          - On REDMAGIC 11 Pro NX809J / Android 16 the extracted
+            `ForzaHorizon5.exe` was successfully auto-selected from the
+            SAF game folder without needing the Android EXE file picker.
+          - Correct original EXE size: **182,826,496 bytes**.
+          - Direct reading: **zero ZIP decompression bytes**.
+          - Static control-flow graph continued across JNE successors.
+          - One JNE arm reaches a register-indirect CALL (target unresolved
+            without tracking actual register values); the other reaches
+            a direct JMP at RVA `0xFE43C7`.
+          - No game code has yet executed. Synthetic x64 JIT is not the game.
+
+          ## New in P3.4
+          - Adds `فحص مكتبات Windows و DLL من Forza EXE` button.
+          - Reads the extracted original EXE's PE32+ Import Directory
+            with bounded SAF random-access reads; returns DLL names and counts.
+          - Cross-section RVA-to-raw mapping, import-descriptor bounds
+            (up to 128), DLL name length bounds (128 ASCII bytes), malformed
+            RVA rejection and explicit truncated/not-terminated results.
+          - No Windows DLL is opened or loaded. No import symbol resolution,
+            process execution or Windows system calls are implemented.
+          - No game bytes or private file system paths appear in the JSON.
+          - **Delay-loaded or dynamically loaded DLLs are not included**
+            in the initial static Import Directory list.
+          - Existing ZIP64 mode, synthetic runtime test, Capstone/JNE tests,
+            SAF extracted-EXE access and Vulkan test remain available.
+          - Fixes old export-name mismatch: `FH5_PORT_P3_4_REPORT.json`.
+
+          ## In-place Android update
+          - Package ID: `com.fh5.port`, versionCode **17** (P3.3 used 16).
+          - Same original permanent signing certificate SHA-256:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA-256: `eef960d1b5222151746b941bd2db994815bfab271213fc39d9bcb50952283057`.
+          - Install P3.4 **over P3.3 without uninstalling**.
+
+          ## Test on your phone
+          1. Install P3.4 over P3.3.
+          2. The existing SAF-extracted Forza EXE selection should be retained.
+          3. Tap `فحص مكتبات Windows و DLL من Forza EXE`.
+          4. Wait for its status/count to appear.
+          5. Export `FH5_PORT_P3_4_REPORT.json` and upload only this JSON.
+
+          This marks an actionable dependency-inventory step, not Windows API
+          functionality, Wine/FEX runtime support, Steam DRM bypass, or game boot.
+
+          Verified Android CI host tests, JVM tests, native CMake, stable
+          APK signing, app identity, version and ARM64 ABI:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43194004470
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.4-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.4 - Windows DLL Static Imports (Experimental)' \
+            --notes-file notes.md --prerelease
