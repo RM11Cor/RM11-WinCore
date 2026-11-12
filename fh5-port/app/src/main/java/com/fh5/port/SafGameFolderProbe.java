@@ -308,4 +308,90 @@ public final class SafGameFolderProbe {
         }
         return output;
     }
+
+    /** P3.9: target of a forwarded export, not executable code. */
+    public static final class LocalForwarders {
+        public final Map<String,PeForwarderProbe.Result> reports;
+        public final Map<String,String> fileStatuses;
+        public final Set<String> immediateDllNames;
+        LocalForwarders(Map<String,PeForwarderProbe.Result> reports,
+                        Map<String,String> statuses,Set<String> siblings) {
+            this.reports=java.util.Collections.unmodifiableMap(reports);
+            this.fileStatuses=java.util.Collections.unmodifiableMap(statuses);
+            this.immediateDllNames=java.util.Collections.unmodifiableSet(siblings);
+        }
+    }
+    /**
+     * Inspect only local DLLs with imports independently classified as
+     * FORWARDED_EXPORT by PeLocalImportLinkProbe. Open read-only via
+     * user-granted SAF tree; do NOT follow target DLL references.
+     */
+    public static LocalForwarders inspectForwarderTargets(
+             ContentResolver resolver,Uri treeUri,Uri selectedExe,
+             Map<String,List<String>> forwardedNames) throws IOException {
+        if(forwardedNames==null||forwardedNames.size()>MAX_LOCAL_DLL_HEADER_CHECKS)
+            throw new IOException("saf_forwarder_dll_count_budget");
+        Found found=find(resolver,treeUri);
+        if(selectedExe==null||!selectedExe.equals(found.documentUri))
+            throw new IOException("saf_forwarder_exe_not_in_selected_tree");
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,found.parentDocumentId);
+        String[] cols={Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,Document.COLUMN_MIME_TYPE};
+        Map<String,String> selected=new LinkedHashMap<>();
+        Set<String> siblings=new HashSet<>();
+        try(Cursor c=resolver.query(children,cols,null,null,null)) {
+            if(c==null)throw new IOException("saf_forwarder_query_unavailable");
+            int i=c.getColumnIndex(Document.COLUMN_DOCUMENT_ID);
+            int n=c.getColumnIndex(Document.COLUMN_DISPLAY_NAME);
+            int t=c.getColumnIndex(Document.COLUMN_MIME_TYPE);
+            if(i<0||n<0||t<0)throw new IOException("saf_forwarder_query_columns_missing");
+            int rows=0;
+            while(c.moveToNext()) {
+                if(++rows>MAX_DIRECTORY_ROWS)
+                    throw new IOException("saf_forwarder_directory_budget");
+                if(Document.MIME_TYPE_DIR.equals(c.getString(t)))continue;
+                String name=c.getString(n),id=c.getString(i);
+                if(id==null||name==null)continue;
+                String lower=name.toLowerCase(Locale.ROOT);
+                if(!lower.matches("[a-z0-9_.-]{1,128}\\.dll"))continue;
+                siblings.add(lower);
+                if(forwardedNames.containsKey(lower)&&!selected.containsKey(lower))
+                    selected.put(lower,id);
+            }
+        } catch(SecurityException ex) {
+            throw new IOException("saf_forwarder_permission_denied",ex);
+        } catch(IllegalArgumentException ex) {
+            throw new IOException("saf_forwarder_query_unsupported",ex);
+        }
+        Map<String,PeForwarderProbe.Result> reports=new LinkedHashMap<>();
+        Map<String,String> status=new LinkedHashMap<>();
+        for(Map.Entry<String,List<String>> entry:forwardedNames.entrySet()) {
+            String dll=entry.getKey(),id=selected.get(dll);
+            if(id==null) {
+                status.put(dll,"FORWARDED_DLL_NOT_FOUND_BESIDE_EXE");
+                continue;
+            }
+            try {
+                Uri file=DocumentsContract.buildDocumentUriUsingTree(treeUri,id);
+                try(ParcelFileDescriptor pfd=resolver.openFileDescriptor(file,"r")) {
+                    if(pfd==null)throw new IOException("saf_forwarder_dll_open_failed");
+                    try(FileInputStream in=new FileInputStream(pfd.getFileDescriptor())) {
+                        PeExportIndex.Result exports=PeExportIndex.inspect(in.getChannel());
+                        PeForwarderProbe.Result forwarders=PeForwarderProbe.inspect(
+                            in.getChannel(),exports,new java.util.LinkedHashSet<>(
+                                entry.getValue()));
+                        reports.put(dll,forwarders);
+                        status.put(dll,forwarders.status);
+                    }
+                }
+            } catch(IOException|SecurityException|IllegalArgumentException ex) {
+                String cause=ex.getMessage();
+                if(cause==null||!cause.matches("(pe|saf)_[a-z0-9_]{2,90}"))
+                    cause="LOCAL_FORWARDER_READ_UNAVAILABLE";
+                status.put(dll,cause);
+            }
+        }
+        return new LocalForwarders(reports,status,siblings);
+    }
 }
