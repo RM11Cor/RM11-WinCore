@@ -1,48 +1,23 @@
-plugins { id 'com.android.application' }
-
-// Release signing is supplied ONLY by encrypted GitHub Actions secrets.
-// Never store keystore credentials in the public source archive.
-def rm11KeystoreFile = System.getenv('RM11_RELEASE_KEYSTORE')
-def rm11KeystorePassword = System.getenv('RM11_RELEASE_PASSWORD')
-
+plugins {
+    id 'com.android.application'
+}
 android {
-    namespace 'com.rm11.autocore'
-    compileSdk 36
+    namespace 'com.rm11cor.carxstreet.portlab'
+    compileSdk 35
     defaultConfig {
-        applicationId 'com.rm11.autocore'
+        applicationId 'com.rm11cor.carxstreet.portlab'
         minSdk 29
         targetSdk 35
-        versionCode 31
-        versionName '2.5.6-nls-redirect'
-        // abiFilters belongs to defaultConfig.ndk, not android.ndk.
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
-    }
-    ndkVersion '27.2.12479018'
-    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
-    packaging { jniLibs { useLegacyPackaging true } }
-    signingConfigs {
-        stable {
-            if (rm11KeystoreFile && rm11KeystorePassword) {
-                storeFile file(rm11KeystoreFile)
-                storePassword rm11KeystorePassword
-                keyAlias 'rm11-autocore'
-                keyPassword rm11KeystorePassword
-                storeType 'pkcs12'
-            }
-        }
+        versionCode 1
+        versionName '0.1.0-source-inspector'
+        resConfigs 'ar', 'en'
     }
     buildTypes {
-        release {
-            signingConfig signingConfigs.stable
-            minifyEnabled false
-        }
+        debug { debuggable true }
+        release { minifyEnabled false }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
-
-dependencies { testImplementation 'junit:junit:4.13.2' }

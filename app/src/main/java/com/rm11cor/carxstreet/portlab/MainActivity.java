@@ -1,0 +1,264 @@
+package com.rm11cor.carxstreet.portlab;
+
+import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.json.JSONObject;
+
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public final class MainActivity extends Activity {
+    private static final int PICK_GAME=5001;
+    private static final int EXPORT_JSON=5002;
+    private static final int BG=0xFF0B1018;
+    private static final int CARD=0xFF182231;
+    private static final int BLUE=0xFF56C6F3;
+    private static final int SUB=0xFFAABAC9;
+    private final Handler main=new Handler(Looper.getMainLooper());
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final AtomicBoolean abort=new AtomicBoolean(false);
+    private volatile boolean scanning=false;
+    private Uri tree;
+    private String lastReport;
+    private TextView status;
+    private TextView details;
+    private TextView folder;
+    private Button copy;
+    private Button export;
+    private Button rescan;
+
+    @Override public void onCreate(Bundle saved) {
+        super.onCreate(saved);
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+        buildUi();
+        SharedPreferences p=getPreferences(MODE_PRIVATE);
+        String last=p.getString("selected_game_tree",null);
+        if(last!=null) {
+            try {
+                tree=Uri.parse(last);
+                folder.setText("المجلد محفوظ من الجلسة السابقة. اضغط إعادة الفحص.");
+                rescan.setEnabled(true);
+            }catch(Exception ignored){}
+        }
+    }
+
+    private void buildUi() {
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20),dp(32),dp(20),dp(30));
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        scroll.addView(root);
+        TextView eyebrow=label("RM11Cor • Android ARM64",13,BLUE,true);
+        root.addView(eyebrow);
+        TextView title=label("CARX STREET",32,Color.WHITE,true);
+        root.addView(title);
+        root.addView(label("PC PORT LAB  /  فحص النسخة الأصلية",15,SUB,false));
+        gap(root,24);
+        LinearLayout banner=new LinearLayout(this);
+        banner.setOrientation(LinearLayout.VERTICAL);
+        banner.setPadding(dp(18),dp(18),dp(18),dp(18));
+        banner.setBackground(round(CARD,18));
+        root.addView(banner);
+        banner.addView(label("المرحلة 01 — تعرف على ملفات اللعبة",19,Color.WHITE,true));
+        gap(banner,8);
+        banner.addView(label("هذا APK يفحص ملفات CarX Street PC الموجودة عندك، بدون نقلها أو رفعها. لا يحتوي بعد على محرك تشغيل ARM64، ولا يدّعي تشغيل نسخة Windows.",14,SUB,false));
+        gap(root,16);
+        folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
+        root.addView(folder);
+        gap(root,12);
+        Button choose=button("اختيار مجلد CarX Street PC",BLUE,0xFF071520);
+        root.addView(choose);
+        choose.setOnClickListener(v -> chooseFolder());
+        gap(root,9);
+        rescan=button("إعادة فحص نفس المجلد",CARD,Color.WHITE);
+        rescan.setEnabled(false);
+        root.addView(rescan);
+        rescan.setOnClickListener(v -> {if(tree!=null)scan();});
+        gap(root,20);
+        LinearLayout reportCard=new LinearLayout(this);
+        reportCard.setPadding(dp(16),dp(18),dp(16),dp(18));
+        reportCard.setOrientation(LinearLayout.VERTICAL);
+        reportCard.setBackground(round(0xFF131E2A,15));
+        root.addView(reportCard);
+        reportCard.addView(label("نتيجة فحص النسخة",18,Color.WHITE,true));
+        gap(reportCard,8);
+        status=label("جاهز لاختيار المجلد",14,BLUE,true);
+        reportCard.addView(status);
+        gap(reportCard,8);
+        details=label("نقرأ ملف EXE وGameAssembly.dll وUnityPlayer.dll وحزم Unity وIL2CPP، ونسجل نتائج دون تعديل اللعبة.",13,SUB,false);
+        reportCard.addView(details);
+        gap(root,16);
+        copy=button("نسخ تقرير JSON",CARD,Color.WHITE);
+        copy.setEnabled(false);
+        root.addView(copy);
+        copy.setOnClickListener(v -> copyReport());
+        gap(root,8);
+        export=button("حفظ التقرير لإرساله بالمحادثة",CARD,Color.WHITE);
+        export.setEnabled(false);
+        root.addView(export);
+        export.setOnClickListener(v -> saveReport());
+        gap(root,22);
+        root.addView(label("مسار التطوير",18,Color.WHITE,true));
+        gap(root,8);
+        root.addView(label("1. كشف بنية نسخة PC وموارد Windows.\n2. تقييم تحويل الموارد إلى Android وفحص الاعتمادات.\n3. محرك تنفيذ ARM64 أصلي مرخّص أو معاد بناؤه بصورة مستقلة.\n4. Vulkan والصوت وتحكم اللمس واليد.\n5. إثبات إقلاع اللعبة والوصول إلى أول إطار فعلي.",14,SUB,false));
+        gap(root,12);
+        root.addView(label("لا يتم تجاوز حماية Steam أو Easy Anti-Cheat. وضع اللعب الجماعي غير مدعوم بهذا النموذج.",12,0xFFFFC384,false));
+        setContentView(scroll);
+    }
+
+    private int dp(int value) {return Math.round(getResources().getDisplayMetrics().density*value);}
+    private GradientDrawable round(int color,int radius) {
+        GradientDrawable d=new GradientDrawable();
+        d.setColor(color);d.setCornerRadius(dp(radius));
+        return d;
+    }
+    private TextView label(String s,int size,int color,boolean strong) {
+        TextView t=new TextView(this);
+        t.setText(s);t.setTextColor(color);t.setTextSize(size);
+        t.setLineSpacing(dp(3),1f);
+        t.setGravity(Gravity.START);
+        if(strong)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        return t;
+    }
+    private Button button(String s,int color,int ink) {
+        Button b=new Button(this);
+        b.setText(s);b.setTextColor(ink);
+        b.setAllCaps(false);
+        b.setTextSize(15);
+        b.setMinHeight(dp(52));
+        b.setBackground(round(color,14));
+        return b;
+    }
+    private void gap(LinearLayout parent,int units) {
+        View v=new View(this);parent.addView(v,new LinearLayout.LayoutParams(1,dp(units)));
+    }
+
+    private void chooseFolder() {
+        if(scanning)return;
+        Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|
+                   Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(i,PICK_GAME);
+    }
+    @Override protected void onActivityResult(int request,int result,Intent data) {
+        super.onActivityResult(request,result,data);
+        if(result!=RESULT_OK||data==null||data.getData()==null)return;
+        if(request==PICK_GAME) {
+            Uri uri=data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(
+                    uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }catch(Exception ignored) {}
+            tree=uri;
+            getPreferences(MODE_PRIVATE).edit().putString("selected_game_tree",uri.toString()).apply();
+            folder.setText("تم اختيار مجلد اللعبة. جاري قراءة الملفات فقط...");
+            rescan.setEnabled(true);
+            scan();
+        }else if(request==EXPORT_JSON && lastReport!=null) {
+            try(OutputStream out=getContentResolver().openOutputStream(data.getData(),"w")) {
+                if(out==null)throw new IllegalStateException("no output stream");
+                out.write(lastReport.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                status.setText("تم حفظ تقرير الفحص — تقدر ترفعه هنا بالمحادثة");
+            }catch(Exception ex) {
+                status.setText("فشل حفظ التقرير: "+ex.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private void scan() {
+        if(tree==null||scanning)return;
+        scanning=true;abort.set(false);
+        status.setText("جاري فحص الملفات...");
+        details.setText("نعالج عناصر المجلد بدون استخراج أو نسخ محتويات اللعبة.");
+        copy.setEnabled(false);export.setEnabled(false);rescan.setEnabled(false);
+        final Uri selected=tree;
+        worker.execute(() -> {
+            try {
+                JSONObject result=GameScanner.inspect(this,selected,new GameScanner.Progress() {
+                    private int lastShown=0;
+                    @Override public void onCount(int files,int dirs) {
+                        if(files+dirs-lastShown>=1000) {
+                            lastShown=files+dirs;
+                            main.post(() -> status.setText("جاري الفحص: "+files+" ملف / "+dirs+" مجلد"));
+                        }
+                    }
+                    @Override public boolean cancelled() {return abort.get();}
+                });
+                String json=result.toString(2);
+                main.post(() -> {
+                    lastReport=json;
+                    scanning=false;
+                    rescan.setEnabled(true);copy.setEnabled(true);export.setEnabled(true);
+                    JSONObject hits=result.optJSONObject("detect");
+                    JSONObject count=result.optJSONObject("counts");
+                    JSONObject machines=result.optJSONObject("machine");
+                    boolean eligible=hits!=null&&hits.optBoolean("carx_pc_exe")
+                                    &&hits.optBoolean("il2cpp_game_assembly_windows")
+                                    &&hits.optBoolean("carx_street_data_directory");
+                    status.setText(eligible ? "نسخة PC وUnity IL2CPP مكتشفة" :
+                        "الفحص اكتمل؛ ناقص دليل على بعض ملفات نسخة PC");
+                    details.setText("الملفات: "+(count==null?0:count.optInt("files"))+
+                        "\nالمجلدات: "+(count==null?0:count.optInt("folders"))+
+                        "\nEXE: "+(machines==null?"":machines.optString("carx_exe"))+
+                        "\nGameAssembly: "+(machines==null?"":machines.optString("gameassembly_dll"))+
+                        "\nUnity + IL2CPP: "+eligible+
+                        "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
+                        "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
+                });
+            }catch(Exception e) {
+                main.post(() -> {
+                    scanning=false;rescan.setEnabled(tree!=null);
+                    status.setText("فشل الفحص");
+                    details.setText(e.getClass().getSimpleName()+": "+e.getMessage()+
+                        "\nجرّب اختيار المجلد الرئيسي الذي يحتوي CarX Street.exe");
+                });
+            }
+        });
+    }
+    private void copyReport() {
+        if(lastReport==null)return;
+        ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        if(c!=null)c.setPrimaryClip(ClipData.newPlainText("CarX PC Port Diagnostic",lastReport));
+        Toast.makeText(this,"اننسخ تقرير الفحص",Toast.LENGTH_SHORT).show();
+    }
+    private void saveReport() {
+        if(lastReport==null)return;
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report.json");
+        startActivityForResult(i,EXPORT_JSON);
+    }
+    @Override protected void onDestroy() {
+        abort.set(true);
+        worker.shutdownNow();
+        super.onDestroy();
+    }
+}
