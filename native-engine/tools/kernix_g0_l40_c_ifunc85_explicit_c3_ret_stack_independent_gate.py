@@ -22,7 +22,7 @@ from kernix_g0_l40_c_irelative85_after_five_same_fex_awatch_plan import OUT as S
 SCHEMA="kernix.g0.l40c.original-gnu-ifunc85-exact-c3-ret-stack-native-read-one-fex-pid-independent.v1"
 OUT="KERNIX-G0-C-IFUNC85-Exact-C3-RET-HW-Stack-Read-Resolver-Writer-Same-FEX-PID.json"
 LOG="original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log"
-ARM="IFUNC85_SOURCE_C3_RET_STACK_HW_RWATCH_ARMED"
+ARM="IFUNC85_SOURCE_C3_RET_STACK_HW_AWATCH_ARMED"
 READ="IFUNC85_ORIGINAL_C3_RET_NATIVE_STACK_HW_READ"
 FINAL="IFUNC85_EXACT_C3_RET_HW_READ_AND_SIX_NATIVE_WRITERS_ONE_FEX_PID"
 ENTRY="IFUNC85_RESOLVER_JIT_ENTRY_HW"
