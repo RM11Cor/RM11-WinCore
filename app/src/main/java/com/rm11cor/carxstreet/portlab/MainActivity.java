@@ -81,16 +81,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v1.3  /  جلب كود الدوال الأم",15,SUB,false));
+        root.addView(label("PC PORT LAB v1.4  /  إغلاق فجوات كود CarX",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 12 — استخراج كود CHAININFO الأصلي",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 13 — استخراج كود الفجوات التنفيذية",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("فحص حزمة v1.2 الأصلية بيّن أن 228 عينة مرتبطة بكود دالة أم غير موجود بالحزمة. هسه نأخذ كود الأجزاء الأم نفسها مع بصماتها حتى نربط مخطط التنفيذ CFG الحقيقي. ما نغيّر ملفات اللعبة.",14,SUB,false));
+        banner.addView(label("من كود CarX v1.3 الحقيقي اكتشفنا 146 فجوة بين مقاطع الأب والتابع، مجموعها 47,416 بايت وأكبرها 2,145 بايت. نأخذ هذه البايتات الأصلية مع SHA حتى نبني CFG متصل ونعرف التبعيات الفعلية.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -104,7 +104,7 @@ public final class MainActivity extends Activity {
         root.addView(rescan);
         rescan.setOnClickListener(v -> {if(tree!=null)scan();});
         gap(root,9);
-        aotSource=button("استخراج كود CarX والدوال الأم CHAININFO",BLUE,0xFF071520);
+        aotSource=button("استخراج كود CarX + الفجوات التنفيذية",BLUE,0xFF071520);
         aotSource.setEnabled(false);
         root.addView(aotSource);
         aotSource.setOnClickListener(v -> requestAotCodeExport());
@@ -328,7 +328,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/zip");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_ParentCode_v1.3.zip");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_ExecutableGaps_v1.4.zip");
         startActivityForResult(i,EXPORT_AOT_CODE);
     }
     private void exportAotCode(Uri output) {
@@ -336,7 +336,7 @@ public final class MainActivity extends Activity {
         scanning=true;
         rescan.setEnabled(false);
         aotSource.setEnabled(false);
-        status.setText("جاري استخراج كود CarX والدوال الأم المرتبطة بها...");
+        status.setText("جاري استخراج كود الفجوات بين المقاطع الأصلية...");
         Uri savedTree=tree;
         worker.execute(() -> {
             try(OutputStream out=getContentResolver().openOutputStream(output,"w")) {
@@ -348,7 +348,7 @@ public final class MainActivity extends Activity {
                     scanning=false;
                     rescan.setEnabled(true);
                     aotSource.setEnabled(true);
-                    status.setText("نجح استخراج مقاطع كود CarX والدوال الأم");
+                    status.setText("نجح استخراج كود CarX والفجوات التنفيذية");
                     details.setText("دوال PE x86-64 الأصلية المؤهلة: "+
                             result.eligibleExecutableFunctions+
                             "\nعينات الدوال المصدّرة: "+result.chosenActualFunctionSamples+
@@ -358,11 +358,14 @@ public final class MainActivity extends Activity {
                             "\nروابط CHAININFO: "+result.chainedUnwindReferences+
                             "\nمقاطع كود الدوال الأم: "+result.uniqueParentCodeFragments+
                             "\nحجم كود الأم بالبايت: "+result.parentCodeBytesExported+
+                            "\nفجوات كود PE المستخرجة: "+result.uniqueExecutableGapCodeRegions+
+                            "\nبايتات كود الفجوات: "+result.executableGapCodeBytes+
+                            "\nفجوات غير متاحة: "+result.executableGapCodeMissing+
                             "\nمقاطع أم لم تُستخرج: "+result.parentCodeReferencesNotExtracted+
                             "\nسلاسل UNWIND المكتملة: "+result.functionsWithCompleteUnwindChain+
                             "\nسلاسل تحتاج مراجعة: "+result.functionsWithUnwindReadIssues+
-                            "\nالنتيجة: ZIP يحتوي code/ وunwind/ وparents/ وmanifest.json"+
-                            "\nالحزمة تشمل كود الدوال الأم الحقيقي؛ مو تشغيل اللعبة. ارفعها حتى نربط الأجزاء ونختبر CFG قبل الترجمة.");
+                            "\nالنتيجة: ZIP يحتوي code/ وunwind/ وparents/ وgaps/ وmanifest.json"+
+                            "\nالحزمة تشمل كود الفجوات الأصلي من GameAssembly؛ مو تشغيل اللعبة. ارفعها حتى نجرب CFG متعدد المقاطع ونتحقق من مسار الدالة.");
                 });
             }catch(Exception error) {
                 main.post(() -> {
