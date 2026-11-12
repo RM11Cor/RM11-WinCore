@@ -44,7 +44,8 @@ int fh5_cf_analyze(const uint8_t *sample,size_t n,
     out->decoded_count=count;
     for(size_t i=0;i<count;i++) {
         const cs_insn *item=&ins[i];
-        if(item->address < rva || item->size==0 || item->size>15 ||
+        if(item->address < rva || item->address-rva >= n ||
+           item->size==0 || item->size>15 ||
            (uint64_t)item->size > (uint64_t)n-(item->address-rva)) {
             cs_free(ins,count);cs_close(&handle);memset(out,0,sizeof(*out));
             return -6;
