@@ -1,0 +1,103 @@
+name: Publish verified CarX Street PC PortLab v0.4 permanent-signed Android upgrade
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v040.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-v040-after-independent-signature-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Only accept fully successful immutable CarX v0.4 source build and signer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43184334995
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.name == "Verify identical pinned CarX certificate package ID and higher versionCode") | .conclusion')" = success
+          echo CARX_V040_ORIGINAL_VERSION4_PERMANENT_CERT_BUILDER_INDEPENDENT_PASS
+      - name: Retrieve exact permanently signed CarX v0.4 Android APK
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43184334995
+          name: CarXStreet-v0.4.0-PERMANENT-SIGNED-Unity-Serialized-Header-Inspector
+          github-token: ${{ github.token }}
+          path: release
+      - name: Recheck APK SHA signature and package identity independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          APK=release/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
+          SDK=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$SDK/apksigner"
+          test -x "$SDK/aapt"
+          CERT=$("$SDK/apksigner" verify --print-certs --verbose "$APK")
+          printf '%s\n' "$CERT"
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$CERT"
+          if ! grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' <<<"$CERT" &&
+             ! grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' <<<"$CERT"; then
+            echo INVALID_CARX_APK_SIGNATURE; exit 1
+          fi
+          BADGE=$("$SDK/aapt" dump badging "$APK")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='4' versionName='0.4.0-unity-serialized-probe'" <<<"$BADGE"
+          echo CARX_V040_SAME_CERT_SAME_PACKAGE_HIGHER_VERSION4_PUBLISH_VALIDATION_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.4.0 — Unity serialized-file diagnostics
+
+          **File inspector only, NOT a playable Android game port.**
+
+          New: bounded read-only source header inspection of PC
+          globalgamemanagers and resources.assets (256 bytes per file).
+          Reports a strict Unity editor version candidate only if the
+          serialized file header supports it, otherwise reports unknown.
+          Classifies original IL2CPP metadata first 16 bytes as HEX and
+          checks up to 4096 bytes for classic metadata magic.
+          Does not decrypt source, circumvent DRM or execute Windows files.
+
+          **Install over v0.3 without uninstalling it.** This APK retains
+          the exact same permanent CarX certificate and application ID,
+          with versionCode 4 (the previous permanent-signed v0.3 was 3).
+          Device-side installation still requires user confirmation.
+
+          If still on the older debug-signed v0.1/v0.2, export the report,
+          uninstall the OLD inspector once, then enter the permanent-signed
+          channel with this v0.4 APK.
+
+          Export CarX_Street_PC_Port_Report_v0.4.json after scanning
+          your already-extracted CarX Street PC game folder.
+          The Android ARM64 engine, game logic and first game frame are
+          NOT included or proven by this inspector.
+          EOF
+      - name: Publish exact v0.4 APK on official GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.4.0-unity-serialized-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PC PortLab v0.4.0 - Unity Serialized Header Inspector (Signed)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
