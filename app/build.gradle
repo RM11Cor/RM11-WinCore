@@ -8,8 +8,8 @@ android {
         applicationId 'com.rm11cor.carxstreet.portlab'
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0-source-inspector'
+        versionCode 2
+        versionName '0.2.0-unity-header-probe'
         resConfigs 'ar', 'en'
     }
     buildTypes {
