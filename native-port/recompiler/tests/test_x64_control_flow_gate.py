@@ -114,6 +114,24 @@ class ReachableOriginalPeCfgTests(unittest.TestCase):
         self.assertEqual(r.decode_failures,1)
         self.assertFalse(r.no_unresolved_control_flow)
 
+    def test_original_source_epilogue_without_prologue_rejected(self):
+        # A source region which only restores a predecessor's Win64
+        # stack frame cannot be an independent callable function.
+        r=self.code("48 83 c4 30 5b c3") # add rsp,48;pop rbx;ret
+        self.assertTrue(r.unmatched_epilogue_stack_restore)
+        self.assertFalse(r.structurally_self_contained_candidate)
+        self.assertEqual(r.return_instructions,1)
+
+    def test_prologue_balanced_stack_is_not_false_epilogue(self):
+        r=self.code("53 48 83 ec 30 48 83 c4 30 5b c3")
+        self.assertFalse(r.unmatched_epilogue_stack_restore)
+        self.assertTrue(r.structurally_self_contained_candidate)
+
+    def test_epilogue_restoring_saved_register_without_local_prologue(self):
+        r=self.code("48 8b 5c 24 50 48 83 c4 40 5f c3")
+        self.assertTrue(r.unmatched_epilogue_stack_restore)
+        self.assertFalse(r.structurally_self_contained_candidate)
+
     def test_reject_zero_size(self):
         with self.assertRaises(ValueError):
             inspect_cfg(b"")
