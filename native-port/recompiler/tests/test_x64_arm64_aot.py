@@ -226,7 +226,7 @@ class SourceRecompilerPipeline(unittest.TestCase):
         self.assertIn("AArch64",header)
         return original,arm,lifted
 
-    def test_actual_x86_against_native_aarch64_aot_for_8_programs_80_cases(self):
+    def test_actual_x86_against_native_aarch64_aot_for_17_programs_170_cases(self):
         results={}
         for key,body in PROGRAMS.items():
             with self.subTest(program=key):
