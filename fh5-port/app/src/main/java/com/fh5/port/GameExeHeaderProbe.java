@@ -399,7 +399,7 @@ public final class GameExeHeaderProbe {
                 long delta=entry-virtualAddress;
                 if((characteristics&0x20000000L)==0)
                     throw new IOException("pe_entry_section_not_executable");
-                if(delta>=rawSize || rawOffset>fileLength ||
+                if(delta>=rawSize || sampleLength>rawSize-delta || rawOffset>fileLength ||
                    delta>fileLength-rawOffset ||
                    sampleLength>fileLength-rawOffset-delta)
                     throw new IOException("pe_entry_not_backed_by_file");
