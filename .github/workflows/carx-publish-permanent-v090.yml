@@ -1,0 +1,112 @@
+name: Publish CarX Street PC PortLab v0.9 permanent signed bundle-source classification correction
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v090.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  independent-original-v090-signed-release-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original CarX v0.9 source and permanent signer CI to pass
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43202851602
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V090_ORIGINAL_APK_SOURCE_BUILDER_CERT_ANDROID_ID_CODE9_PASS
+      - name: Retrieve exact original permanent-signed v0.9 APK and source SHA
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43202851602
+          name: CarXStreet-v0.9.0-SAF-Bundle-Names-Mismatch-Cause-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently verify APK SHA certificate same app ID higher code9 and original AArch64 JNI
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          package=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='9' versionName='0.9.0-asset-reference-classification'" <<<"$package"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V090_IMMUTABLE_APK_SHA_SAME_SIGNER_AND_ANDROID_CODE9_INPLACE_UPGRADE_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.9.0 — exact bundle source-name audit correction
+
+          **This APK is an inspector only, not a playable CarX Street port.**
+
+          The owner's actual v0.8 report revealed:
+          - 808 physical Windows64 bundle entries, only 807 accepted basenames.
+          - 807 catalog Windows64 entries, 806 accepted basenames.
+          - 806 source filename matches, one unlisted physical
+            player_layout.bundle, no accepted catalog-only missing files.
+          - One original physical filename rejected by the original
+            strict normalizer, and one catalog reference ambiguous.
+          - The former inspector falsely described the unsupported
+            physical source basename as bundle count/input limit overflow.
+
+          v0.9 fixes this diagnostic ambiguity: records separate
+          rejected physical source name count, sanitized examples and
+          ambiguous Windows64 catalog name categories. It does not
+          guess the game asset contents or assert the game is corrupt.
+          A catalog ID mentioning graphics_quality_android_view.json
+          is a textual reference, NOT Android-target Unity game assets.
+
+          **Install directly over v0.8** — package ID unchanged
+          com.rm11cor.carxstreet.portlab and permanent CarX signing
+          certificate unchanged, higher versionCode 9 (v0.8 was 8).
+          Original game files and previous SAF folder selection remain
+          untouched. Device-side update requires owner confirmation.
+
+          Rescan the same selected PC folder and export
+          CarX_Street_PC_Port_Report_v0.9.json. This is intended to
+          close the final source-filename audit; after it, work must
+          focus on authentic Android ARM64 game logic and Android
+          platform assets, not endlessly generating inspectors.
+
+          The user's REDMAGIC GPU Vulkan 1024-pixel work proof remains,
+          but original Windows x86-64 CarX game code has NOT executed
+          on Android, and no original playable scene/frame exists.
+          EOF
+      - name: Publish exact independently verified signed v0.9 APK on GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.9.0-bundle-name-classification-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PortLab v0.9 - Source Bundle Name Classification (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
