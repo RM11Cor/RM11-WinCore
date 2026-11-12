@@ -17,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.Locale;
@@ -53,6 +55,14 @@ public final class GameAssemblyCodeBridge {
         }
     }
 
+    private static final class ParentCode {
+        final int length;
+        final String member,sha256;
+        ParentCode(int n,String m,String s) {
+            length=n;member=m;sha256=s;
+        }
+    }
+
     public static final class ExportStats {
         public int originalPdataEntries;
         public int eligibleExecutableFunctions;
@@ -62,6 +72,9 @@ public final class GameAssemblyCodeBridge {
         public int functionsWithCompleteUnwindChain;
         public int functionsWithUnwindReadIssues;
         public int chainedUnwindReferences;
+        public int uniqueParentCodeFragments;
+        public int parentCodeBytesExported;
+        public int parentCodeReferencesNotExtracted;
         public long originalAssemblyLength;
         public long exceptionDirectorySize;
     }
@@ -233,14 +246,20 @@ public final class GameAssemblyCodeBridge {
             stats.chosenActualFunctionSamples=selected.size();
 
             JSONObject manifest=new JSONObject();
-            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v2");
-            manifest.put("version","1.2-source-diverse");
+            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v3");
+            manifest.put("version","1.3-parent-code-bounded");
             manifest.put("sampler_policy","one_source_function_per_distinct_unwind_rva");
             manifest.put("sampled_distinct_unwind_rva_count",
                     chosen.distinctUnwindRvasSelected());
             manifest.put("does_not_identify_distinct_gameplay_methods",true);
             manifest.put("same_unwind_rva_does_not_necessarily_mean_same_method",true);
             manifest.put("includes_actual_win64_unwind_info_records",true);
+            manifest.put("includes_original_chained_parent_code_fragments",true);
+            manifest.put("max_parent_code_fragment_bytes",
+                    Win64ParentCodePolicy.MAX_PARENT_FRAGMENT_BYTES);
+            manifest.put("max_parent_code_total_bytes",
+                    Win64ParentCodePolicy.MAX_TOTAL_PARENT_SOURCE_BYTES);
+            manifest.put("parent_code_fragment_is_not_full_il2cpp_method",true);
             manifest.put("unwind_metadata_record_source","original GameAssembly.dll PE .xdata RVA");
             manifest.put("win64_unwind_data_is_not_executable_game_logic",true);
             manifest.put("max_chain_depth",MAX_CHAIN_DEPTH);
@@ -260,6 +279,7 @@ public final class GameAssemblyCodeBridge {
             JSONArray entries=new JSONArray();
             try(ZipOutputStream zip=new ZipOutputStream(destination)) {
                 Set<Long> emittedUnwindRvas=new HashSet<>();
+                Map<Long,ParentCode> emittedParentCode=new HashMap<>();
                 for(Win64UnwindDiverseSampler.Range f:selected) {
                     int n=(int)(f.end-f.begin);
                     long rawAt=rvaToFile(sections,f.begin,n,fileSize,true);
@@ -278,7 +298,7 @@ public final class GameAssemblyCodeBridge {
                     record.put("sha256",sha256(code));
                     appendActualUnwindChain(
                             zip,fd,fileSize,sections,f.unwind,
-                            emittedUnwindRvas,record,stats);
+                            emittedUnwindRvas,emittedParentCode,record,stats);
                     record.put("original_function_gameplay_identity_confirmed",false);
                     entries.put(record);
                     stats.bytesExported+=n;
@@ -288,6 +308,10 @@ public final class GameAssemblyCodeBridge {
                 manifest.put("complete_unwind_chains",stats.functionsWithCompleteUnwindChain);
                 manifest.put("functions_with_unwind_read_issues",stats.functionsWithUnwindReadIssues);
                 manifest.put("chained_unwind_references",stats.chainedUnwindReferences);
+                manifest.put("unique_parent_source_code_fragments",stats.uniqueParentCodeFragments);
+                manifest.put("original_parent_code_bytes_exported",stats.parentCodeBytesExported);
+                manifest.put("parent_code_reference_extraction_issues",
+                        stats.parentCodeReferencesNotExtracted);
                 manifest.put("full_callable_il2cpp_method_verified",false);
                 manifest.put("functions",entries);
                 zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -302,6 +326,7 @@ public final class GameAssemblyCodeBridge {
     private static void appendActualUnwindChain(
             ZipOutputStream zip,ParcelFileDescriptor fd,long fileSize,
             List<Section> sections,long firstUnwindRva,Set<Long> emitted,
+            Map<Long,ParentCode> emittedParentCode,
             JSONObject sourceFunction,ExportStats stats) throws Exception {
         JSONArray chain=new JSONArray();
         Set<Long> visited=new HashSet<>();
@@ -347,6 +372,10 @@ public final class GameAssemblyCodeBridge {
                     target.put("unwind_rva",details.chainedUnwindRva);
                     item.put("chained_runtime_function",target);
                     stats.chainedUnwindReferences++;
+                    appendOriginalChainedParentCode(
+                            zip,fd,fileSize,sections,
+                            details.chainedBeginRva,details.chainedEndRva,
+                            details.chainedUnwindRva,emittedParentCode,item,stats);
                 }
                 chain.put(item);
                 if(!details.chained) {
@@ -373,6 +402,77 @@ public final class GameAssemblyCodeBridge {
         sourceFunction.put("unwind_records",chain);
         sourceFunction.put("unwind_status",status);
         sourceFunction.put("callable_il2cpp_method_proven",false);
+    }
+
+    private static void appendOriginalChainedParentCode(
+            ZipOutputStream zip,ParcelFileDescriptor fd,long fileSize,
+            List<Section> sections,long begin,long end,long unwind,
+            Map<Long,ParentCode> existing,JSONObject unwindRecord,
+            ExportStats stats) throws Exception {
+        int length;
+        String member;
+        try {
+            length=Win64ParentCodePolicy.checkedLength(begin,end,unwind);
+            member=Win64ParentCodePolicy.memberName(begin,end,unwind);
+        } catch(IllegalArgumentException badRange) {
+            unwindRecord.put("parent_code_status","ORIGINAL_PARENT_CODE_RANGE_REJECTED");
+            stats.parentCodeReferencesNotExtracted++;
+            return;
+        }
+
+        ParentCode previous=existing.get(begin);
+        if(previous!=null) {
+            if(previous.length!=length) {
+                unwindRecord.put("parent_code_status",
+                        "ORIGINAL_PARENT_RVA_LENGTH_CONFLICT");
+                stats.parentCodeReferencesNotExtracted++;
+                return;
+            }
+            JSONObject fromCache=new JSONObject();
+            fromCache.put("begin_rva",begin);
+            fromCache.put("end_rva",end);
+            fromCache.put("unwind_rva",unwind);
+            fromCache.put("zip_member",previous.member);
+            fromCache.put("length_bytes",length);
+            fromCache.put("sha256",previous.sha256);
+            unwindRecord.put("original_parent_code",fromCache);
+            unwindRecord.put("parent_code_status","EXPORTED_VERIFIED_BOUNDED_FRAGMENT");
+            return;
+        }
+
+        if(!Win64ParentCodePolicy.canInclude(
+                existing.size(),stats.parentCodeBytesExported,length)) {
+            unwindRecord.put("parent_code_status","PARENT_SOURCE_EXTRACTION_BUDGET");
+            stats.parentCodeReferencesNotExtracted++;
+            return;
+        }
+
+        try {
+            long fileAt=rvaToFile(sections,begin,length,fileSize,true);
+            byte[] originalCode=readExact(fd,fileSize,fileAt,length);
+            String hash=sha256(originalCode);
+            zip.putNextEntry(new ZipEntry(member));
+            zip.write(originalCode);
+            zip.closeEntry();
+
+            existing.put(begin,new ParentCode(length,member,hash));
+            stats.uniqueParentCodeFragments++;
+            stats.parentCodeBytesExported+=length;
+
+            JSONObject item=new JSONObject();
+            item.put("begin_rva",begin);
+            item.put("end_rva",end);
+            item.put("unwind_rva",unwind);
+            item.put("zip_member",member);
+            item.put("length_bytes",length);
+            item.put("sha256",hash);
+            unwindRecord.put("original_parent_code",item);
+            unwindRecord.put("parent_code_status","EXPORTED_VERIFIED_BOUNDED_FRAGMENT");
+        } catch(IOException unsafeSource) {
+            unwindRecord.put("parent_code_status",
+                    "ORIGINAL_PARENT_EXECUTABLE_RVA_UNAVAILABLE");
+            stats.parentCodeReferencesNotExtracted++;
+        }
     }
 
     private static String sha256(byte[] input)throws Exception {
