@@ -59,6 +59,11 @@ public final class GameScanner {
         final ArrayDeque<Node> stack=new ArrayDeque<>();
         final Set<String> visited=new HashSet<>();
         final HashMap<String,String> found=new HashMap<>();
+        final HashMap<String,Uri> documentsToProbe=new HashMap<>();
+        final ArrayList<Uri> bundleSampleUris=new ArrayList<>();
+        final ArrayList<String> bundleSamplePaths=new ArrayList<>();
+        int windowsBundleCount=0;
+        long windowsBundleBytes=0;
         final JSONArray evidence=new JSONArray();
         final ArrayList<String> warnings=new ArrayList<>();
         final String rootName=displayName(resolver,DocumentsContract.buildDocumentUriUsingTree(tree,rootId));
@@ -112,6 +117,31 @@ public final class GameScanner {
                         long length=cursor.isNull(size)?-1:cursor.getLong(size);
                         if(length>=0) totalBytes+=length; else unknownSizes++;
                         String basename=n.toLowerCase(Locale.ROOT);
+                        // Select only bounded source headers, never whole 22+ GB
+                        // contents. SAF document URIs are never sent anywhere.
+                        if(basename.equals("global-metadata.dat")) {
+                            documentsToProbe.put("il2cpp_metadata",
+                                DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                        }
+                        if(basename.equals("boot.config")) {
+                            documentsToProbe.put("boot_config",
+                                DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                        }
+                        if(basename.equals("catalog.json") &&
+                           lower.contains("streamingassets/aa/")) {
+                            documentsToProbe.put("addressables_catalog",
+                                DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                        }
+                        if(basename.endsWith(".bundle") &&
+                           lower.contains("standalonewindows64")) {
+                            windowsBundleCount++;
+                            if(length>=0)windowsBundleBytes+=length;
+                            if(bundleSampleUris.size()<12) {
+                                bundleSampleUris.add(
+                                    DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                                bundleSamplePaths.add(relative);
+                            }
+                        }
                         if(basename.equals("unityplayer.dll")) {
                             hasUnity=true; found.put("unity_player",relative);
                         }
@@ -203,7 +233,7 @@ public final class GameScanner {
         machine.put("gameassembly_relative_path",assemblyPath);
         JSONObject report=new JSONObject();
         report.put("schema","rm11carx.pc-port-readonly-inspector.v1");
-        report.put("inspector_version","0.1.0");
+        report.put("inspector_version","0.2.0");
         report.put("source_game","CarX Street PC (Unity IL2CPP)");
         report.put("user_selected_folder_name",rootName);
         report.put("game_files_transmitted",false);
@@ -218,9 +248,12 @@ public final class GameScanner {
         for(Map.Entry<String,String> e:found.entrySet())paths.put(e.getKey(),e.getValue());
         report.put("relative_path_evidence",paths);
         report.put("sample_files",evidence);
+        report.put("unity_deep_probe",UnityDeepProbe.inspect(
+                resolver,documentsToProbe,bundleSampleUris,bundleSamplePaths,
+                windowsBundleCount,windowsBundleBytes));
         report.put("notes",notes);
         report.put("device",device(context));
-        report.put("next_gate","Obtain authorized ARM64 game runtime or independent source port; then test native Unity initialization, Vulkan assets and first real frame");
+        report.put("next_gate","Original UnityFS/IL2CPP header evidence only. Obtain authorized Android ARM64 game runtime or independent source port, rebuild Android-compatible assets, then test a genuine game frame");
         return report;
     }
 
