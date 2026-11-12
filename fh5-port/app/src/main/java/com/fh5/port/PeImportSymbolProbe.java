@@ -20,19 +20,25 @@ public final class PeImportSymbolProbe {
     public static final int MAX_THUNKS_PER_DLL=512;
     public static final int MAX_TOTAL_THUNKS=8192;
     public static final int MAX_SAMPLE_NAMES=6;
-    private static final int MAX_SYMBOL_BYTES=96;
+    /** Read in bounded 96-byte blocks, up to 1024 bytes for long C++ mangled names. */
+    public static final int MAX_SYMBOL_SCAN_BYTES=1024;
+    public static final int MAX_SYMBOL_SAMPLE_BYTES=80;
+    private static final int SYMBOL_READ_CHUNK=96;
     private static final long ORDINAL_FLAG=Long.MIN_VALUE;
 
     public static final class Dll {
         public final String dll;
         public final int namedImports, ordinalImports;
         public final boolean thunkTableComplete;
+        public final int truncatedSampleNames,overlongUnterminatedNames;
         public final List<String> exampleFunctions;
         private Dll(String dll,int named,int ordinal,boolean complete,
-                    List<String> examples) {
+                    int truncatedNames,int overlongNames,List<String> examples) {
             this.dll=dll;
             namedImports=named;ordinalImports=ordinal;
             thunkTableComplete=complete;
+            truncatedSampleNames=truncatedNames;
+            overlongUnterminatedNames=overlongNames;
             exampleFunctions=Collections.unmodifiableList(new ArrayList<>(examples));
         }
     }
@@ -40,6 +46,7 @@ public final class PeImportSymbolProbe {
         public final String status;
         public final int totalNamedImports,totalOrdinalImports;
         public final int dllsChecked;
+        public final int sampleNamesTruncated,namesOverScanBudget;
         public final boolean complete,gameExecuted=false;
         public final List<Dll> dlls;
         private Report(String status,List<Dll> dlls,int named,int ord,boolean complete) {
@@ -47,6 +54,12 @@ public final class PeImportSymbolProbe {
             this.dlls=Collections.unmodifiableList(new ArrayList<>(dlls));
             dllsChecked=dlls.size();
             totalNamedImports=named;totalOrdinalImports=ord;this.complete=complete;
+            int truncated=0,overBudget=0;
+            for(Dll d:dlls) {
+                truncated+=d.truncatedSampleNames;
+                overBudget+=d.overlongUnterminatedNames;
+            }
+            sampleNamesTruncated=truncated;namesOverScanBudget=overBudget;
         }
     }
     private static long u64(byte[] b) {
@@ -54,29 +67,50 @@ public final class PeImportSymbolProbe {
         for(int i=0;i<8;i++)result|=(b[i]&255L)<<(8*i);
         return result;
     }
-    private static String functionName(SeekableByteChannel ch,
-                    PeImportProbe.Mapper map,long rva,long imageSize) throws IOException {
+    private static final class ReadName {
+        final String sample;
+        final boolean sampleTruncated,terminated;
+        ReadName(String sample,boolean truncated,boolean terminated) {
+            this.sample=sample;sampleTruncated=truncated;this.terminated=terminated;
+        }
+    }
+    private static ReadName functionName(SeekableByteChannel ch,
+                   PeImportProbe.Mapper map,long rva,long imageSize) throws IOException {
         if(rva<=0||rva>=imageSize||imageSize-rva<3)
             throw new IOException("pe_symbol_function_rva_invalid");
-        // IMAGE_IMPORT_BY_NAME: 2-byte hint followed by null-terminated name.
+        // IMAGE_IMPORT_BY_NAME starts with a 2-byte hint; do not interpret it.
         PeImportProbe.read(ch,map.map(rva,2),2);
-        int bounded=map.backedNameBytes(rva+2);
-        if(bounded<2)throw new IOException("pe_symbol_function_name_unbacked");
-        bounded=Math.min(bounded,MAX_SYMBOL_BYTES+1);
-        byte[] src=PeImportProbe.read(ch,map.map(rva+2,1),bounded);
-        int end=0;
-        while(end<src.length&&src[end]!=0) {
-            int c=src[end]&255;
-            // PE decorated names may include ? $ @ . and underscores.
-            // No newlines, control characters, separators or paths.
-            if(c<33||c>126||c=='/'||c=='\\'||c=='"'||c=='<'
-                ||c=='>'||c=='{'||c=='}')
-                throw new IOException("pe_symbol_function_name_invalid");
-            end++;
+        StringBuilder prefix=new StringBuilder(MAX_SYMBOL_SAMPLE_BYTES);
+        boolean truncated=false;
+        int scanned=0;
+        while(scanned<MAX_SYMBOL_SCAN_BYTES) {
+            long pos=rva+2L+scanned;
+            if(pos>=imageSize)throw new IOException("pe_symbol_function_name_outside_image");
+            int backed=map.backedNameBytes(pos);
+            if(backed<1)throw new IOException("pe_symbol_function_name_unbacked");
+            int length=Math.min(Math.min(backed,SYMBOL_READ_CHUNK),
+                MAX_SYMBOL_SCAN_BYTES-scanned);
+            byte[] bytes=PeImportProbe.read(ch,map.map(pos,length),length);
+            for(byte raw:bytes) {
+                int c=raw&255;
+                if(c==0) {
+                    if(scanned==0)throw new IOException("pe_symbol_function_name_empty");
+                    return new ReadName(prefix.toString(),truncated,true);
+                }
+                // Valid printable decorated names (?,$,@,etc); reject control
+                // characters, storage paths and unsafe JSON/display markup.
+                if(c<33||c>126||c=='/'||c=='\\'||c=='"'||c=='<'
+                    ||c=='>'||c=='{'||c=='}')
+                    throw new IOException("pe_symbol_function_name_invalid");
+                if(scanned<MAX_SYMBOL_SAMPLE_BYTES)prefix.append((char)c);
+                else truncated=true;
+                scanned++;
+            }
         }
-        if(end<1||end>=src.length||end>MAX_SYMBOL_BYTES)
-            throw new IOException("pe_symbol_function_name_unterminated");
-        return new String(src,0,end,StandardCharsets.US_ASCII);
+        // A valid x64 game may import a mangled C++ function name longer
+        // than this privacy/performance budget. Count it without stopping
+        // all later DLL imports; accurately label the name as incomplete.
+        return new ReadName(prefix.toString(),true,false);
     }
     public static Report inspectDirect(SeekableByteChannel ch) throws IOException {
         PeImportProbe.Result imports=PeImportProbe.inspectDirect(ch);
@@ -111,6 +145,7 @@ public final class PeImportSymbolProbe {
             long thunkRva=PeImportProbe.u32(desc,0);
             if(thunkRva==0)thunkRva=PeImportProbe.u32(desc,16);
             int named=0,ordinal=0;
+            int truncatedNames=0,overlongNames=0;
             boolean tableComplete=false;
             List<String> examples=new ArrayList<>();
             if(thunkRva>0 && thunkRva<pe.imageSize) {
@@ -130,15 +165,18 @@ public final class PeImportSymbolProbe {
                     } else {
                         if((value>>>32)!=0)
                             throw new IOException("pe_symbol_unbound_thunk_invalid");
-                        String name=functionName(ch,map,value,pe.imageSize);
-                        if(examples.size()<MAX_SAMPLE_NAMES)examples.add(name);
+                        ReadName name=functionName(ch,map,value,pe.imageSize);
+                        if(examples.size()<MAX_SAMPLE_NAMES)
+                            examples.add(name.sampleTruncated?name.sample+" [truncated]":name.sample);
+                        if(name.sampleTruncated)truncatedNames++;
+                        if(!name.terminated){overlongNames++;allComplete=false;}
                         named++;totalNamed++;
                     }
                 }
             }
             if(!tableComplete)allComplete=false;
             details.add(new Dll(imports.dllNames.get(i),
-                named,ordinal,tableComplete,examples));
+                named,ordinal,tableComplete,truncatedNames,overlongNames,examples));
         }
         boolean complete=allComplete&&descriptorTerminated
             &&details.size()==imports.descriptorCount;
