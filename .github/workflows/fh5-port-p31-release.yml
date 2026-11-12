@@ -1,0 +1,83 @@
+name: Publish FH5 Native Port P3.1 - Second JNE Successors
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p31-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact signed P3.1 APK from tested CI run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43184379125 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.1-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'e42523dbbfc95d4875300b87bac618057c03ca1c75ab2c981f814a2e60d3bc76' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.1-Permanent-Signed.apk
+      - name: Release P3.1 as experimental static-analysis update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-1-second-jne-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.1 already released'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.1 — Second JNE Successor Inspection (Experimental)
+
+          **Not a playable Forza Horizon 5 port. Original Forza instructions are NOT executed.**
+
+          ## Based on real P3.0 phone report
+          - P3.0 confirmed a STATIC cross-link reconvergence at RVA `0x3128D4`.
+          - After the join, first direct CALL target is RVA `0x7F9800`.
+          - In that function, the first conditional JNE has a direct taken target
+            RVA `0x824C8E`. P3.0 had not verified the separate fall-through path.
+
+          ## New in P3.1
+          - Inspects the second JNE at the first shared CALL target.
+          - Uses Capstone's bounded decode to identify both the JNE taken target
+            and the not-taken fall-through **from the actual EXE**.
+          - Strictly at most two additional read-only target probes, with 128
+            uncompressed bytes per probe; no recursion or full-game unpack.
+          - Distinguishes direct/indirect/out-of-image, identical successors,
+            self-loops, and incomplete static branch information.
+          - Records an adjacent not-taken JMP target only when Capstone confirms
+            the direct target and PE image bounds.
+          - Retains ZIP64 indexing, Vulkan test, synthetic tiny x64->ARM64 JIT
+            demonstration, Capstone disassembly and earlier P3.0 branch metadata.
+          - Export `FH5_PORT_P3_1_REPORT.json` (no raw game code, private paths,
+            original game execution or runtime condition evaluation).
+
+          ## Safe Android update
+          - Package ID `com.fh5.port`; versionCode **14** (P3.0 was 13).
+          - Uses the SAME permanently protected FH5 signing certificate:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA-256: `e42523dbbfc95d4875300b87bac618057c03ca1c75ab2c981f814a2e60d3bc76`.
+          - Install over permanently signed P3.0 without uninstalling.
+
+          ## Phone test
+          1. Install the P3.1 APK on top of P3.0.
+          2. Select the existing ~100GB Forza ZIP file, if needed.
+          3. Press `فحص فرعي JNE بعد أول CALL (بدون تشغيل)`.
+          4. Export and upload `FH5_PORT_P3_1_REPORT.json` only.
+
+          CI build, native tests, Java tests, APK version and cert verified:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43184379125
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.1-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.1 - Second JNE Successors (Experimental)' \
+            --notes-file notes.md --prerelease
