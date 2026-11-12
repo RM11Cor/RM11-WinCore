@@ -187,4 +187,76 @@ public final class GameEntryStreamTest {
             }
         }
     }
+
+    private GameExeHeaderProbe.EntryResult direct(byte[] exe,long rva,int n)
+            throws Exception {
+        Path file=tmp.newFile("direct"+System.nanoTime()+".exe").toPath();
+        Files.write(file,exe);
+        try(SeekableByteChannel ch=Files.newByteChannel(file,StandardOpenOption.READ)) {
+            return GameExeHeaderProbe.inspectDirectAtRva(ch,rva,n);
+        }
+    }
+    @Test public void directlyExtractedPeMatchesArchivedPeAtEntrypoint() throws Exception {
+        byte[] pe=syntheticPe(4096,true);
+        GameExeHeaderProbe.EntryResult viaZip=run(zip(pe,false));
+        GameExeHeaderProbe.EntryResult raw=direct(pe,-1,128);
+        assertArrayEquals(viaZip.entrySample,raw.entrySample);
+        assertEquals(viaZip.entryFileOffset,raw.entryFileOffset);
+        assertEquals("stack-sub-imm8",raw.leadingOpcodeFamily);
+        assertEquals(0,raw.bytesInflated);
+        assertEquals(0,raw.compressedBytesRead);
+        assertEquals(0,raw.sectionIndex);
+        assertEquals(0x1000,raw.pe.entryPointRva);
+    }
+    @Test public void directRandomAccessReadsBranchRvasAt512Bytes() throws Exception {
+        byte[] pe=syntheticPe(4096,true);
+        GameExeHeaderProbe.EntryResult r=direct(pe,0x1004,512);
+        assertEquals(4100,r.entryFileOffset);
+        assertEquals(512,r.sampleLength);
+        assertEquals("rex-mov-modrm",r.leadingOpcodeFamily);
+    }
+    @Test public void directModeUsesSameExecutableSectionBounds() throws Exception {
+        byte[] pe=syntheticPe(4096,false);
+        try {direct(pe,0x1000,128);fail("non executable");}
+        catch(IOException ex){assertTrue(ex.getMessage(),
+            ex.getMessage().contains("pe_entry_section_not_executable"));}
+        pe=syntheticPe(4096,true);
+        try {direct(pe,0x2000,128);fail("unmapped");}
+        catch(IOException ex){assertTrue(ex.getMessage(),
+            ex.getMessage().contains("pe_entry_rva_unmapped"));}
+        try {direct(pe,0x1FF0,128);fail("section boundary");}
+        catch(IOException ex){assertTrue(ex.getMessage(),
+            ex.getMessage().contains("pe_entry_not_backed_by_file"));}
+    }
+    @Test public void directModeRejectsBadPeAndOutOfImageTargets() throws Exception {
+        byte[] bad=syntheticPe(4096,true);
+        bad[0]=0;
+        try {direct(bad,-1,128);fail("bad MZ");}
+        catch(IOException ex){assertTrue(ex.getMessage(),
+            ex.getMessage().contains("pe_dos_magic_invalid"));}
+        byte[] good=syntheticPe(4096,true);
+        try {direct(good,0x500000,128);fail("bad RVA");}
+        catch(IOException ex){assertTrue(ex.getMessage(),
+            ex.getMessage().contains("pe_target_rva_outside_image"));}
+        try {direct(good,0x1000,513);fail("budget");}
+        catch(IOException ex){assertEquals("pe_target_sample_budget_invalid",ex.getMessage());}
+    }
+    @Test public void sourceFacadeChoosesDirectOrZipWithSameInputBytes() throws Exception {
+        byte[] pe=syntheticPe(4096,true);
+        Path a=tmp.newFile("forza-direct"+System.nanoTime()+".exe").toPath();
+        Path b=tmp.newFile("forza-zip"+System.nanoTime()+".zip").toPath();
+        Files.write(a,pe);Files.write(b,zip(pe,true));
+        try(SeekableByteChannel c=Files.newByteChannel(a,StandardOpenOption.READ);
+            SeekableByteChannel z=Files.newByteChannel(b,StandardOpenOption.READ)) {
+            GameCodeSource direct=new GameCodeSource(c,true);
+            GameCodeSource archived=new GameCodeSource(z,false);
+            assertEquals("EXTRACTED_PE64_DIRECT",direct.kind());
+            assertEquals("ZIP64_ARCHIVED_EXE",archived.kind());
+            assertTrue(direct.inspectHeader().amd64);
+            assertTrue(archived.inspectHeader().amd64);
+            assertArrayEquals(direct.inspectEntry().entrySample,archived.inspectEntry().entrySample);
+            assertArrayEquals(direct.inspectAtRva(0x1004,128).entrySample,
+                              archived.inspectAtRva(0x1004,128).entrySample);
+        }
+    }
 }
