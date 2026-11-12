@@ -1,0 +1,115 @@
+name: Publish CarX v1.4 signed original Win64 parent-child executable gap code source bridge
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v140-executable-gaps.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable source-built and signed Android PortLab v1.4
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=43252317885
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq '.conclusion')" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/artifacts --jq '.artifacts | any(.name == "CarXStreet-v1.4.0-Original-GameAssembly-Executable-Gap-Code-Permanent-Signed")')" = true
+          echo CARX_V140_SOURCE_SIGNED_ARTIFACT_EXISTS_READY_FOR_RELEASE
+      - name: Retrieve exact signed v1.4 source build artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43252317885
+          name: CarXStreet-v1.4.0-Original-GameAssembly-Executable-Gap-Code-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently check original signature, version 14 and actual ARM64 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v1.4.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          sig=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$sig"
+          info=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='14' versionName='1.4.0-carx-executable-gap-source-export'" <<<"$info"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V140_STABLE_CERT_SAME_PACKAGE_MONOTONIC_VCODE14_NATIVE_ARM64_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PortLab v1.4 — Original GameAssembly executable gap bytes
+
+          **Original-code developer source tool, NOT a playable game.**
+
+          Based on the owner's actual v1.3 GameAssembly export, verified:
+          - 256 Windows x86-64 original child source machine-code regions
+          - 429 unique original Win64 UNWIND_INFO records
+          - 258 unique original CHAININFO parent code fragments with SHA256
+          - 146 positive-length original executable RVA gaps between
+            adjacent observed parent/child ranges, totaling 47,416 bytes
+          - largest previously absent source interval: 2,145 bytes.
+
+          What v1.4 actually implements:
+          - Continues the established Android SAF game-folder access.
+          - Retains v1.3 original child, parent and xdata source reading.
+          - NEW: reads exact original executable PE gap intervals from
+            GameAssembly.dll read-only and exports gaps/rva_*.bin,
+            with original begin/end RVA, length and SHA256.
+          - Each gap <=4KiB, all gap bytes together <=2MiB.
+          - The exported original gap interval is not automatically
+            a verified Unity gameplay method; source may include
+            unrelated executable code or padding.
+          - Owner selects offline ZIP output:
+            CarX_GameAssembly_AOT_ExecutableGaps_v1.4.zip.
+          - All source files remain unchanged on the phone; no full
+            142 MB DLL or game assets are copied to the archive.
+          - Separate offline analyzer validates original source hashes,
+            source unwind/chain metadata and gaps before a bounded
+            multi-segment x86 CFG inspection.
+
+          The original owner's v1.4 output is not yet verified here.
+          Independently tested 7 synthetic source-gap/CFG SHA controls,
+          plus earlier 330 x86-vs-AArch64 synthetic machine-code
+          output equivalence comparisons. These are engineering
+          test gates, not original CarX gameplay execution.
+
+          Install v1.4 OVER v1.3 (same stable package ID and permanent
+          signing certificate, versionCode14) without uninstalling.
+          EOF
+      - name: Publish tested signed v1.4 artifact to permanent GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v1.4.0-original-PE-executable-gaps-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.4.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.4.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX PortLab v1.4 - Original Win64 Executable Source Gaps (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
