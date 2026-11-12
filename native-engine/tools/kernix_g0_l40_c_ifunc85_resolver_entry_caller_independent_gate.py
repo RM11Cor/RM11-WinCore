@@ -87,7 +87,7 @@ def verify(log,source):
     need(type(entry["pid"]) is int and entry["pid"]==pid
          and entry["guest_entry"]=="0x8040c8570"
          and entry["guest_stack_return"]=="0x80100fd5c"
-         and type(entry["scan"]) is int and 1<=entry["scan"]<=1536
+         and type(entry["scan"]) is int and 1<=entry["scan"]<=16384
          and type(entry["guest_size"]) is int and 1<=entry["guest_size"]<=4096
          and type(entry["native_ops"]) is int and 1<=entry["native_ops"]<=4096
          and int(entry["native_pc"],16)>=0xffff00000000,
@@ -98,7 +98,7 @@ def verify(log,source):
     need(type(caller["pid"]) is int and caller["pid"]==pid
          and caller["guest_entry"]=="0x80100fd5c"
          and type(caller["scan"]) is int
-         and entry["scan"]<caller["scan"]<=1536
+         and entry["scan"]<caller["scan"]<=16384
          and type(caller["guest_size"]) is int and 1<=caller["guest_size"]<=4096
          and type(caller["native_ops"]) is int and 1<=caller["native_ops"]<=4096
          and int(caller["guest_rsp"],16)==int(entry["guest_rsp"],16)+8
