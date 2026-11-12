@@ -147,6 +147,37 @@ jobs:
           print('KERNIX_G0_C_FOUR_AUTHENTIC_NATIVE_WRITERS_SAME_REAL_FEX_PID_RAW',passed,'RC',rc,'HITS',len(hits))
           assert passed,'actual original 80..83 source ARM64 hardware writes NOT all proven in one inferior, no release claim'
           PY
+      - name: Independently audit actual original GNU 80-83 ARM64 FEX stores in the SAME run
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=native-engine/tools python3 \
+            native-engine/tools/test_kernix_g0_l40_c_first_four_original_writers_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l40_c_first_four_original_writers_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            dist/C-4-real-native . dist/C-4-real-native-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("dist/C-4-real-native-independent/KERNIX-G0-C-80-83-Independent-Real-Native-Writer-Audit-NOT-40.json")
+          d=json.loads(p.read_text())
+          assert d["source_indices_independently_audited_in_one_FEX_pid"]==[80,81,82,83]
+          assert d["original_GNU_four_writer_events_independently_audited"]==4
+          assert len(d["counterfeit_native_source_traces_rejected"])==28
+          assert d["stage_C_all_40_native_writers_one_pid_proven"] is False
+          assert d["full_original_ELF_dynamic_loader_proven"] is False
+          assert d["Android_Bionic_Wine_Proton_games_proven"] is False
+          print("KERNIX_G0_C_FIRST4_ARM64_FEX_REAL_HARDWARE_AND_INDEPENDENT_AUDIT_COMPLETE_ONLY_4_OF_C40")
+          PY
+      - name: Archive independent real-source 80-83 native writer audit if obtained
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-Original-80-83-Four-ARM64-FEX-Writers-Independent-28-Forged-Controls-NOT-C40
+          path: dist/C-4-real-native-independent/KERNIX-G0-C-80-83-Independent-Real-Native-Writer-Audit-NOT-40.json
+          retention-days: 30
+          if-no-files-found: warn
       - name: Preserve native hardware traps and per-source failure evidence even on failed GDB process
         if: always()
         uses: actions/upload-artifact@v4
