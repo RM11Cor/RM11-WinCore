@@ -99,7 +99,7 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
                 r=ins.reg_name(op.reg)
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
-                return ("uint64_t(uint32_t(r[%d]))" if op.size==4
+                return ("static_cast<uint64_t>(static_cast<uint32_t>(r[%d]))" if op.size==4
                         else "r[%d]")%REGS[r]
             if op.type==X86_OP_MEM:
                 return ("read32(%s)" if op.size==4 else "read64(%s)")%memaddr(op)
@@ -113,7 +113,7 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
                 if op.size==4:
-                    return "r[%d]=uint64_t(uint32_t(%s));"%(REGS[r],value)
+                    return "r[%d]=static_cast<uint64_t>(static_cast<uint32_t>(%s));"%(REGS[r],value)
                 return "r[%d]=%s;"%(REGS[r],value)
             if op.type==X86_OP_MEM:
                 return ("write32(%s,%s);" if op.size==4
