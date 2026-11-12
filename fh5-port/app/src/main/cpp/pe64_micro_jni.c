@@ -90,11 +90,16 @@ Java_com_fh5_port_X64Proof_nativeInspectBlock(JNIEnv *env, jclass unused,
   snprintf(report,sizeof(report),
     "{\"status\":\"%s\",\"microTranslatorAccepted\":%s,"
     "\"armWords\":%zu,\"x86BytesTranslated\":%zu,"
+    "\"recognizedPrefixBytes\":%zu,\"recognizedInstructionCount\":%zu,"
+    "\"firstUnsupportedOffset\":%zu,\"firstStackSubSupported\":%s,"
+    "\"stackBytesOutstanding\":%u,"
     "\"translationOnly\":true,\"executed\":false,"
     "\"originalGameCodeExecuted\":false,\"fullX64RuntimeReady\":false}",
     rm11_micro_status_name(result),
     result==RM11_MICRO_OK ? "true" : "false",
     result==RM11_MICRO_OK ? out.word_count : 0u,
-    result==RM11_MICRO_OK ? out.x86_bytes : 0u);
+    result==RM11_MICRO_OK ? out.x86_bytes : 0u,
+    out.x86_bytes,out.x86_instructions,out.unsupported_offset,
+    out.x86_bytes>=4 ? "true":"false", out.stack_bytes);
   return (*env)->NewStringUTF(env,report);
 }
