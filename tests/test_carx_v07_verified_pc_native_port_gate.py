@@ -72,7 +72,7 @@ class Gate(unittest.TestCase):
         with self.assertRaises(gate.ValidationError):
             gate.evaluate(self.input)
 
-    def test वास्तविक_807_808_discrepancy_is_not_missing_file_proof(self):
+    def test_real_807_vs_808_discrepancy_is_not_missing_file_proof(self):
         d=gate.evaluate(self.input)
         self.assertEqual(d["addressables"]["bundle_file_minus_catalog_reference_count"],1)
         self.assertFalse(d["addressables"]["bundle_file_count_vs_catalog_count_is_missing_file_proof"])
