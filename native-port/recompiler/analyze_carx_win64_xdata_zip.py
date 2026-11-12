@@ -19,11 +19,15 @@ from x64_control_flow_gate import inspect_cfg
 from win64_callable_source_gate import evaluate_win64_source_function
 
 ZIP_SCHEMA="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
+ZIP_SCHEMA_V3="rm11carx.original-win64-gameassembly-bounded-function-samples.v3"
 MAX_SIZE=8*1024*1024
 MAX_CODE_BYTES=256*320
 MAX_UNWIND_FILES=1024
+MAX_PARENT_FILES=1024
+MAX_PARENT_SOURCE_BYTES=2*1024*1024
 CODE=re.compile(r"code/rva_([0-9a-f]{8})\.bin$")
 UNWIND=re.compile(r"unwind/rva_([0-9a-f]{8})\.bin$")
+PARENT=re.compile(r"parents/rva_([0-9a-f]{8})\.bin$")
 
 def require(valid,reason):
     if not valid:raise ValueError(reason)
@@ -45,33 +49,66 @@ def verify_member(z:zipfile.ZipFile, info:dict,pattern:re.Pattern,expected_rva:i
             "source original record SHA256 mismatch")
     return raw
 
+def verify_parent_member(z:zipfile.ZipFile, parent:dict,
+                         expected_begin:int,expected_end:int,
+                         expected_unwind:int)->bytes:
+    require(isinstance(parent,dict),"missing user-exported Win64 parent code metadata")
+    begin=parent.get("begin_rva")
+    end=parent.get("end_rva")
+    require(begin==expected_begin and end==expected_end and
+            parent.get("unwind_rva")==expected_unwind,
+            "parent code declaration does not match actual original CHAININFO")
+    size=end-begin
+    require(1<=size<=4096 and parent.get("length_bytes")==size,
+            "original parent machine-code range exceeds 4KiB bounded size")
+    member=parent.get("zip_member")
+    match=PARENT.fullmatch(member or "")
+    require(match is not None and int(match.group(1),16)==begin,
+            "parent code member does not match original BeginAddress")
+    require(member in z.NameToInfo and z.getinfo(member).file_size==size,
+            "original parent code member is missing or has wrong size")
+    raw=z.read(member)
+    require(len(raw)==size and
+            hashlib.sha256(raw).hexdigest()==parent.get("sha256"),
+            "original parent code bytes do not match manifest SHA256")
+    return raw
+
 def analyze(source:Path)->dict:
     require(source.is_file() and not source.is_symlink() and
             0<source.stat().st_size<=MAX_SIZE,"source ZIP is unavailable or excessive")
     with zipfile.ZipFile(source) as z:
         records=z.infolist()
         names=[r.filename for r in records]
-        require(len(records)<=1+256+MAX_UNWIND_FILES,
+        require(len(records)<=1+256+MAX_UNWIND_FILES+MAX_PARENT_FILES,
                 "archive entry bound exceeded")
         require(len(names)==len(set(names)),"duplicate original ZIP member")
         require("manifest.json" in names,"source manifest missing")
         require(all(name=="manifest.json" or CODE.fullmatch(name) or
-                    UNWIND.fullmatch(name) for name in names),
+                    UNWIND.fullmatch(name) or PARENT.fullmatch(name)
+                    for name in names),
                 "unknown source ZIP members or unsafe archive paths")
-        require(sum(x.file_size for x in records)<2*1024*1024,
+        require(sum(x.file_size for x in records)<6*1024*1024,
                 "uncompressed archive outside original sampling limit")
         require(z.getinfo("manifest.json").file_size<256*1024,
                 "source manifest too large")
         manifest=json.loads(z.read("manifest.json"))
-        require(manifest.get("schema")==ZIP_SCHEMA,
-                "owner archive is not actual v1.1 UNWIND_INFO source package")
+        source_schema=manifest.get("schema")
+        require(source_schema in (ZIP_SCHEMA,ZIP_SCHEMA_V3),
+                "owner archive is not actual v1.1-v1.3 Win64 unwind source package")
+        v3=(source_schema==ZIP_SCHEMA_V3)
+        if v3:
+            require(manifest.get("version")=="1.3-parent-code-bounded" and
+                    manifest.get("max_parent_code_fragment_bytes")==4096 and
+                    manifest.get("max_parent_code_total_bytes")==MAX_PARENT_SOURCE_BYTES,
+                    "v1.3 original parent-code export limits not documented")
         functions=manifest.get("functions")
         require(isinstance(functions,list) and 1<=len(functions)<=256,
                 "source manifest function list absent or over bound")
         distinct_unwind_rvas={
             x.get("win64_unwind_info_rva") for x in functions
         }
-        if manifest.get("version")=="1.2-source-diverse":
+        if manifest.get("version") in ("1.2-source-diverse",
+                                       "1.3-parent-code-bounded"):
             require(
                 manifest.get("sampler_policy")==
                     "one_source_function_per_distinct_unwind_rva",
@@ -88,6 +125,9 @@ def analyze(source:Path)->dict:
 
         used={"manifest.json"}
         unique_unwind=set()
+        unique_parent_code={}
+        parent_code_references_verified=0
+        parent_code_references_missing=0
         code_bytes=0
         decoded=0
         unsupported=Counter()
@@ -123,6 +163,7 @@ def analyze(source:Path)->dict:
             independently_decoded_chain=[]
             status=function.get("unwind_status")
             chain_record=[]
+            parent_code_complete=v3
             if raw_chain:
                 require(raw_chain[0].get("unwind_rva")==
                         function.get("win64_unwind_info_rva"),
@@ -158,9 +199,39 @@ def analyze(source:Path)->dict:
                     if index+1<len(raw_chain):
                         require(raw_chain[index+1]["unwind_rva"]==expected[2],
                                 "next Win64 xdata chain link missing/misordered")
+                    if v3:
+                        parent_status=item.get("parent_code_status")
+                        if parent_status=="EXPORTED_VERIFIED_BOUNDED_FRAGMENT":
+                            parent=item.get("original_parent_code")
+                            parent_raw=verify_parent_member(
+                                z,parent,*parsed.chained_runtime_function)
+                            member=parent["zip_member"]
+                            existing=unique_parent_code.get(member)
+                            fingerprint=(len(parent_raw),parent["sha256"])
+                            require(existing is None or existing==fingerprint,
+                                    "original parent source reused with conflicting code bytes")
+                            unique_parent_code[member]=fingerprint
+                            used.add(member)
+                            parent_code_references_verified+=1
+                        else:
+                            require(
+                                parent_status in (
+                                    "ORIGINAL_PARENT_CODE_RANGE_REJECTED",
+                                    "ORIGINAL_PARENT_RVA_LENGTH_CONFLICT",
+                                    "PARENT_SOURCE_EXTRACTION_BUDGET",
+                                    "ORIGINAL_PARENT_EXECUTABLE_RVA_UNAVAILABLE"),
+                                "unrecognized original parent source code status")
+                            require(not item.get("original_parent_code"),
+                                    "parent source marked missing but file claimed")
+                            parent_code_references_missing+=1
+                            parent_code_complete=False
                 else:
                     require(not declared_chain,
                             "Android reported false chain in independent decoder")
+                    if v3:
+                        require(not item.get("parent_code_status") and
+                                not item.get("original_parent_code"),
+                                "nonchained xdata must not declare parent executable")
                 if parsed.handler_rva is not None:
                     chain_types["handler_record"]+=1
                 decoded+=1
@@ -184,7 +255,11 @@ def analyze(source:Path)->dict:
             # standalone or identifiable Unity game method.
             source_gate=evaluate_win64_source_function(
                 rva,len(sample),cfg,independently_decoded_chain,
-                status if isinstance(status,str) else "UNWIND_NOT_READ")
+                status if isinstance(status,str) else "UNWIND_NOT_READ",
+                parent_code_segments_verified=(
+                    v3 and parent_code_complete and
+                    any(x.chained_runtime_function is not None
+                        for x in independently_decoded_chain)))
             source_gate_totals[source_gate.status]+=1
             for blocker in source_gate.blockers:
                 source_gate_totals["blocked_by_"+blocker]+=1
@@ -194,6 +269,8 @@ def analyze(source:Path)->dict:
                 "original_function_code_bytes":len(sample),
                 "unwind_metadata_status":status,
                 "independently_decoded_unwind_count":decoded_for_function,
+                "original_chain_parent_code_all_verified":
+                    v3 and parent_code_complete,
                 "reachable_original_x64_cfg":cfg.safe_report(),
                 "chain":chain_record,
                 "complete_callable_il2cpp_method_proven":False,
@@ -201,6 +278,18 @@ def analyze(source:Path)->dict:
         require(used==set(names),"archive contains undeclared original data")
         require(len(unique_unwind)==manifest.get("unwind_records_exported_unique"),
                 "unique source unwind record count mismatch")
+        if v3:
+            require(
+                len(unique_parent_code)==
+                    manifest.get("unique_parent_source_code_fragments") and
+                sum(v[0] for v in unique_parent_code.values())==
+                    manifest.get("original_parent_code_bytes_exported") and
+                parent_code_references_missing==
+                    manifest.get("parent_code_reference_extraction_issues"),
+                "v1.3 original parent code counters differ from SHA-verified ZIP")
+            require(sum(v[0] for v in unique_parent_code.values())<=
+                        MAX_PARENT_SOURCE_BYTES,
+                    "v1.3 original parent source export over total budget")
         return {
             "schema":"rm11carx.owner-real-gameassembly-win64-unwind-analyzed.v1",
             "original_source_archive_type":"owner Android PortLab v1.1 Windows PE x64 .pdata/.xdata",
@@ -210,6 +299,12 @@ def analyze(source:Path)->dict:
                 manifest.get("version")=="1.2-source-diverse",
             "original_source_code_bytes_verified":code_bytes,
             "sha256_verified_unique_unwind_records":len(unique_unwind),
+            "original_parent_code_archive_schema_v3":v3,
+            "sha256_verified_unique_parent_code_fragments":len(unique_parent_code),
+            "sha256_verified_parent_code_references":parent_code_references_verified,
+            "missing_bounded_parent_code_references":parent_code_references_missing,
+            "sha256_verified_unique_parent_code_bytes":
+                sum(v[0] for v in unique_parent_code.values()),
             "independently_decoded_win64_unwind_records":decoded,
             "unsupported_unwind_records":dict(sorted(unsupported.items())),
             "source_chain_observations":dict(sorted(chain_types.items())),
@@ -225,7 +320,7 @@ def analyze(source:Path)->dict:
             "original_carx_machine_code_executed_on_android":False,
             "original_carx_game_first_frame_rendered":False,
             "no_original_machine_code_in_report":True,
-            "next_gate":"match decoded unwind ranges to real x86 CFG + source RIP globals; only then test actual GameAssembly method",
+            "next_gate":"merge source Win64 parent code into bounded multi-segment CFG, resolve original call/global dependencies and prove real reference behavior",
         }
 
 def main():
