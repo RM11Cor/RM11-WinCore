@@ -49,6 +49,7 @@ def plan(triad:Path,ledger:Path,repo:Path,out:Path):
          "exact native source resolver detection insertion points")
     watch_class=r'''state["actual_ret_hw_read"]=None
 state["ret_stack_read_count"]=0
+state["ret_paused_watchpoints"]=[]
 class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
     def __init__(self,slot):
         self.slot=slot
@@ -88,6 +89,10 @@ class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
                 state["actual_ret_hw_read"]=evt
                 jmark("IFUNC85_ORIGINAL_C3_RET_NATIVE_STACK_HW_READ",**evt)
                 self.delete()
+                assert len(state["ret_paused_watchpoints"])==2
+                for saved in state["ret_paused_watchpoints"]:
+                    saved.enabled=True
+                jmark("IFUNC85_OTHER_TWO_SOURCE_WATCHES_RESTORED_AFTER_C3_READ",pid=pid,count=2)
                 return False
             jmark("IFUNC85_RET_STACK_ACCESS_UNCLASSIFIED",**evt)
             if n>=16:
@@ -104,11 +109,18 @@ class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
                 jmark("IFUNC85_RESOLVER_JIT_ENTRY_HW",**evt)'''
     to_line='''                state["resolver_jit_first"]=evt
                 jmark("IFUNC85_RESOLVER_JIT_ENTRY_HW",**evt)
+                state["ret_paused_watchpoints"]=[bp for bp in (gdb.breakpoints() or [])
+                    if isinstance(bp,(IFUNC85OriginalGNUJITHeaderWatch,OriginalIRELATIVE85ZeroAccess))]
+                assert len(state["ret_paused_watchpoints"])==2,"expected two pre-RET watchpoint owners"
+                for saved in state["ret_paused_watchpoints"]:
+                    saved.enabled=False
+                jmark("IFUNC85_OTHER_TWO_SOURCE_WATCHES_SUSPENDED_FOR_C3_READ",pid=pid,count=2)
                 OriginalIFUNC85ActualGuestC3RETRead(rsp)
                 jmark("IFUNC85_SOURCE_C3_RET_STACK_HW_RWATCH_ARMED",
                       pid=pid,stack_slot=hex(rsp),expected_return=hex(ret),
                       source_guest_C3_RET="0x8040c860d",
-                      original_ret_hardware_read_proven_yet=False)'''
+                      original_ret_hardware_read_proven_yet=False,
+                      other_two_source_watchpoints_temporarily_suspended=True)'''
     need(patched.count(from_line)==1,"unique exact source resolver entry where C3 return read watch is installed")
     patched=patched.replace(from_line,to_line)
     terminal="\nquit\n"
