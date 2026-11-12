@@ -1,0 +1,138 @@
+name: KERNIX G0 C genuine GNU IFUNC85 C3 RET native stack HW read one ARM64 FEX PID 16 spoof checks
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_hw_plan.py'
+      - 'native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_independent_gate.py'
+      - '.github/workflows/kernix-g0-l40-c-ifunc85-explicit-c3-ret-stack-native-arm64-fex.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc85-exact-guest-C3-RET-native-arm64-hardware-stack-read-one-FEX-PID:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require native 80-85 GNU source same PID and independently certified IFUNC85 resolver caller JIT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 41846530666 43068123299 43160956967 43161732148; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+      - name: Download real original immutable GNU x86_64 guest libc and ld-linux ELF source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download 147 individually attested original GNU source targets canonical ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Reuse original genuine pinned Linux ARM64 FEXCore translation runtime
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43078736764
+          name: KERNIX-G0-Parallel20-Shared-True-ARM64-FEX-Original-GNU-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/FEX
+      - name: Re-derive original GNU CALL/C3 RET/caller/write and exact GDB hardware RSP read script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_hw_plan.py \
+            native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_hw_plan.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/C-ifunc85-ret-source
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          p=Path('dist/C-ifunc85-ret-source')
+          obj=json.loads((p/'KERNIX-G0-C-IFUNC85-Exact-C3-RET-Hardware-Read-One-FEX-PID-SOURCE-ONLY.json').read_text())
+          gdb=(p/'kernix-g0-c-ifunc85-actual-C3-RET-hardware-stack-read-one-real-FEX-pid.gdb').read_bytes()
+          assert obj['source_original_guest_C3_RET_RIP']=='0x8040c860d'
+          assert obj['source_original_guest_C3_RET_byte']=='c3'
+          assert obj['generated_native_GDB_script_sha256']==hashlib.sha256(gdb).hexdigest()
+          assert obj['native_guest_ret_stack_read_proven_by_source'] is False
+          assert obj['native_ifunc85_full_chain_proven_by_source'] is False
+          print('KERNIX_G0_C_IFUNC85_ORIGINAL_GNU_C3_RET_HARDWARE_SOURCE_PLAN_READY_NO_NATIVE_RESULT')
+          PY
+          B=inputs/FEX/kernix-parallel20-authentic-original-FEX-package.tar.gz
+          test "$(sha256sum "$B" | cut -d ' ' -f1)" = "$(cat inputs/FEX/parallel20-package.sha256)"
+          tar -C dist -xzf "$B"
+          test -s dist/parallel20-package/FEXCore-lib/libFEXCore.so
+          test -s dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64
+      - name: Install native AArch64 real GDB watchpoint debugger
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          bash native-engine/tools/kernix_ci_arm64_apt_mirror_failover.sh gdb
+      - name: Execute source-original FEX five writes IFUNC85 resolver and exact C3 RET hardware stack READ
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/dist/parallel20-package/FEXCore-lib"
+          mkdir -p dist/C-ifunc85-ret-native
+          set +e
+          timeout -k 5s 180s gdb -q -nx -batch \
+            -x dist/C-ifunc85-ret-source/kernix-g0-c-ifunc85-actual-C3-RET-hardware-stack-read-one-real-FEX-pid.gdb \
+            --args dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64 \
+            dist/parallel20-package/original-source-pinned-root \
+            >dist/C-ifunc85-ret-native/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/C-ifunc85-ret-native/gdb.exit
+          grep '^KERNIX_G0_L40_C_IFUNC85_' dist/C-ifunc85-ret-native/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log || true
+          echo KERNIX_G0_C_IFUNC85_EXACT_SOURCE_C3_RET_HW_READ_FEX_EXIT "$rc"
+          test "$rc" = 0
+      - name: Independent original GNU x86 RET source, actual ARM64 native stack HW read and sixteen forged controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_l40_c_ifunc85_explicit_c3_ret_stack_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . \
+            dist/C-ifunc85-ret-native \
+            dist/C-ifunc85-ret-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/C-ifunc85-ret-independent/KERNIX-G0-C-IFUNC85-Exact-C3-RET-HW-Stack-Read-Resolver-Writer-Same-FEX-PID.json')
+          d=json.loads(p.read_text())
+          assert d['source_indices_real_native_writer_events_in_same_pid']==[80,81,82,83,84,85]
+          assert d['source_IFUNC85_original_C3_RET_read_hardware_observed'] is True
+          assert d['source_IFUNC85_original_ret_guest_RIP']=='0x8040c860d'
+          assert d['source_IFUNC85_resolver_entry_caller_site_and_zero_STLR_same_pid'] is True
+          assert len(d['sixteen_forged_C3_RET_hardware_reads_rejected'])==16
+          assert d['stage_C_40_original_GNU_relocations_one_PID_proven'] is False
+          assert d['original_GNU_main_ldso_RELRO_sealing_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_C_TRUE_IFUNC85_C3_RET_STACK_NATIVE_HARDWARE_READ_ZERO_STORE_ONE_FEX_PID_INDEPENDENT_PASS')
+          PY
+      - name: Preserve actual IFUNC85 native FEX C3 RET GDB read and independent log, even failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-IFUNC85-GNU-Exact-C3-RET-HW-Stack-Read-Same-FEX-Writer-Independent
+          path: |
+            dist/C-ifunc85-ret-native/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
+            dist/C-ifunc85-ret-native/gdb.exit
+            dist/C-ifunc85-ret-independent/KERNIX-G0-C-IFUNC85-Exact-C3-RET-HW-Stack-Read-Resolver-Writer-Same-FEX-PID.json
+          retention-days: 30
+          if-no-files-found: warn
