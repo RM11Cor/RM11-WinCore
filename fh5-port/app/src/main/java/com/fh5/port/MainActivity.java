@@ -440,7 +440,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if(!"direct".equals(node.optString("first_transfer_target_kind","")))
             return -1;
         long rva=node.optLong("first_transfer_target_rva",-1);
-        return rva>0 && rva<imageSize?rva:-1;
+        return JumpJoin.inImage(rva,imageSize)?rva:-1;
     }
 
     /** Hard stop at one more JMP per JNE arm. No recursion/cycle execution. */
@@ -449,10 +449,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                                        long secondArmRva,long callTargetRva) {
         JSONObject result=new JSONObject();
         try {
-            if(nextRva<=0 || nextRva>=imageSize) {
+            if(!JumpJoin.inImage(nextRva,imageSize)) {
                 result.put("status","NO_RESOLVED_IN_IMAGE_DIRECT_JMP");
-            } else if(nextRva==firstArmRva || nextRva==secondArmRva ||
-                      nextRva==callTargetRva) {
+            } else if(JumpJoin.previouslyVisited(nextRva,firstArmRva,
+                                          secondArmRva,callTargetRva)) {
                 result.put("status","TARGET_ALREADY_VISITED_CYCLE_OR_CROSS_LINK");
                 result.put("target_rva",nextRva);
             } else {
@@ -560,13 +560,11 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                                     paths.put("not_taken_second_jmp_target_rva",
                                         notTakenNext>0?notTakenNext:JSONObject.NULL);
                                     paths.put("branch_paths_were_executed",false);
-                                    boolean bothKnown=takenNext>0 && notTakenNext>0;
+                                    boolean bothKnown=JumpJoin.inImage(takenNext,e.pe.imageSize)
+                                        && JumpJoin.inImage(notTakenNext,e.pe.imageSize);
                                     paths.put("both_next_targets_direct_and_in_image",bothKnown);
                                     paths.put("static_next_jump_join_status",
-                                        !bothKnown?"ONE_OR_BOTH_UNRESOLVED":
-                                        takenNext==notTakenNext?
-                                        "SAME_IMMEDIATE_JMP_DESTINATION":
-                                        "DISTINCT_IMMEDIATE_JMP_DESTINATIONS");
+                                        JumpJoin.classify(takenNext,notTakenNext,e.pe.imageSize));
                                     if(bothKnown && takenNext==notTakenNext) {
                                         JSONObject shared=inspectNextJump(file.getChannel(),
                                             takenNext,e.pe.imageSize,takenRva,otherRva,targetRva);
