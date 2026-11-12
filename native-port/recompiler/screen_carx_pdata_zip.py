@@ -59,9 +59,15 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         if not isinstance(items,list) or len(items)>256 or not items:
             raise ValueError("invalid bounded function list")
         expected={"manifest.json"}|{item["zip_member"] for item in items}
+        source_admission_by_rva={}
         if source_schema==SOURCE_SCHEMA_V2:
             from analyze_carx_win64_xdata_zip import analyze
             unwind_report=analyze(archive)
+            source_admission_by_rva={
+                int(item["function_rva_hex"],16):
+                    item["callable_source_admission"]
+                for item in unwind_report["source_function_unwind_details"]
+            }
             result["original_unwind_records_sha_verified"]=(
                 unwind_report["sha256_verified_unique_unwind_records"])
             result["independent_win64_unwind_records_decoded"]=(
@@ -91,7 +97,21 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
             cfg=inspect_cfg(code,base=item["relative_rva"])
             record={"rva_hex":hex(item["relative_rva"]),"bytes":len(code),
                     "sha256":sha,"statical_aot_translatable":False,
-                    "reachable_original_x86_cfg":cfg.safe_report()}
+                    "reachable_original_x86_cfg":cfg.safe_report(),
+                    "complete_unwind_info_verified":
+                        source_schema==SOURCE_SCHEMA_V2}
+            if source_schema==SOURCE_SCHEMA_V2:
+                admission=source_admission_by_rva.get(item["relative_rva"])
+                if admission is None:
+                    raise ValueError("source xdata admission missing for original RVA")
+                record["callable_source_admission"]=admission
+                if admission["status"]!=(
+                        "STRUCTURALLY_LOCAL_CANDIDATE_NEEDS_REFERENCE_EXECUTION"):
+                    reason="original_unwind_parent_or_boundary_dependencies_unresolved"
+                    record["blocker_category"]=reason
+                    rejected[reason]+=1
+                    records.append(record)
+                    continue
             if not cfg.structurally_self_contained_candidate:
                 if cfg.external_direct_calls or cfg.indirect_calls:
                     reason="original_call_dependencies_unresolved"
@@ -151,6 +171,8 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         result["per_function_results"]=records
         result["aot_cpp_generated"]=cpp_dir is not None and result["aot_supported_source_functions"]>0
         result["source_CFG_checked_before_AOT"]=True
+        result["xdata_admission_enforced_before_cpp_codegen"]=source_schema==SOURCE_SCHEMA_V2
+        result["legacy_v1_without_xdata_cannot_prove_callable_game_methods"]=source_schema!=SOURCE_SCHEMA_V2
         result["unresolved_source_function_fragments_not_emitted_as_CXX"]=True
         result["code_is_original_win64_unwind_function_not_confirmed_gameplay_method"]=True
     return result
