@@ -16,8 +16,8 @@ jobs:
       - name: Require genuine original ARM64 native C++ build and all independent signer checks
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
-          GH_${{ github.repository }}: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           RUN=43186176740
@@ -87,8 +87,8 @@ jobs:
       - name: Publish exact verified v0.5 Android APK to Releases with separate immutable tag
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
-          GH_${{ github.repository }}: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           TAG=carx-street-portlab-v0.5.0-native-arm64-vulkan-20261112
