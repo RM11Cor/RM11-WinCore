@@ -80,4 +80,44 @@ public final class PeImportSymbolProbeTest {
         assertTrue(PeImportSymbolProbe.MAX_TOTAL_THUNKS<=8192);
         assertTrue(PeImportSymbolProbe.MAX_THUNKS_PER_DLL<=512);
     }
+
+    @Test public void longCppMangledNameDoesNotAbortAllDllImports() throws Exception {
+        byte[] pe=fixture();
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(pe).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        b.putLong(4096+0x400,0x1700);
+        String longName="?ForzaLongMangledFunction@"+("C".repeat(210))+"@@Z";
+        byte[] name=(longName+"\0").getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        System.arraycopy(name,0,pe,4096+0x702,name.length);
+        PeImportSymbolProbe.Report report=inspect(pe);
+        assertTrue(report.complete);
+        assertEquals("IMPORT_SYMBOLS_DECODED",report.status);
+        assertEquals(2,report.totalNamedImports);
+        assertEquals(1,report.totalOrdinalImports);
+        assertEquals(1,report.sampleNamesTruncated);
+        assertEquals(0,report.namesOverScanBudget);
+        assertTrue(report.dlls.get(0).exampleFunctions.get(0).endsWith(" [truncated]"));
+        assertTrue(report.dlls.get(0).exampleFunctions.get(0).length()<110);
+        assertEquals("D3D12CreateDevice",report.dlls.get(1).exampleFunctions.get(0));
+    }
+    @Test public void overOneKilobyteFunctionNameIsBoundedAndClearlyIncomplete()
+            throws Exception {
+        byte[] pe=fixture();
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(pe).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        b.putLong(4096+0x400,0x1700);
+        java.util.Arrays.fill(pe,4096+0x702,4096+0x702+1100,(byte)'A');
+        PeImportSymbolProbe.Report r=inspect(pe);
+        assertFalse(r.complete);
+        assertEquals("IMPORT_SYMBOLS_INCOMPLETE_OR_BUDGET_REACHED",r.status);
+        assertEquals(1,r.namesOverScanBudget);
+        assertEquals(2,r.totalNamedImports);
+        assertEquals(1,r.totalOrdinalImports);
+        assertEquals(1,r.sampleNamesTruncated);
+    }
+    @Test public void smallNameStillHasExactSampleNoTruncation() throws Exception {
+        PeImportSymbolProbe.Report report=inspect(fixture());
+        assertTrue(report.complete);
+        assertEquals(0,report.sampleNamesTruncated);
+        assertEquals(0,report.namesOverScanBudget);
+        assertEquals("CreateFileW",report.dlls.get(0).exampleFunctions.get(0));
+    }
 }
