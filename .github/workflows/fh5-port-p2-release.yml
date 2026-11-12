@@ -1,0 +1,69 @@
+name: Publish FH5 Native Port P2 to Releases
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p2-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-p2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download independently built P2 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh run download 43165711853 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2-x64-arm64-APK --dir dist
+          test -s dist/app-debug.apk
+          printf '%s  %s\n' 'd0dd757de2a6b897262ed066bff99b71de6b44481ac51ed3e42710434e203b65' 'dist/app-debug.apk' | sha256sum -c -
+          mv dist/app-debug.apk dist/FH5-Native-Port-P2-arm64-debug.apk
+      - name: Publish carefully labeled experimental release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag='fh5-native-port-p2-x64-proof-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: $tag"
+            exit 0
+          fi
+          cat > release-notes.md <<'EOF'
+          ## FH5 Native Port P2 - standalone Android ARM64 (EXPERIMENTAL)
+
+          Independent APK build including:
+          - Direct Android Vulkan presentation on the device (P0)
+          - ZIP64 central-directory metadata index from a selected Forza source archive, no 100GB extraction (P1)
+          - Bounded synthetic x86-64 PE64 instructions translated to ARM64 and executed by a W^X JIT **inside the APK** (P2)
+          - User-exportable privacy-safe report: FH5_PORT_P2_REPORT.json
+
+          ### What P2 does not do
+          This is **NOT** a playable Forza Horizon 5 port. No original Forza x86-64 game
+          instructions execute in P2. It does not include an integrated complete
+          FEXCore/Windows loader/Steam runtime/VKD3D-Proton/Forza engine.
+          The **Play** button is intentionally disabled. No Bannerlator/Winlator UI is required.
+
+          ### Test on REDMAGIC 11 Pro
+          1. Install this debug APK. If Android rejects it as an update, uninstall only
+             the previous P1 test APK first because GitHub debug signing keys differ.
+             Your original game ZIP on shared storage is not removed.
+          2. Open the app, choose Forza ZIP again and wait for P1 index success.
+          3. Tap the x64/ARM64 proof button. Expected synthetic result: 42 if device allows executable JIT.
+          4. Export FH5_PORT_P2_REPORT.json and upload only this JSON.
+          Do not upload proprietary game files or private local paths.
+
+          SHA256 APK: d0dd757de2a6b897262ed066bff99b71de6b44481ac51ed3e42710434e203b65
+          CI: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43165711853
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2-arm64-debug.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2 - x64 ARM64 Execution Proof (Experimental)' \
+            --notes-file release-notes.md --prerelease
