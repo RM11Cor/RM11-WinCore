@@ -1,0 +1,89 @@
+name: Publish FH5 Native Port P3.6 - Import Symbols and Local DLL Headers
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p36-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify permanent-signed P3.6 Android release build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43198954720 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.6-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'f36d82c6c0a2560c8051a7a51a90cc1d470ff9f96f6910ba16a5170be6e499de' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.6-Permanent-Signed.apk
+      - name: Publish P3.6 experimental static symbol and DLL inspection
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-6-import-symbols-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.6 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.6 — PE Import Functions and Local DLL Headers
+
+          **Experimental read-only Android ARM64 diagnostic APK, not a playable Forza Horizon 5 port.**
+
+          ## Grounded in real P3.5 device report
+          - Original extracted Forza EXE has **47 static imported DLL names**.
+          - Six DLL files were found **beside ForzaHorizon5.exe**:
+            `amd_ags_x64.dll`, `bink2w64.dll`, `partywin.dll`,
+            `partyxboxlive.dll`, `steam_api64.dll`, `webview2loader.dll`.
+          - 41 other names were not found beside the EXE, including 20 Windows API Set
+            contracts. This is **not** evidence that 41 runtime DLLs must be copied
+            into the game directory. Many are provided by Windows runtimes/API sets.
+
+          ## New in P3.6
+          - Analyzes original PE32+ Import Lookup Table (ILT) entries, to find
+            per-DLL named function import counts, ordinal import counts and
+            up to six printable example imported function names per DLL.
+          - Strict cap at 128 DLL import descriptors, 512 thunks per DLL
+            and 8192 total import thunks; read-only original PE RVA mapping.
+          - Inspects headers of at most 16 immediate sibling DLL files
+            with original Android SAF user-granted access, checking MZ/PE64,
+            x64 AMD64 machine type, and IMAGE_FILE_DLL flag.
+          - These checks do NOT load DLLs, resolve their exports, translate
+            imports, execute x64 code, verify licenses or initialize a Windows
+            process. Dynamic/late-loaded libraries are not captured.
+          - Retains prior game code static inspection, Vulkan synthetic display
+            test, extracted EXE fast reading, and original ZIP64 fallback.
+          - New sanitized JSON: `FH5_PORT_P3_6_REPORT.json`, with no
+            game bytes, passwords or private SAF document paths.
+
+          ## Android in-place update
+          - App ID `com.fh5.port`; versionCode **19** (P3.5 was 18).
+          - Same permanently protected signing certificate as P2.1–P3.5:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA256: `f36d82c6c0a2560c8051a7a51a90cc1d470ff9f96f6910ba16a5170be6e499de`.
+          - Install over P3.5, **do not uninstall**.
+
+          ## Phone procedure
+          1. Update P3.5 directly with P3.6 APK.
+          2. Keep the previously granted original extracted game folder.
+          3. Press `فحص دوال Windows وملفات DLL المحلية`.
+          4. Export `FH5_PORT_P3_6_REPORT.json` and share only that JSON.
+
+          Build, synthetic JVM import-symbol and DLL header tests, ARM64
+          libraries, APK identity and stable certificate were verified by:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43198954720
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.6-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.6 - Imported Windows Functions and DLL Headers (Experimental)' \
+            --notes-file notes.md --prerelease
