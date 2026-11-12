@@ -1,0 +1,77 @@
+name: Publish FH5 Native Port P2.9 - Static JMP Join
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p29-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified permanently signed P2.9 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43180077726 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.9-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'ab7a09d2bedd8968ba7a30f04d5792ca843d7b486120979951e4b93b29c43fea' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.9-Permanent-Signed.apk
+      - name: Publish bounded read-only branch reconvergence APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-9-jmp-join-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.9 release already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.9 — Next JMP Targets and Static Join (Experimental)
+
+          **Standalone Android ARM64 diagnostic APK. Forza Horizon 5 is NOT playable yet.**
+
+          ## New
+          - Uses results of P2.8 to identify both direct branches of the first JNE
+            inside the original Forza EXE's first resolved function.
+          - Inspects the first unconditional JMP target from each branch one
+            additional step (bounded 128-byte reads, no full extraction).
+          - Classifies if both immediate JMP destinations are the **same static RVA**
+            (`SAME_IMMEDIATE_JMP_DESTINATION`), different, or unresolved.
+          - Detects return-to-visited-node cycles/cross-links and avoids infinite traversal.
+          - If two paths resolve to the same target, inspects the shared target only once.
+          - Never executes original x86-64 game instructions or evaluates a JNE condition;
+            reported joins are STATIC, not observed running game control flow.
+          - Keeps read-only ZIP64 indexing, Vulkan test, synthetic small PE64 JIT
+            test, Capstone x86-64 decoding, and P2.8 control-flow metadata.
+          - New JSON report: `FH5_PORT_P2_9_REPORT.json` (no original game bytes).
+
+          ## In-place Android updates
+          - Application ID `com.fh5.port`, versionCode **12** (P2.8 was 11).
+          - SAME permanent FH5 signing certificate as P2.1–P2.8:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA-256: `ab7a09d2bedd8968ba7a30f04d5792ca843d7b486120979951e4b93b29c43fea`.
+          - Install over permanently-signed P2.8, **do not uninstall**.
+
+          ## On-device procedure
+          1. Install P2.9 APK on top of P2.8.
+          2. Choose the real Forza ZIP64 archive.
+          3. Tap `فحص تفرّع والتقاء مسارات فورزا (بدون تشغيل)`.
+          4. Export `FH5_PORT_P2_9_REPORT.json` and upload only that file.
+
+          Android CI native tests, JVM tests, APK signature and version verified:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43180077726
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.9-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.9 - Next JMP Targets and Static Join (Experimental)' \
+            --notes-file notes.md --prerelease
