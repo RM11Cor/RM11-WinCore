@@ -38,7 +38,7 @@ fi
 
 mkdir -p "$HOME/.local/share/carx-portlab"
 SCRIPT="$HOME/.local/share/carx-portlab/carx_windows_gamecode_port_gate.py"
-URL="https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/carx-street-pc-port-v1/tools/carx_windows_gamecode_port_gate.py"
+URL="https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/99606ac90d0c3aa6e9297d23fcb5690921e4a572/tools/carx_windows_gamecode_port_gate.py"
 curl --fail --location --show-error --silent --retry 3 --connect-timeout 10 \
      --max-time 120 "$URL" -o "$SCRIPT.tmp"
 test -s "$SCRIPT.tmp"
