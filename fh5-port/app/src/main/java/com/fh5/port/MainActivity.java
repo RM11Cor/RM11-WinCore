@@ -39,6 +39,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final String GAME_ARCHIVE = "game_archive";
     private static final String GAME_FOLDER = "game_folder";
     private static final String GAME_DIRECT_EXE = "direct_forza_exe";
+    private static final String AUTO_EXE_FROM_FOLDER = "direct_exe_from_folder";
     private SurfaceView gameSurface;
     private Button gpuButton;
     private TextView status;
@@ -81,13 +82,13 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.2 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.3 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
-        root.addView(button("اختيار أرشيف اللعبة ZIP", () -> pickArchive()));
-        root.addView(button("اختيار ForzaHorizon5.exe المستخرج (أسرع)", () -> pickDirectExe()));
-        root.addView(button("اختيار مجلد ملفات اللعبة", () -> pickFolder()));
+        root.addView(button("اختيار مجلد فورزا المستخرج (يكتشف EXE تلقائياً)", () -> pickFolder()));
+        root.addView(button("اختيار EXE مباشرة (إذا ظهر في الملفات)", () -> pickDirectExe()));
+        root.addView(button("اختيار أرشيف اللعبة ZIP (بديل)", () -> pickArchive()));
 
         gameSurface = new SurfaceView(this);
         gameSurface.getHolder().addCallback(this);
@@ -107,7 +108,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.2", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.3", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -117,7 +118,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.2: اختَر EXE المستخرج مباشرة لفحص أسرع، مع بقاء ZIP خياراً ثانياً؛ دون تشغيل اللعبة.");
+        updateStatus("P3.3: اختَر مجلد Forza Horizon 5 المستخرج؛ التطبيق يبحث عن EXE بنفسه ولو كان مخفياً في المنتقي.");
     }
 
     private int dp(int v) {
@@ -156,6 +157,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         startActivityForResult(intent,SELECT_DIRECT_EXE);
     }
     private void pickFolder() {
+        if(archiveBusy || entryBusy || exeBusy) {
+            updateStatus("فحص آخر شغال، اختَر المجلد بعد انتهائه.");
+            return;
+        }
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
                 Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -176,7 +181,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.2. ارفع FH5_PORT_P3_2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.3. ارفع FH5_PORT_P3_2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -204,7 +209,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 updateStatus("اختَر ملف ForzaHorizon5.exe نفسه من المجلد المستخرج.");
                 return;
             }
-            prefs.edit().putString(GAME_DIRECT_EXE,uri.toString()).apply();
+            prefs.edit().putString(GAME_DIRECT_EXE,uri.toString())
+                .putBoolean(AUTO_EXE_FROM_FOLDER,false).apply();
             updateStatus("تم اختيار EXE المستخرج. صار الفحص يقرأ الملف مباشرة بدون ZIP. اضغط فحص التعليمات.");
             return;
         }
@@ -216,7 +222,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             archiveBusy = true;
             final Uri selectedUri = uri;
             prefs.edit().putString(GAME_ARCHIVE, selectedUri.toString())
-                .remove(GAME_DIRECT_EXE).apply();
+                .remove(GAME_DIRECT_EXE).putBoolean(AUTO_EXE_FROM_FOLDER,false).apply();
             updateStatus("جاري قراءة فهرس ZIP/ZIP64 من الملفات الأصلية... بدون استخراج.");
             Thread worker = new Thread(() -> {
                 JSONObject info = new JSONObject();
@@ -286,8 +292,45 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             }, "fh5-zip64-index");
             worker.start();
         } else if (request == SELECT_FOLDER) {
-            prefs.edit().putString(GAME_FOLDER, uri.toString()).apply();
-            updateStatus("تم حفظ إذن مجلد اللعبة. ما زال يحتاج فحص المحتويات وربطه بمحرك التشغيل.");
+            if(archiveBusy || exeBusy || entryBusy) {
+                updateStatus("فحص آخر شغال. اختَر مجلد فورزا بعد انتهاء الفحص.");
+                return;
+            }
+            // User-granted tree access includes descendant documents even if
+            // Android's single-file picker hides .exe extensions.
+            prefs.edit().putString(GAME_FOLDER,uri.toString()).apply();
+            archiveBusy=true;
+            updateStatus("جاري العثور على ForzaHorizon5.exe داخل المجلد المحدد بدون نسخ أو تعديل...");
+            final Uri treeUri=uri;
+            Thread discover=new Thread(() -> {
+                String message;
+                try {
+                    SafGameFolderProbe.Found found=SafGameFolderProbe.find(
+                        getContentResolver(),treeUri);
+                    prefs.edit()
+                        .putString(GAME_DIRECT_EXE,found.documentUri.toString())
+                        .putBoolean(AUTO_EXE_FROM_FOLDER,true).apply();
+                    message="✅ تم العثور على ForzaHorizon5.exe تلقائياً!"
+                        +"\nحجم الملف: "+found.byteSize+" بايت"
+                        +"\nالفحص الآن يستخدم EXE مباشرة بدون ZIP."
+                        +"\nاضغط تحليل Forza EXE مباشرة (بدون تشغيل).";
+                } catch(Exception ex) {
+                    String reason=ex.getMessage();
+                    if(reason==null ||
+                       !reason.matches("(saf|pe)_[a-z0-9_]{2,90}"))
+                        reason="saf_folder_read_or_provider_failure";
+                    prefs.edit().remove(GAME_DIRECT_EXE)
+                        .putBoolean(AUTO_EXE_FROM_FOLDER,false).apply();
+                    message="تعذّر اكتشاف EXE من المجلد: "+reason
+                        +"\nحدد مجلد Forza Horizon 5 الداخلي نفسه، مو Downloads.";
+                }
+                final String result=message;
+                runOnUiThread(() -> {
+                    archiveBusy=false;
+                    updateStatus(result);
+                });
+            },"fh5-extracted-folder-saf-discovery");
+            discover.start();
         }
     }
 
@@ -613,7 +656,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         entryBusy=true;
         entryButton.setEnabled(false);
-        updateStatus("P3.2: نفحص دوال فورزا مباشرة من EXE إذا تم اختياره؛ لا ننفّذ أي تعليمة من اللعبة.");
+        updateStatus("P3.3: نفحص دوال فورزا من EXE المكتشف داخل المجلد، بدون تنفيذ كود اللعبة.");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -783,8 +826,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                             }
                         }
                     }
-                    info.put("stage","P3_2_DIRECT_PE_OR_ZIP_STATIC_ANALYSIS");
-                    info.put("status","P3_2_DIRECT_SOURCE_STATIC_ANALYSIS_COMPLETED");
+                    info.put("stage","P3_3_SAF_TREE_DIRECT_PE_ANALYSIS");
+                    info.put("status","P3_3_FOLDER_DIRECT_ANALYSIS_COMPLETED");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -802,7 +845,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     info.put("game_file_crc_fully_checked",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
-                    message="P3.2: فحصنا تعليمات فورزا من "+(directMode?"EXE مباشر!":"ZIP64!") +
+                    message="P3.3: فحصنا تعليمات فورزا من "+(directMode?"EXE مباشر!":"ZIP64!") +
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
@@ -826,7 +869,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P3_2_DIRECT_SOURCE_SCAN_FAILED");
+                    info.put("status","P3_3_FOLDER_DIRECT_ANALYSIS_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
@@ -851,7 +894,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.2")
+                .put("stage", "P3.3")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
@@ -859,6 +902,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 .put("game_zip_selected", prefs.contains(GAME_ARCHIVE))
                 .put("game_folder_selected", prefs.contains(GAME_FOLDER))
                 .put("direct_exe_selected", prefs.contains(GAME_DIRECT_EXE))
+                .put("direct_exe_auto_found_in_folder",
+                    prefs.getBoolean(AUTO_EXE_FROM_FOLDER,false))
                 .put("preferred_game_code_source",
                     prefs.contains(GAME_DIRECT_EXE)?"EXTRACTED_PE64_DIRECT":"ZIP64_ARCHIVED_EXE")
                 .put("archive_header", archiveInfo)
