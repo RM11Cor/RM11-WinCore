@@ -41,7 +41,7 @@ Java_com_fh5_port_X86Disasm_nativeInspect(JNIEnv *env,jclass unused,
         "{\"status\":\"capstone_disassembly_failed\",\"original_game_executed\":false}");
     char out[10000];
     int nprinted=snprintf(out,sizeof(out),
-       "{\"stage\":\"P2_7_CAPSTONE_DEEP_TARGET_READ_ONLY\","
+       "{\"stage\":\"P2_8_CAPSTONE_JCC_SUCCESSOR_READ_ONLY\","
        "\"engine\":\"Capstone\",\"engine_version\":\"5.0.9\","
        "\"status\":\"decoded\",\"linear_decode_only\":true,"
        "\"control_flow_validated\":false,\"first_transfer_boundary_identified\":%s,"
@@ -93,8 +93,24 @@ Java_com_fh5_port_X86Disasm_nativeInspect(JNIEnv *env,jclass unused,
     if(nprinted<0 || (size_t)nprinted>=sizeof(out)-used)
         return jstr(env,"{\"status\":\"report_overflow\",\"original_game_executed\":false}");
     used+=(size_t)nprinted;
+    char fallthrough_num[32],jump_num[32];
+    if(cf.fallthrough_rva_valid)
+        snprintf(fallthrough_num,sizeof(fallthrough_num),"%llu",
+                 (unsigned long long)cf.fallthrough_rva);
+    else strcpy(fallthrough_num,"null");
+    if(cf.fallthrough_jump_direct_target_valid)
+        snprintf(jump_num,sizeof(jump_num),"%llu",
+                 (unsigned long long)cf.fallthrough_jump_direct_target_rva);
+    else strcpy(jump_num,"null");
     nprinted=snprintf(out+used,sizeof(out)-used,
-       ",\"possible_branch_instructions\":%zu,"
+       ",\"conditional_two_successors\":%s,"
+       "\"conditional_not_taken_rva\":%s,"
+       "\"not_taken_next_instruction_present\":%s,"
+       "\"not_taken_next_mnemonic\":\"%s\","
+       "\"not_taken_next_is_jump\":%s,"
+       "\"not_taken_jump_target_kind\":\"%s\","
+       "\"not_taken_jump_target_rva\":%s,"
+       "\"possible_branch_instructions\":%zu,"
        "\"possible_call_instructions\":%zu,\"possible_return_instructions\":%zu,"
        "\"instructions_with_memory_operands\":%zu,"
        "\"push_instruction_count\":%zu,\"pop_instruction_count\":%zu,"
@@ -105,6 +121,11 @@ Java_com_fh5_port_X86Disasm_nativeInspect(JNIEnv *env,jclass unused,
        "\"original_game_executed\":false,\"executed\":false,"
        "\"raw_bytes_exported\":false,\"operands_exported\":false,"
        "\"game_playable\":false}",
+       cf.first_transfer_is_conditional?"true":"false",
+       fallthrough_num,cf.fallthrough_next_insn_present?"true":"false",
+       cf.fallthrough_next_insn_present?cf.fallthrough_next_mnemonic:"none",
+       cf.fallthrough_next_is_jump?"true":"false",
+       cf.fallthrough_jump_target_kind,jump_num,
        cf.branch_count,cf.call_count,cf.return_count,cf.memory_operand_count,
        cf.push_count,cf.pop_count,cf.vector_xmm_count,cf.vector_ymm_count,
        cf.vector_zmm_count,cf.transfer_found?"true":"false");
