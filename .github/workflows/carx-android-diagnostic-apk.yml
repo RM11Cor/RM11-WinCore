@@ -1,4 +1,4 @@
-name: CarX Street PC PortLab v0.8 - actual physical Windows64 versus catalog bundle filenames
+name: CarX Street PC PortLab v0.9 - reject unsupported bundle names without claiming 808 input overflow
 on:
   push:
     branches: [carx-street-pc-port-v1]
@@ -39,7 +39,7 @@ jobs:
           java -cp build/header-unit-tests PeImportProbeTest
           javac -d build/header-unit-tests app/src/main/java/com/rm11cor/carxstreet/portlab/BundleCatalogReconciler.java tests/BundleCatalogReconcilerTest.java
           java -cp build/header-unit-tests BundleCatalogReconcilerTest
-          echo CARX_V080_SAF_BUNDLE_CATALOG_RECONCILIATION_TESTS_COMPLETED
+          echo CARX_V090_SAF_BUNDLE_RECONCILIATION_DIAGNOSTIC_CLASSIFICATION_TESTS_COMPLETED
       - name: Restore only the original dedicated immutable CarX signing identity
         shell: bash
         env:
@@ -95,13 +95,13 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk \
-            dist/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk
-          sha256sum dist/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk >dist/SHA256.txt
+            dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
+          sha256sum dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk >dist/SHA256.txt
       - name: Independently verify permanent CarX certificate app versionCode 7 and native ELF
         shell: bash
         run: |
           set -euo pipefail
-          apk=dist/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk
+          apk=dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
           signature=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$signature"
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$signature"
@@ -110,19 +110,19 @@ jobs:
             echo 'No verified Android APK v2/v3 signature'; exit 1
           fi
           info=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
-          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='8' versionName='0.8.0-assetbundle-reconciliation'" <<<"$info"
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='9' versionName='0.9.0-asset-reference-classification'" <<<"$info"
           unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
           count=$(unzip -Z1 "$apk" | grep '^lib/' | grep -c '\.so$')
           test "$count" -eq 1
           unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/libcarx_native_probe.so"
           readelf -h "$RUNNER_TEMP/libcarx_native_probe.so" | grep -Fq 'AArch64'
-          echo CARX_V080_WINDOWS_BUNDLE_NAME_RECONCILIATION_ELF_CERT_VERSION8_READY_FOR_PHONE_TEST
+          echo CARX_V090_WINDOWS_BUNDLE_SOURCE_REJECTION_REASON_ELF_CERT_VCODE9_READY_FOR_PHONE_TEST
       - name: Preserve correct scope for actual device-side JNI Vulkan verification
         shell: bash
         run: |
           set -euo pipefail
           cat >dist/RELEASE_SCOPE.txt <<'EOF'
-          CarX Street PC PortLab v0.8.0 Windows64 bundle filename audit and source inspector ONLY.
+          CarX Street PC PortLab v0.9.0 true physical/catalog name rejection classification inspector ONLY.
           This app includes original independent JNI C++ ARM64 native code.
           It calls Android Vulkan system API to enumerate GPU, extensions and memory.
           No native CarX game engine or original Windows executable is executed.
@@ -132,22 +132,25 @@ jobs:
           NEW: compare distinct physical Windows64 bundle filenames with
           catalog-referenced bundle names, never infer file missing from counts.
           Android word occurrence is not an Android-target asset proof.
+          v0.8 detected 1 unaccepted physical bundle name plus 1 ambiguous
+          Windows64 catalog reference. They are source-name classification
+          gaps, not evidence of missing assets or source count exhaustion.
           None of the 22GB original game contents are copied or distributed.
           The user report must verify actual source read success.
           No game Vulkan surface, swapchain or first gameplay frame is rendered.
           User selected PC game files remain read-only and offline.
-          Android appID com.rm11cor.carxstreet.portlab, versionCode 8.
+          Android appID com.rm11cor.carxstreet.portlab, versionCode 9.
           Same protected permanent CarX signing certificate SHA256:
           73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
-          Installs IN-PLACE over stable signed v0.3-v0.7; device test still pending.
+          Installs IN-PLACE over stable signed v0.3-v0.8; device test still pending.
           EOF
       - name: Upload permanent-signed actual ARM64 Vulkan native test APK and SHA
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: CarXStreet-v0.8.0-SAF-Bundle-Catalog-Reconciliation-Permanent-Signed
+          name: CarXStreet-v0.9.0-SAF-Bundle-Names-Mismatch-Cause-Permanent-Signed
           path: |
-            dist/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk
+            dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
             dist/SHA256.txt
             dist/RELEASE_SCOPE.txt
           retention-days: 30
