@@ -41,6 +41,10 @@ jobs:
           python -m unittest discover \
             -s native-port/recompiler/tests \
             -p 'test_screen_carx_pdata_zip.py' -v
+          python -m unittest discover \
+            -s native-port/recompiler/tests \
+            -p 'test_triage_real_pe_functions.py' -v
+          echo CARX_AOT_REAL_PDATA_STRUCTURE_TRIAGE_SYNTHETIC_CI_TESTS_PASS
           echo CARX_AOT_REAL_GAMEASSEMBLY_SAMPLE_ARCHIVE_SCREEN_AND_SHA_NEGATIVE_TESTS_PASS
           echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_170_CROSS_ISA_MACHINE_EXECUTIONS_PASS
       - name: Scope gate no game claim without original CarX GameAssembly method run
