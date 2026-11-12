@@ -47,10 +47,10 @@ public final class PeImportProbe {
     private static int u16(byte[] b,int i) {
         return (b[i]&255)|((b[i+1]&255)<<8);
     }
-    private static long u32(byte[] b,int i) {
+    static long u32(byte[] b,int i) {
         return (long)u16(b,i)|((long)u16(b,i+2)<<16);
     }
-    private static byte[] read(SeekableByteChannel ch,long off,int len)
+    static byte[] read(SeekableByteChannel ch,long off,int len)
             throws IOException {
         if(off<0||len<0||off>ch.size()||len>ch.size()-off)
             throw new IOException("pe_import_file_bounds");
@@ -64,7 +64,7 @@ public final class PeImportProbe {
     }
 
     /** PE32+ RVA -> raw-file offset: no relocations, no section execution. */
-    private static final class Mapper {
+    static final class Mapper {
         final long fileSize,headersSize;
         final byte[] prefix;
         final int count,sectionTable;
