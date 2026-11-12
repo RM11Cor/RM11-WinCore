@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.4  /  فحص إصدار Unity",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.5  /  اختبار ARM64 و Vulkan",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 03 — تشخيص رؤوس ملفات Unity",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 04 — اختبار Vulkan الأصلي على الجهاز",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("هذا الإصدار يفحص رؤوس Unity وglobalgamemanagers وIL2CPP بشكل محلي وآمن، حتى نعرف إصدار اللعبة الحقيقي أو سبب تعذر تحديده. التطبيق ليس بورت تشغيل بعد.",14,SUB,false));
+        banner.addView(label("نفحص ملفات اللعبة وننفذ اختبار Vulkan أصلي بمعمارية ARM64 من داخل APK لمعرفة تعريف GPU الحقيقي. نجاح Vulkan مو تشغيل CarX بعد؛ كود اللعبة الأصلي ما زال مخصصاً لويندوز.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -222,6 +222,11 @@ public final class MainActivity extends Activity {
                     JSONObject deep=result.optJSONObject("unity_deep_probe");
                     JSONObject meta=deep==null?null:deep.optJSONObject("global_metadata");
                     JSONObject serial=deep==null?null:deep.optJSONObject("unity_serialized_file_headers");
+                    JSONObject nativeProbe=result.optJSONObject("native_arm64_vulkan_preflight");
+                    JSONObject nativeData=nativeProbe==null?null:nativeProbe.optJSONObject("native_runtime");
+                    String gpuName=nativeData==null?"غير محدد":nativeData.optString("gpu_name","غير محدد");
+                    boolean nativeArm=nativeProbe!=null&&nativeProbe.optBoolean("native_arm64_procedure_executed");
+                    boolean vkReady=nativeProbe!=null&&nativeProbe.optBoolean("vulkan_instance_created");
                     org.json.JSONArray engineCandidates=serial==null?null:serial.optJSONArray("candidate_unity_editor_versions");
                     String engineVersion=(engineCandidates!=null && engineCandidates.length()>0)?
                             engineCandidates.optString(0):"غير مثبت من الملف";
@@ -244,6 +249,9 @@ public final class MainActivity extends Activity {
                         "\nUnityFS header (معلومات عامة): "+sampleVersion+
                         "\nإصدار المحرك من globalgamemanagers: "+engineVersion+
                         "\nتوقيع IL2CPP القياسي: "+(meta!=null&&meta.optBoolean("classic_il2cpp_magic")?"موجود":"غير موجود")+
+                        "\nARM64 native code: "+(nativeArm?"نفّذ الاختبار":"لم ينفذ")+
+                        "\nVulkan instance: "+(vkReady?"نجح الإنشاء":"لم يثبت")+
+                        "\nGPU الأصلي: "+gpuName+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -268,7 +276,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.4.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.5.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
