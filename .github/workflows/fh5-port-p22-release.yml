@@ -1,0 +1,66 @@
+name: Publish FH5 Native Port P2.2 - Real EXE Header
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p22-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release-p22:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified release-signed P2.2 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43168729910 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.2-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'f363f146ffcb55f58678a13cf94e470ae1b557f41641f9e68326b79eabf5332f' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.2-Permanent-Signed.apk
+      - name: Publish in-place-updateable P2.2 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-2-real-exe-header-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.2 release already exists'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.2 — Read-only Forza EXE Header (Experimental)
+          - Standalone Android ARM64 APK, no Bannerlator/Winlator UI.
+          - Direct Vulkan proof, ZIP64 index, bounded synthetic x86-64 execution proof retained.
+          - **New:** button reads genuine `ForzaHorizon5.exe` header directly from the user's ZIP64 through Android SAF.
+          - Supports stored / deflated EXE members; no whole-game extraction; validates AMD64 PE32+ header, section count, entry RVA and import directory presence.
+          - New privacy-safe `FH5_PORT_P2_2_REPORT.json`; no raw game bytes or source paths uploaded.
+          - Original game executable is **not executed**. Not a playable FH5 port.
+          
+          ## Android in-place upgrade
+          - Application ID: `com.fh5.port`; versionCode `5` (P2.1 was `4`).
+          - Permanently signed with SAME dedicated FH5 signing certificate as P2.1.
+          - Certificate SHA-256: `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA-256: `f363f146ffcb55f58678a13cf94e470ae1b557f41641f9e68326b79eabf5332f`.
+          - **If P2.1 Permanent Signed is installed, install P2.2 over it without uninstalling.**
+          - If P0/P1/old debug P2 remains installed, Android rejects in-place updates due to the different certificate.
+          
+          ## Test
+          1. Install APK over permanent-signed P2.1.
+          2. Select the real ZIP64 Forza archive (100GB file stays in shared storage).
+          3. Press 'فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)'.
+          4. Export `FH5_PORT_P2_2_REPORT.json` and upload the JSON only.
+          
+          Android CI: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43168729910
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.2-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.2 - Real EXE Header + In-Place Update (Experimental)' \
+            --notes-file notes.md --prerelease
