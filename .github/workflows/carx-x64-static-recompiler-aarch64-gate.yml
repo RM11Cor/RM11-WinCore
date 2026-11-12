@@ -50,6 +50,10 @@ jobs:
             -s native-port/recompiler/tests \
             -p 'test_win64_unwind_boundary.py' -v
           echo CARX_G0_WIN64_UNWIND_INFO_CHAIN_AND_SOURCE_BOUNDARY_TESTS_PASS
+          python -m unittest discover \
+            -s native-port/recompiler/tests \
+            -p 'test_analyze_carx_xdata_zip.py' -v
+          echo CARX_G0_ACTUAL_WIN64_XDATA_ZIP_SHA_AND_CHAIN_LINK_INDEPENDENT_TESTS_PASS
           echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_330_CROSS_ISA_MACHINE_EXECUTIONS_PASS
       - name: Scope gate no game claim without original CarX GameAssembly method run
         shell: bash
