@@ -32,7 +32,7 @@ public final class X64Proof {
             } else {
                 out=new JSONObject(nativeInspectBlock(bytes));
             }
-            out.put("stage","P2_3_ORIGINAL_ENTRY_TRANSLATION_ONLY");
+            out.put("stage","P2_4_ORIGINAL_ENTRY_TRANSLATION_ONLY");
             out.put("raw_entry_bytes_exported",false);
             out.put("original_game_code_executed",false);
             out.put("full_windows_runtime_available",false);
@@ -68,8 +68,10 @@ public final class X64Proof {
         b.putInt(section+16,0x200); // Raw size.
         b.putInt(section+20,0x200); // Raw start.
         b.putInt(section+36,0x60000020); // Executable + readable code.
-        // mov eax,2; add eax,40; ret. Result must be 42 if run by native ARM64 JIT.
-        byte[] program={(byte)0xb8,2,0,0,0,0x05,40,0,0,0,(byte)0xc3};
+        // sub rsp,40; mov eax,2; add eax,40; add rsp,40; ret. Synthetic 42 proof.
+        byte[] program={(byte)0x48,(byte)0x83,(byte)0xEC,0x28,
+                (byte)0xb8,2,0,0,0,0x05,40,0,0,0,
+                (byte)0x48,(byte)0x83,(byte)0xC4,0x28,(byte)0xc3};
         System.arraycopy(program,0,pe,0x200,program.length);
         return pe;
     }
