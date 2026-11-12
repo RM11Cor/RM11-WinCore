@@ -17,7 +17,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.PriorityQueue;
 import java.util.zip.ZipEntry;
@@ -43,6 +45,7 @@ public final class GameAssemblyCodeBridge {
     private static final int MAX_SAMPLE_BYTES=320;
     private static final int MAX_EXCEPTION_BYTES=24 * 1024 * 1024;
     private static final int CHUNK_ENTRIES=8192;
+    private static final int MAX_CHAIN_DEPTH=4;
     private static final long MAX_PE_FILE_BYTES=1_073_741_824L;
 
     private static final class Section {
@@ -64,6 +67,10 @@ public final class GameAssemblyCodeBridge {
         public int eligibleExecutableFunctions;
         public int chosenActualFunctionSamples;
         public int bytesExported;
+        public int uniqueUnwindRecordsExported;
+        public int functionsWithCompleteUnwindChain;
+        public int functionsWithUnwindReadIssues;
+        public int chainedUnwindReferences;
         public long originalAssemblyLength;
         public long exceptionDirectorySize;
     }
@@ -244,7 +251,12 @@ public final class GameAssemblyCodeBridge {
             stats.chosenActualFunctionSamples=selected.size();
 
             JSONObject manifest=new JSONObject();
-            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v1");
+            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v2");
+            manifest.put("version","1.1");
+            manifest.put("includes_actual_win64_unwind_info_records",true);
+            manifest.put("unwind_metadata_record_source","original GameAssembly.dll PE .xdata RVA");
+            manifest.put("win64_unwind_data_is_not_executable_game_logic",true);
+            manifest.put("max_chain_depth",MAX_CHAIN_DEPTH);
             manifest.put("game_source","original owner-selected GameAssembly.dll");
             manifest.put("source_file_size_bytes",fileSize);
             manifest.put("pe_machine","IMAGE_FILE_MACHINE_AMD64");
@@ -260,6 +272,7 @@ public final class GameAssemblyCodeBridge {
             manifest.put("no_carx_game_content_published_to_github",true);
             JSONArray entries=new JSONArray();
             try(ZipOutputStream zip=new ZipOutputStream(destination)) {
+                Set<Long> emittedUnwindRvas=new HashSet<>();
                 for(Function f:selected) {
                     int n=(int)(f.end-f.begin);
                     long rawAt=rvaToFile(sections,f.begin,n,fileSize,true);
@@ -276,11 +289,19 @@ public final class GameAssemblyCodeBridge {
                     record.put("win64_unwind_info_rva",f.unwind);
                     record.put("zip_member",filename);
                     record.put("sha256",sha256(code));
+                    appendActualUnwindChain(
+                            zip,fd,fileSize,sections,f.unwind,
+                            emittedUnwindRvas,record,stats);
                     record.put("original_function_gameplay_identity_confirmed",false);
                     entries.put(record);
                     stats.bytesExported+=n;
                 }
                 manifest.put("sample_code_bytes_total",stats.bytesExported);
+                manifest.put("unwind_records_exported_unique",stats.uniqueUnwindRecordsExported);
+                manifest.put("complete_unwind_chains",stats.functionsWithCompleteUnwindChain);
+                manifest.put("functions_with_unwind_read_issues",stats.functionsWithUnwindReadIssues);
+                manifest.put("chained_unwind_references",stats.chainedUnwindReferences);
+                manifest.put("full_callable_il2cpp_method_verified",false);
                 manifest.put("functions",entries);
                 zip.putNextEntry(new ZipEntry("manifest.json"));
                 zip.write(manifest.toString(2).getBytes(StandardCharsets.UTF_8));
@@ -289,6 +310,82 @@ public final class GameAssemblyCodeBridge {
             }
             return stats;
         }
+    }
+
+    private static void appendActualUnwindChain(
+            ZipOutputStream zip,ParcelFileDescriptor fd,long fileSize,
+            List<Section> sections,long firstUnwindRva,Set<Long> emitted,
+            JSONObject sourceFunction,ExportStats stats) throws Exception {
+        JSONArray chain=new JSONArray();
+        Set<Long> visited=new HashSet<>();
+        long next=firstUnwindRva;
+        String status="UNWIND_NOT_READ";
+        for(int depth=0;depth<MAX_CHAIN_DEPTH;depth++) {
+            if(next==0 || (next&3L)!=0 || !visited.add(next)) {
+                status="UNWIND_BAD_RVA_OR_CYCLIC_CHAIN";
+                stats.functionsWithUnwindReadIssues++;
+                break;
+            }
+            try {
+                long headerAt=rvaToFile(sections,next,4,fileSize,false);
+                byte[] header=readExact(fd,fileSize,headerAt,4);
+                int bytes=Win64UnwindRecordFormat.requiredBytes(header);
+                long rawAt=rvaToFile(sections,next,bytes,fileSize,false);
+                byte[] raw=readExact(fd,fileSize,rawAt,bytes);
+                Win64UnwindRecordFormat.Descriptor details=
+                        Win64UnwindRecordFormat.inspect(raw);
+                String member=String.format(Locale.ROOT,
+                        "unwind/rva_%08x.bin",next);
+                if(emitted.add(next)) {
+                    zip.putNextEntry(new ZipEntry(member));
+                    zip.write(raw);
+                    zip.closeEntry();
+                    stats.uniqueUnwindRecordsExported++;
+                }
+                JSONObject item=new JSONObject();
+                item.put("unwind_rva",next);
+                item.put("zip_member",member);
+                item.put("length_bytes",raw.length);
+                item.put("sha256",sha256(raw));
+                item.put("version",details.version);
+                item.put("flags",details.flags);
+                item.put("prologue_bytes",details.prologBytes);
+                item.put("code_slots",details.slotCount);
+                item.put("has_handler",details.hasHandler);
+                item.put("has_chained_runtime_function",details.chained);
+                if(details.chained) {
+                    JSONObject target=new JSONObject();
+                    target.put("begin_rva",details.chainedBeginRva);
+                    target.put("end_rva",details.chainedEndRva);
+                    target.put("unwind_rva",details.chainedUnwindRva);
+                    item.put("chained_runtime_function",target);
+                    stats.chainedUnwindReferences++;
+                }
+                chain.put(item);
+                if(!details.chained) {
+                    status="COMPLETE_UNWIND_CHAIN_READ";
+                    stats.functionsWithCompleteUnwindChain++;
+                    break;
+                }
+                next=details.chainedUnwindRva;
+                if(depth==MAX_CHAIN_DEPTH-1) {
+                    status="CHAIN_DEPTH_LIMIT_REACHED";
+                    stats.functionsWithUnwindReadIssues++;
+                }
+            }catch(IOException sourceInvalid) {
+                // Never invent missing original metadata; preserve a
+                // structured reason and continue other independent samples.
+                status="UNWIND_SOURCE_READ_OR_FORMAT_UNSUPPORTED";
+                sourceFunction.put("unwind_issue",
+                        sourceInvalid.getMessage()==null?"unknown source condition":
+                        sourceInvalid.getMessage());
+                stats.functionsWithUnwindReadIssues++;
+                break;
+            }
+        }
+        sourceFunction.put("unwind_records",chain);
+        sourceFunction.put("unwind_status",status);
+        sourceFunction.put("callable_il2cpp_method_proven",false);
     }
 
     private static String sha256(byte[] input)throws Exception {
