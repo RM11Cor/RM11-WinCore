@@ -1,4 +1,4 @@
-name: FH5 Standalone APK P2 - x64 Proof + ZIP64 + Vulkan
+name: FH5 Standalone APK P2.1 - Stable Signed Release
 on:
   push:
     branches:
@@ -24,7 +24,7 @@ jobs:
       - uses: android-actions/setup-android@v4
       - name: Install platform, NDK, and CMake for arm64-v8a
         run: |
-          sdkmanager --install "platforms;android-36" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
@@ -36,32 +36,56 @@ jobs:
             fh5-port/app/src/test/native/test_pe64_core.c \
             -o /tmp/fh5_pe64_host_tests
           /tmp/fh5_pe64_host_tests
-      - name: Build independent Android APK
+      - name: Load existing permanent signing key from protected GitHub secrets
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64" || { echo "Stable signing keystore secret missing"; exit 1; }
+          test -n "$RM11_RELEASE_PASSWORD" || { echo "Stable signing password missing"; exit 1; }
+          printf %s "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/fh5-stable-signing.p12"
+          chmod 600 "$RUNNER_TEMP/fh5-stable-signing.p12"
+          keytool -list -keystore "$RUNNER_TEMP/fh5-stable-signing.p12" \
+            -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          echo "FH5_STABLE_KEYSTORE=$RUNNER_TEMP/fh5-stable-signing.p12" >> "$GITHUB_ENV"
+      - name: Build independent stable-signed ARM64 APK
         working-directory: fh5-port
+        env:
+          FH5_STABLE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
         run: |
-          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
-      - name: Verify APK is native and has no game binaries
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease
+      - name: Verify APK signature, package identity, version, and native libraries
+        shell: bash
         run: |
+          set -euo pipefail
+          apk="fh5-port/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          cert="$("${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk")"
+          printf "%s\n" "$cert"
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$cert"
+          pkg="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$apk")"
+          printf "%s\n" "$pkg" | head -n 8
+          grep -Fq "package: name='com.fh5.port' versionCode='4' versionName='P2.1-stable-signed'" <<< "$pkg"
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
-          p=Path("fh5-port/app/build/outputs/apk/debug/app-debug.apk")
-          print("APK path and size:", p, p.stat().st_size if p.exists() else "MISSING")
-          assert p.is_file() and p.stat().st_size>10000, "APK missing or implausibly small"
+          p=Path("fh5-port/app/build/outputs/apk/release/app-release.apk")
+          assert p.is_file() and p.stat().st_size>10000
           with zipfile.ZipFile(p) as z:
               names=set(z.namelist())
               assert "classes.dex" in names
               assert "lib/arm64-v8a/libfh5_renderer.so" in names
               assert "lib/arm64-v8a/libfh5_x64_micro.so" in names
-              assert not any(x.lower().endswith((".exe",".modelbin",".carbin",".rpf")) for x in names), "Game files cannot ship in APK"
+              assert not any(x.lower().endswith((".exe",".modelbin",".carbin",".rpf")) for x in names)
               assert not any(x.startswith("lib/x86") for x in names)
-          print("APK size bytes:",p.stat().st_size)
-          print("Standalone P2 Vulkan+ZIP64+micro-x64 proof. FH5 Windows game runtime NOT implemented.")
+          print("Verified permanent signed APK size:",p.stat().st_size)
           PY
-      - name: Upload installable debug APK
+      - name: Upload permanent signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: FH5-Native-Port-P2-x64-arm64-APK
-          path: fh5-port/app/build/outputs/apk/debug/app-debug.apk
+          name: FH5-Native-Port-P2.1-PERMANENT-SIGNED-arm64
+          path: fh5-port/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
