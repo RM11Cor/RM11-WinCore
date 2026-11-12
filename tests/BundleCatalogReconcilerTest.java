@@ -96,6 +96,32 @@ public final class BundleCatalogReconcilerTest {
         j.addCatalogInternalId(p("bad name.bundle"));
         ok(!j.summarize(true,true).fullReconciliationValid,
                 "unsafe invalid source bundle name rejected");
+        var physicalUnsupported=new BundleCatalogReconciler();
+        physicalUnsupported.addPhysicalWindowsBundle("regular.bundle");
+        physicalUnsupported.addPhysicalWindowsBundle("not allowed.bundle");
+        physicalUnsupported.addCatalogInternalId(p("regular.bundle"));
+        var diagnostic=physicalUnsupported.summarize(true,true);
+        ok(diagnostic.physicalEntries==2&&diagnostic.distinctPhysicalFilenames==1,
+                "Count of physical source entries must remain complete");
+        ok(diagnostic.unsupportedPhysicalBasenameCount==1,
+                "Rejected physical name count must not masquerade as count overflow");
+        ok(diagnostic.status.equals("unsupported_physical_bundle_basename"),
+                "Source-format rejection must be disclosed separately from limits");
+        ok(!diagnostic.fullReconciliationValid,
+                "Unsupported real source filename prevents complete comparison");
+        ok(diagnostic.unsupportedPhysicalNameExamples.toString().contains("redacted"),
+                "Unsafe original filename not echoed into public JSON");
+        var bothReject=new BundleCatalogReconciler();
+        bothReject.addPhysicalWindowsBundle("bad name.bundle");
+        bothReject.addCatalogInternalId(p("nested/a.bundle"));
+        var both=bothReject.summarize(true,true);
+        ok(both.status.equals("both_physical_and_catalog_names_need_review"),
+                "Original v0.8 808/807 ambiguous simultaneous source formats classified");
+        ok(both.unsupportedPhysicalBasenameCount==1 &&
+                both.invalidOrNonlocalWindowsReferences==1,
+                "Two independent mismatch causes retained");
+        ok(both.ambiguousCatalogNameExamples.toString().contains("nested_Windows64_path"),
+                "Safe source hint for catalog nested path ambiguity");
         var q=new BundleCatalogReconciler();
         q.addCatalogInternalId("generic/base/android_support.dat");
         ok(q.summarize(true,true).androidPlatformPathCount==0,
