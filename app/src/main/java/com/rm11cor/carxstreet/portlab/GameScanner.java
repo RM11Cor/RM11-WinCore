@@ -123,6 +123,14 @@ public final class GameScanner {
                             documentsToProbe.put("il2cpp_metadata",
                                 DocumentsContract.buildDocumentUriUsingTree(tree,id));
                         }
+                        if(basename.equals("globalgamemanagers")) {
+                            documentsToProbe.put("globalgamemanagers",
+                                DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                        }
+                        if(basename.equals("resources.assets")) {
+                            documentsToProbe.put("unity_resources",
+                                DocumentsContract.buildDocumentUriUsingTree(tree,id));
+                        }
                         if(basename.equals("boot.config")) {
                             documentsToProbe.put("boot_config",
                                 DocumentsContract.buildDocumentUriUsingTree(tree,id));
@@ -233,7 +241,7 @@ public final class GameScanner {
         machine.put("gameassembly_relative_path",assemblyPath);
         JSONObject report=new JSONObject();
         report.put("schema","rm11carx.pc-port-readonly-inspector.v1");
-        report.put("inspector_version","0.2.0");
+        report.put("inspector_version","0.4.0");
         report.put("source_game","CarX Street PC (Unity IL2CPP)");
         report.put("user_selected_folder_name",rootName);
         report.put("game_files_transmitted",false);
