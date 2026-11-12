@@ -27,8 +27,8 @@ jobs:
         run: |
           set -euo pipefail
           find inputs/original-ret-failed -maxdepth 3 -type f -printf '%P %s bytes\n'
-          test "$(cat inputs/original-ret-failed/gdb.exit)" = 139
-          p=inputs/original-ret-failed/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
+          test "$(cat inputs/original-ret-failed/C-ifunc85-ret-native/gdb.exit)" = 139
+          p=inputs/original-ret-failed/C-ifunc85-ret-native/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
           test -s "$p"
           sha256sum "$p"
           grep -E -n '(Internal error|SIGSEGV|Segmentation fault|watchpoint|Hardware|Cannot|Error|error|The program|Inferior|Python Exception|IFUNC85_|AssertionError|Traceback)' "$p" | tail -n 110 || true
@@ -42,7 +42,7 @@ jobs:
         with:
           name: KERNIX-G0-C-Original-IFUNC85-RET-Exit139-Raw-FEX-Diagnostic-Only
           path: |
-            inputs/original-ret-failed/gdb.exit
-            inputs/original-ret-failed/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
+            inputs/original-ret-failed/C-ifunc85-ret-native/gdb.exit
+            inputs/original-ret-failed/C-ifunc85-ret-native/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
           retention-days: 14
           if-no-files-found: warn
