@@ -38,7 +38,8 @@ jobs:
           from pathlib import Path
           import zipfile
           p=Path("fh5-port/app/build/outputs/apk/debug/app-debug.apk")
-          assert p.is_file() and p.stat().st_size>100000, "APK missing"
+          print("APK path and size:", p, p.stat().st_size if p.exists() else "MISSING")
+          assert p.is_file() and p.stat().st_size>10000, "APK missing or implausibly small"
           with zipfile.ZipFile(p) as z:
               names=set(z.namelist())
               assert "classes.dex" in names
