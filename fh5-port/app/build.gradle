@@ -11,7 +11,7 @@ android {
             stableRelease {
                 storeFile file(stableKeyPath)
                 storePassword stableKeyPassword
-                keyAlias 'rm11-autocore'
+                keyAlias 'fh5-release'
                 keyPassword stableKeyPassword
                 storeType 'pkcs12'
                 enableV1Signing = false
