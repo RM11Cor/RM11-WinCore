@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.0 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.1 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -97,12 +97,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
-        entryButton = button("فحص نقطة التقاء مسارات فورزا وأول CALL (بدون تشغيل)", () -> testActualEntry());
+        entryButton = button("فحص فرعي JNE بعد أول CALL (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.0", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.1", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.0: نثبت التقاء مساري JNE الحقيقي ونفحص أول CALL بعد نقطة الالتقاء. تحليل ثابت فقط.");
+        updateStatus("P3.1: نحلّل فرعي JNE الجديدة داخل الدالة 0x7F9800، بدون تشغيل تعليمات فورزا.");
     }
 
     private int dp(int v) {
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_0_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_1_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -163,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.0. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.1. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -408,6 +408,22 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 && !parsed.isNull("first_transfer_target_rva"))
                 output.put("first_transfer_target_rva",
                     parsed.optLong("first_transfer_target_rva",-1));
+            // Expose only structural metadata for the next JNE.
+            output.put("conditional_two_successors",
+                parsed.optBoolean("conditional_two_successors",false));
+            if(parsed.optBoolean("conditional_two_successors",false)) {
+                output.put("conditional_not_taken_rva",
+                    parsed.optLong("conditional_not_taken_rva",-1));
+                output.put("not_taken_next_mnemonic",
+                    parsed.optString("not_taken_next_mnemonic","none"));
+                output.put("not_taken_next_is_jump",
+                    parsed.optBoolean("not_taken_next_is_jump",false));
+                output.put("not_taken_jump_target_kind",
+                    parsed.optString("not_taken_jump_target_kind","none"));
+                if(!parsed.isNull("not_taken_jump_target_rva"))
+                    output.put("not_taken_jump_target_rva",
+                        parsed.optLong("not_taken_jump_target_rva",-1));
+            }
             output.put("sample_compressed_bytes_read",sample.compressedBytesRead);
         } catch(java.io.IOException ex) {
             String reason=ex.getMessage();
@@ -428,6 +444,75 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             output.put("raw_game_bytes_exported",false);
         } catch(Exception ignored) { }
         return output;
+    }
+
+
+    /** P3.1: strictly two static successor probes of the second JNE.
+     * A decoded target is NOT a branch executed on the user's device. */
+    private JSONObject inspectPostJoinJne(FileChannel channel,JSONObject callTarget,
+                                           long imageSize,long callRva) {
+        JSONObject out=new JSONObject();
+        try {
+            out.put("stage","P3_1_SECOND_JNE_STATIC_SUCCESSORS");
+            out.put("original_game_code_executed",false);
+            out.put("runtime_condition_evaluated",false);
+            out.put("raw_game_bytes_exported",false);
+            out.put("max_extra_successor_probes",PostJoinBranch.MAX_SUCCESSOR_PROBES);
+            out.put("max_sample_bytes_per_successor",
+                PostJoinBranch.SAMPLE_BYTES_PER_SUCCESSOR);
+            if(!"EXECUTABLE_TARGET_SECTION_DECODED".equals(
+                 callTarget.optString("status","")) ||
+               !"conditional_jump".equals(callTarget.optString("first_transfer_kind","")) ||
+               !"direct".equals(callTarget.optString("first_transfer_target_kind","")) ||
+               !callTarget.optBoolean("conditional_two_successors",false)) {
+                out.put("status","SECOND_JNE_NOT_CONFIRMED_DIRECT");
+                return out;
+            }
+            long takenRva=callTarget.optLong("first_transfer_target_rva",-1);
+            long fallthroughRva=callTarget.optLong("conditional_not_taken_rva",-1);
+            out.put("status","SECOND_JNE_STATIC_BRANCH_TARGETS_CLASSIFIED");
+            out.put("source_call_function_rva",callRva);
+            out.put("taken_rva",
+                JumpJoin.inImage(takenRva,imageSize)?takenRva:JSONObject.NULL);
+            out.put("not_taken_fallthrough_rva",
+                JumpJoin.inImage(fallthroughRva,imageSize)?fallthroughRva:JSONObject.NULL);
+            out.put("static_successor_pair",
+                PostJoinBranch.classifyPair(takenRva,fallthroughRva,imageSize));
+            out.put("not_taken_next_instruction",
+                callTarget.optString("not_taken_next_mnemonic","none"));
+            out.put("not_taken_adjacent_direct_jump",
+                callTarget.optBoolean("not_taken_next_is_jump",false)
+                && "direct".equals(callTarget.optString("not_taken_jump_target_kind","")));
+            if(callTarget.optBoolean("not_taken_next_is_jump",false)
+               && "direct".equals(callTarget.optString("not_taken_jump_target_kind",""))
+               && JumpJoin.inImage(callTarget.optLong("not_taken_jump_target_rva",-1),imageSize))
+                out.put("not_taken_adjacent_jump_target_rva",
+                    callTarget.optLong("not_taken_jump_target_rva",-1));
+            String t=PostJoinBranch.classifyTarget(takenRva,imageSize,callRva,-1);
+            JSONObject takenNode=new JSONObject();
+            if("SAFE_DIRECT_IN_IMAGE_TARGET".equals(t)) {
+                takenNode=probeBranchRva(channel,takenRva,imageSize);
+            } else takenNode.put("status",t);
+            out.put("taken_target",takenNode);
+            String f=PostJoinBranch.classifyTarget(
+                fallthroughRva,imageSize,callRva,takenRva);
+            JSONObject notTakenNode=new JSONObject();
+            if("SAFE_DIRECT_IN_IMAGE_TARGET".equals(f)) {
+                notTakenNode=probeBranchRva(channel,fallthroughRva,imageSize);
+            } else notTakenNode.put("status",f);
+            out.put("not_taken_fallthrough",notTakenNode);
+            out.put("successor_probes_completed",
+                ("SAFE_DIRECT_IN_IMAGE_TARGET".equals(t)?1:0)+
+                ("SAFE_DIRECT_IN_IMAGE_TARGET".equals(f)?1:0));
+            out.put("no_recursive_followups",true);
+        } catch(Exception ex) {
+            try {
+                out.put("status","POST_JOIN_JNE_PROBE_FAILED");
+                out.put("exception_class",ex.getClass().getSimpleName());
+                out.put("original_game_code_executed",false);
+            } catch(Exception ignored) { }
+        }
+        return out;
     }
 
     /** Only an explicitly direct in-image JMP target can be followed. */
@@ -483,7 +568,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         entryBusy=true;
         entryButton.setEnabled(false);
-        updateStatus("P3.0: نميّز التقاء المسارات من الحلقات ونفحص هدف أول CALL التالي بدون تنفيذ اللعبة.");
+        updateStatus("P3.1: نفحص هدف JNE الثاني ومسار عدم تحقق شرطه، بنطاق قراءة محدود ودون تنفيذ.");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -625,8 +710,13 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                                         }
                                     }
                                     paths.put("first_direct_call_after_join_probe",afterJoinCall);
-                                    paths.put("maximum_followed_new_targets",5);
-                                    paths.put("maximum_followup_depth",2);
+                                    long verifiedCallRva=afterJoinCall.optLong("followed_call_rva",-1);
+                                    JSONObject secondJne=inspectPostJoinJne(
+                                        file.getChannel(),afterJoinCall,e.pe.imageSize,
+                                        verifiedCallRva);
+                                    paths.put("second_jne_successors",secondJne);
+                                    paths.put("maximum_followed_new_targets",7);
+                                    paths.put("maximum_followup_depth",3);
                                 }
                                 targetProbe.put("conditional_branch_paths",paths);
                                 targetProbe.put("target_executed",false);
@@ -642,8 +732,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                             }
                         }
                     }
-                    info.put("stage","P3_0_BRANCH_RECONVERGENCE_AND_CALL_STATIC_ANALYSIS");
-                    info.put("status","P3_0_GRAPH_RECONVERGENCE_CLASSIFIED");
+                    info.put("stage","P3_1_SECOND_JNE_STATIC_BRANCH_ANALYSIS");
+                    info.put("status","P3_1_SECOND_JNE_ANALYSIS_COMPLETED");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -661,7 +751,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     info.put("game_file_crc_fully_checked",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
-                    message="P3.0: فحصنا نقطة التقاء مسارات JNE وأول CALL بعدها!" +
+                    message="P3.1: فحصنا فرعي JNE التالية داخل دالة فورزا!" +
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
@@ -685,7 +775,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P3_0_BRANCH_GRAPH_SCAN_FAILED");
+                    info.put("status","P3_1_SECOND_JNE_SCAN_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
@@ -710,7 +800,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.0")
+                .put("stage", "P3.1")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
