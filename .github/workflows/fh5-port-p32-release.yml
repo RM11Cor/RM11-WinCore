@@ -1,0 +1,92 @@
+name: Publish FH5 Native Port P3.2 - Direct Extracted EXE
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p32-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified permanent signed P3.2 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43189311744 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.2-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'b430677b828c1fb776d495dd5515a4cf68b364d0960d9aaeffafac9df3f95e09' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.2-Permanent-Signed.apk
+      - name: Publish P3.2 direct PE64 source prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-2-direct-exe-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.2 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.2 — Direct Extracted EXE Reader
+
+          **EXPERIMENTAL READ-ONLY DIAGNOSTIC. This APK does NOT run Forza Horizon 5.**
+          The original game's Windows x64 instructions are NEVER executed.
+
+          ## Why P3.2
+          - The user finished extracting the original 94 GiB ZIP64 archive into
+            about 102 GiB of files, including 182,826,496-byte ForzaHorizon5.exe.
+          - P3.1 repeatedly inflated tens of MiB from ZIP before inspecting
+            individual original game functions, which is unnecessarily slow.
+
+          ## New features
+          - An Android Storage Access Framework button to select the extracted
+            **ForzaHorizon5.exe** directly; the selected file remains on-device.
+          - Prioritizes the direct EXE if selected, while preserving original
+            ZIP64 archive mode as a fallback when explicitly chosen.
+          - Reuses the same PE32+ AMD64 header validation, executable section
+            bounds, RVA-to-file mapping and Capstone static branch analysis.
+          - All previous first-entry, JNE, cross-link reconvergence and post-join
+            CALL/JNE test stages now work with either code source.
+          - Direct mode reads at most 256 KiB of PE header plus 128/512-byte
+            bounded random-access samples, without whole-EXE extraction,
+            without ZIP decompression and without copying game code into APK.
+          - Includes direct-vs-ZIP equality tests, corrupt PE rejection,
+            invalid/out-of-image RVA and non-executable section guards.
+          - Exports `FH5_PORT_P3_2_REPORT.json` with source type and safe
+            instruction metadata, not original game bytes nor private paths.
+
+          ## Android in-place upgrade
+          - Package `com.fh5.port`, versionCode **15** (P3.1 was 14).
+          - Permanent signing certificate unchanged since P2.1:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - SHA-256: `b430677b828c1fb776d495dd5515a4cf68b364d0960d9aaeffafac9df3f95e09`.
+          - Install directly **over P3.1**, without uninstalling.
+
+          ## What to do on the device
+          1. Install P3.2 over P3.1.
+          2. Tap `اختيار ForzaHorizon5.exe المستخرج (أسرع)`.
+          3. Navigate to `Download/FH5_Extracted` and select ForzaHorizon5.exe
+            from its actual subfolder if necessary.
+          4. Tap `تحليل Forza EXE مباشرة (بدون تشغيل)`.
+          5. Export and upload `FH5_PORT_P3_2_REPORT.json`.
+
+          The app still needs a complete x64-to-ARM64 execution runtime,
+          Windows API/DLL loader, rendering translation and game bootstrap.
+          Existing Forza files are untouched.
+
+          Verified build/test/signature workflow:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43189311744
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.2-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.2 - Direct Extracted EXE (Experimental)' \
+            --notes-file notes.md --prerelease
