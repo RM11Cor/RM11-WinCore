@@ -36,3 +36,15 @@ The app does **not** bypass DRM, Steam or Easy Anti-Cheat, distribute copyrighte
 Until G3–G4 are passed, reports must say **not playable**. Every game gets its own APK; no global emulator app setup is required once an actual runtime exists.
 
 Sources: Steam CarX Street PC version FAQ, SteamDB depot 1114151 (`GameAssembly.dll`, `UnityPlayer.dll`, `CarX Street_Data`), UnityDataTools Android vs standalone player format.
+
+## Stage 02 / v0.2.0 — exact Unity headers, not a playable APK
+
+The first phone-side report confirmed **914 files / 23 folders / 22,750,725,816 bytes**, a Windows x86-64 launcher and GameAssembly.dll, UnityPlayer.dll, global-metadata.dat, globalgamemanagers, Windows64 Addressables bundles and Easy Anti-Cheat. This is a file-identity scan, NOT executable ARM64 Unity code or gameplay.
+
+The v0.2 header audit reads **at most 64 bytes** of original IL2CPP global-metadata.dat and validates its classic little-endian magic and version. It reads **up to 12 × 512 bytes** of Windows64 bundle headers and reports UnityFS / UnityWeb signature, bundle header format and **bundle-produced** Unity version/revision strings, **not** a definitive Unity Player version. It samples just the first 16 KiB of catalog.json for syntax hints (not complete dependencies) and records boot.config key names only. It also counts Windows64 bundles.
+
+All reads use the user-approved Android document provider and remain on device. There are no full game-file hashes, raw assets, extractors, internet permissions, game runtime, native ARM64 game port, EAC bypass, or hidden emulator in this inspector. Valid metadata and UnityFS headers **cannot** recompile Windows x86-64 IL2CPP code, reconstruct the game's Unity source, or convert Windows platform shaders/textures into Android game content.
+
+**Independent test:** Java 17 vectors for header recognition and corrupt inputs are run before APK build. Android Gradle debug APK is then built, fingerprinted and published in a separate inspector-only release. The Android debug signing certificate may differ between build runners: if Android refuses an in-place update due to certificate mismatch, uninstall the prior inspector (keep exported JSON first).
+
+**Next gate after v0.2 report:** Compare original Unity bundle and IL2CPP metadata versions with a legally obtained native Android ARM64 game code/runtime. Native-game G3 remains BLOCKED without authorized source/rebuild path or independently implemented executable. Windows64 assets are NOT validated as Android-compatible until a real runtime loads them.
