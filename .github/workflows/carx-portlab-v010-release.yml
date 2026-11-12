@@ -1,0 +1,74 @@
+name: CarX Street PC PortLab v0.1.0 Inspector APK GitHub Release
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - '.github/workflows/carx-portlab-v010-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release-verified-inspector-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out original CarX PC port repository
+        uses: actions/checkout@v4
+      - name: Verify original Android inspector APK build succeeded
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43178119823 --jq .conclusion)" = success
+      - name: Download original immutable successful CarX Street PC inspector APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43178119823
+          name: CarXStreet-PC-PortLab-v0.1.0-File-Inspector-Only-ARM64-Gate-Open
+          github-token: ${{ github.token }}
+          path: dist/carx-inspector-original
+      - name: SHA256-verify exact successful APK and prepare release scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/carx-inspector-original/app-debug.apk
+          echo '6fb3e99ac2b8756ca2b4b66a11f623cf3dc03fb01fb93085f9ec5e275015218e  dist/carx-inspector-original/app-debug.apk' | sha256sum -c -
+          cp dist/carx-inspector-original/app-debug.apk dist/CarXStreet_PC_PortLab_v0.1.0_Inspector.apk
+          sha256sum dist/CarXStreet_PC_PortLab_v0.1.0_Inspector.apk >dist/SHA256.txt
+          cat >dist/RELEASE_SCOPE.txt <<'EOF'
+          CarX Street PC PortLab v0.1.0
+          File INSPECTOR ONLY, not a playable Android port.
+          Select an extracted, legally obtained CarX Street PC game folder.
+          Scan original Unity/IL2CPP files and export JSON diagnostic report.
+          Does not execute Windows EXE, translate x86, render PC game,
+          run native Android game engine, or provide gameplay.
+          Original APK GitHub Actions 43178119823.
+          Original artifact SHA256 6fb3e99ac2b8756ca2b4b66a11f623cf3dc03fb01fb93085f9ec5e275015218e.
+          EOF
+          cat >dist/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.1.0 — Inspector APK
+
+          **Experimental file inspector, not a playable CarX Street Android port.**
+
+          This signed-by-Android-debug-key APK lets you select your own extracted CarX Street PC folder, examine Unity/IL2CPP-related files, and export a JSON scan report for planning the game-specific Android port.
+
+          It does **not** run the Windows game, and it does not yet include the native ARM64 game runtime.
+
+          Source APK: successful GitHub Actions [#43178119823](https://github.com/RM11Cor/RM11-WinCore/actions/runs/43178119823), SHA256 pinned and checked in release workflow.
+          EOF
+      - name: Publish release with verified direct APK download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.1.0-inspector-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG"               dist/CarXStreet_PC_PortLab_v0.1.0_Inspector.apk               dist/SHA256.txt dist/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG"               dist/CarXStreet_PC_PortLab_v0.1.0_Inspector.apk               dist/SHA256.txt dist/RELEASE_SCOPE.txt               --target 71a023ae04a1315dbe6ef2b94974a8300222b1f3               --title 'CarX Street PC PortLab v0.1.0 — File Inspector (Not Playable)'               --notes-file dist/release-notes.md               --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
