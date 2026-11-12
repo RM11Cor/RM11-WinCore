@@ -82,7 +82,10 @@ jobs:
           signature=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$signature"
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$signature"
-          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' <<<"$signature"
+          if ! grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' <<<"$signature" &&
+             ! grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' <<<"$signature"; then
+            echo 'APK must be signed with a verified v2 or v3 certificate'; exit 1
+          fi
           details=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
           printf '%s\n' "$details" | head -n 5
           grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='3' versionName='0.3.0-permanent-signing-baseline'" <<<"$details"
