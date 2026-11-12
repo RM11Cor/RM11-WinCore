@@ -28,6 +28,7 @@ from x64_control_flow_gate import inspect_cfg
 MAX_ORIGINAL_BYTES=256*320
 MAX_ARCHIVE_BYTES=8*1024*1024
 SOURCE_SCHEMA_V2="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
+SOURCE_SCHEMA_V3="rm11carx.original-win64-gameassembly-bounded-function-samples.v3"
 SAFE_MEMBER=re.compile(r"^code/rva_([0-9a-f]{8})\.bin$")
 
 def screen(archive:Path,cpp_dir:Path|None=None)->dict:
@@ -45,7 +46,7 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         raise ValueError("archive outside bounded local sample size")
     with zipfile.ZipFile(archive,"r") as z:
         names=z.namelist()
-        if len(names)>1+256+1024 or len(names)!=len(set(names)):
+        if len(names)>1+256+1024+1024 or len(names)!=len(set(names)):
             raise ValueError("invalid/duplicate bounded sample ZIP")
         if "manifest.json" not in names:
             raise ValueError("missing authentic bridge manifest JSON")
@@ -53,14 +54,15 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         source_schema=manifest.get("schema")
         if source_schema not in (
             "rm11carx.original-win64-gameassembly-bounded-function-samples.v1",
-            SOURCE_SCHEMA_V2):
+            SOURCE_SCHEMA_V2,
+            SOURCE_SCHEMA_V3):
             raise ValueError("wrong original source manifest schema")
         items=manifest.get("functions")
         if not isinstance(items,list) or len(items)>256 or not items:
             raise ValueError("invalid bounded function list")
         expected={"manifest.json"}|{item["zip_member"] for item in items}
         source_admission_by_rva={}
-        if source_schema==SOURCE_SCHEMA_V2:
+        if source_schema in (SOURCE_SCHEMA_V2,SOURCE_SCHEMA_V3):
             from analyze_carx_win64_xdata_zip import analyze
             unwind_report=analyze(archive)
             source_admission_by_rva={
@@ -72,6 +74,16 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
                 unwind_report["sha256_verified_unique_unwind_records"])
             result["independent_win64_unwind_records_decoded"]=(
                 unwind_report["independently_decoded_win64_unwind_records"])
+            if source_schema==SOURCE_SCHEMA_V3:
+                result["verified_original_chained_parent_code_fragments"]=(
+                    unwind_report["sha256_verified_unique_parent_code_fragments"])
+                result["verified_original_parent_code_bytes"]=(
+                    unwind_report["sha256_verified_unique_parent_code_bytes"])
+                expected.update(
+                    u["original_parent_code"]["zip_member"]
+                    for item in items for u in item.get("unwind_records",[])
+                    if u.get("parent_code_status")==
+                        "EXPORTED_VERIFIED_BOUNDED_FRAGMENT")
             expected.update(
                 u["zip_member"] for item in items
                 for u in item.get("unwind_records",[]))
@@ -99,8 +111,8 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
                     "sha256":sha,"statical_aot_translatable":False,
                     "reachable_original_x86_cfg":cfg.safe_report(),
                     "complete_unwind_info_verified":
-                        source_schema==SOURCE_SCHEMA_V2}
-            if source_schema==SOURCE_SCHEMA_V2:
+                        source_schema in (SOURCE_SCHEMA_V2,SOURCE_SCHEMA_V3)}
+            if source_schema in (SOURCE_SCHEMA_V2,SOURCE_SCHEMA_V3):
                 admission=source_admission_by_rva.get(item["relative_rva"])
                 if admission is None:
                     raise ValueError("source xdata admission missing for original RVA")
@@ -171,8 +183,8 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         result["per_function_results"]=records
         result["aot_cpp_generated"]=cpp_dir is not None and result["aot_supported_source_functions"]>0
         result["source_CFG_checked_before_AOT"]=True
-        result["xdata_admission_enforced_before_cpp_codegen"]=source_schema==SOURCE_SCHEMA_V2
-        result["legacy_v1_without_xdata_cannot_prove_callable_game_methods"]=source_schema!=SOURCE_SCHEMA_V2
+        result["xdata_admission_enforced_before_cpp_codegen"]=source_schema in (SOURCE_SCHEMA_V2,SOURCE_SCHEMA_V3)
+        result["legacy_v1_without_xdata_cannot_prove_callable_game_methods"]=source_schema not in (SOURCE_SCHEMA_V2,SOURCE_SCHEMA_V3)
         result["unresolved_source_function_fragments_not_emitted_as_CXX"]=True
         result["code_is_original_win64_unwind_function_not_confirmed_gameplay_method"]=True
     return result
