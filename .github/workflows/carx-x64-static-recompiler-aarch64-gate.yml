@@ -1,0 +1,73 @@
+name: CarX no-emulator x64 -> native AArch64 static recompilation real machine-code behavioral gate
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'native-port/recompiler/**'
+      - '.github/workflows/carx-x64-static-recompiler-aarch64-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prove-native-aarch64-static-translated-instruction-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real x86 assembler, Capstone disassembler, ARM64 cross compiler and CI-only ARM64 execution tester
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            gcc g++ binutils \
+            g++-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            qemu-user
+          python -m pip install 'capstone==5.0.6'
+          aarch64-linux-gnu-g++ --version | head -1
+          qemu-aarch64 --version | head -1
+          python -c 'import capstone; print("CARX_AOT_DECODER_CAPSTONE",capstone.__version__)'
+      - name: Test original x86 function machine code and compiled AArch64 semantics on 80 behavioral inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile native-port/recompiler/x64_function_aot.py
+          python -m unittest discover \
+            -s native-port/recompiler/tests \
+            -p 'test_x64_arm64_aot.py' -v
+          echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_80_CROSS_ISA_MACHINE_EXECUTIONS_PASS
+      - name: Scope gate no game claim without original CarX GameAssembly method run
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e 'GameAssembly.dll'
+          test ! -e 'CarX Street_Data'
+          test ! -e 'native-port/recompiler/original_carx_code.bin'
+          mkdir -p dist
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          output={
+              "schema":"rm11carx.x64-to-native-aarch64-source-recompiler-ci.v1",
+              "actual_x86_code_executed_in_reference":True,
+              "actual_aarch64_machine_code_executed_by_CI_qemu_runner":True,
+              "recompiled_code_runtime_uses_x86_guest_binary_decoder":False,
+              "tested_functions":"synthetic Win64 ABI function bodies only",
+              "original_carx_gameassembly_method_executed":False,
+              "game_unity_scene_rendered":False,
+              "android_bionic_target_compiled":False,
+              "original_game_port_proven":False,
+              "next_goal":"validate a bounded, permissioned original CarX function before scaling to Windows Unity runtime dependencies"
+          }
+          Path("dist/carx-aot-cross-architecture-evidence.json").write_text(
+              json.dumps(output,indent=2)+"\n",encoding="utf-8")
+          print("CARX_AOT_NO_FAKE_GAME_PORT_CLAIM_BUT_REAL_NATIVE_INSTRUCTION_RECOMPILATION_TEST")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-X64-to-AArch64-static-recompiler-behavioral-test-source-only
+          path: dist/carx-aot-cross-architecture-evidence.json
+          retention-days: 30
