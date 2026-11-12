@@ -132,21 +132,3 @@ jobs:
             dist/SHA256.txt
             dist/RELEASE_SCOPE.txt
           retention-days: 30
-      - name: Publish GitHub Release, refuse signature drift
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG=carx-street-portlab-v0.3.0-permanent-signing-20261112
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk \
-              dist/SHA256.txt dist/RELEASE_SCOPE.txt --clobber
-          else
-            gh release create "$TAG" dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk \
-              dist/SHA256.txt dist/RELEASE_SCOPE.txt \
-              --target "$GITHUB_SHA" \
-              --title 'CarX Street PC PortLab v0.3.0 - Permanent Signed Inspector' \
-              --notes-file dist/release-notes.md --latest=false
-          fi
-          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
