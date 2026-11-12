@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/carx_windows_gamecode_port_gate.py'
       - 'tests/test_carx_windows_gamecode_port_gate.py'
+      - 'tools/carx_run_pc_port_gate_termux.sh'
       - '.github/workflows/carx-windows-gamecode-addressables-native-port-gate.yml'
   workflow_dispatch:
 permissions:
@@ -28,6 +29,19 @@ jobs:
           python3 -m unittest discover -s tests \
             -p 'test_carx_windows_gamecode_port_gate.py' -v
           echo CARX_PC_IL2CPP_GAMEASSEMBLY_PE_IMPORT_AND_UNITY_CATALOG_18_TESTS_PASS
+      - name: Check Termux runner syntax and refuse nonexistent game folder without downloading
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/carx_run_pc_port_gate_termux.sh
+          mkdir -p /tmp/carx-missing-original-game-test
+          set +e
+          bash tools/carx_run_pc_port_gate_termux.sh /tmp/carx-missing-original-game-test > /tmp/carx-termux.stdout 2> /tmp/carx-termux.stderr
+          rc=$?
+          set -e
+          test "$rc" = 3
+          grep -Fq 'GameAssembly.dll' /tmp/carx-termux.stderr
+          echo CARX_TERMUX_RUNNER_NO_ORIGINAL_GAME_FAILS_CLOSED_BEFORE_NETWORK
       - name: Reject any fabricated actual CarX game files and real ARM64 game frame claim
         shell: bash
         run: |
