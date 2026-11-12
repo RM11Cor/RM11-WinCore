@@ -148,6 +148,91 @@ PROGRAMS={
         xor eax, eax
         ret
 """,
+    "byte_low_preserves_high":"""
+        mov rax, rcx
+        mov al, 1
+        ret
+""",
+    "byte_high_preserves_low":"""
+        mov rax, rcx
+        mov ah, 0x7f
+        ret
+""",
+    "word_preserves_high":"""
+        mov rax, rcx
+        mov ax, dx
+        ret
+""",
+    "byte_stack_memory":"""
+        sub rsp, 40
+        mov BYTE PTR [rsp+8], cl
+        movzx eax, BYTE PTR [rsp+8]
+        add rsp, 40
+        ret
+""",
+    "word_stack_memory":"""
+        sub rsp, 40
+        mov WORD PTR [rsp+8], dx
+        movzx eax, WORD PTR [rsp+8]
+        add rsp, 40
+        ret
+""",
+    "movsx_sign_byte_32":"""
+        movsx eax, cl
+        ret
+""",
+    "movsx_sign_word_64":"""
+        movsx rax, dx
+        ret
+""",
+    "movsxd_sign_dword_64":"""
+        movsxd rax, ecx
+        ret
+""",
+    "xor_lowbyte":"""
+        mov rax, rcx
+        xor al, dl
+        ret
+""",
+    "add_lowword":"""
+        mov rax, rcx
+        add ax, dx
+        ret
+""",
+    "cmp_unsigned8":"""
+        mov rax, rcx
+        cmp cl, dl
+        jae .Ldone
+        mov al, dl
+.Ldone:
+        ret
+""",
+    "inc_lowbyte":"""
+        mov rax, rcx
+        inc al
+        ret
+""",
+    "dec_lowword":"""
+        mov rax, rcx
+        dec ax
+        ret
+""",
+    "test_lowbyte":"""
+        mov rax, rcx
+        test al, al
+        jne .Ldone
+        mov al, 7
+.Ldone:
+        ret
+""",
+    "movzx_word_64":"""
+        movzx rax, cx
+        ret
+""",
+    "movsx_byte_64":"""
+        movsx rax, cl
+        ret
+""",
 }
 CASES=[
     [0,0,0,0],
@@ -226,7 +311,7 @@ class SourceRecompilerPipeline(unittest.TestCase):
         self.assertIn("AArch64",header)
         return original,arm,lifted
 
-    def test_actual_x86_against_native_aarch64_aot_for_17_programs_170_cases(self):
+    def test_actual_x86_against_native_aarch64_aot_for_33_programs_330_cases(self):
         results={}
         for key,body in PROGRAMS.items():
             with self.subTest(program=key):
@@ -239,7 +324,7 @@ class SourceRecompilerPipeline(unittest.TestCase):
                         self.assertEqual(native,reference)
                 results[key]=lifted.insn_count
         print("CARX_AOT_X64_WINDOWS_ABI_TO_NATIVE_AARCH64_RESULTS="+str(results))
-        print("CARX_AOT_17_WINDOWS_ABI_PROGRAMS_170_BEHAVIORAL_COMPARISONS_PASS")
+        print("CARX_AOT_33_WINDOWS_ABI_PROGRAMS_330_BEHAVIORAL_COMPARISONS_PASS")
 
     def test_reject_unhandled_sse_instruction(self):
         # addss xmm0,xmm1
@@ -264,10 +349,22 @@ class SourceRecompilerPipeline(unittest.TestCase):
         with self.assertRaises(aot.UnsupportedGuestCode):
             aot.lift_function(bytes.fromhex("90 90 90"))
 
-    def test_reject_16bit_register_write_until_semantics_added(self):
-        # mov ax, cx; ret. Partial-register preservation must be proven.
+    def test_16bit_register_partial_write_is_now_supported(self):
+        # mov ax, cx; ret. The 16-bit overwrite preserves high RAX bits.
+        translated=aot.lift_function(bytes.fromhex("66 89 c8 c3"))
+        self.assertEqual(translated.insn_count,2)
+        self.assertIn("~0xffffULL",translated.code)
+        
+    def test_8bit_high_register_write_preserves_rest_of_rax(self):
+        # mov ah, 0x7f; ret.
+        translated=aot.lift_function(bytes.fromhex("b4 7f c3"))
+        self.assertEqual(translated.insn_count,2)
+        self.assertIn("~0xff00ULL",translated.code)
+
+    def test_reject_sse_vector_not_truncated_into_integer_registers(self):
+        # movss xmm0, xmm1; ret must remain unsupported.
         with self.assertRaises(aot.UnsupportedGuestCode):
-            aot.lift_function(bytes.fromhex("66 89 c8 c3"))
+            aot.lift_function(bytes.fromhex("f3 0f 10 c1 c3"))
 
     def test_reject_missing_function(self):
         with self.assertRaises(aot.UnsupportedGuestCode):
