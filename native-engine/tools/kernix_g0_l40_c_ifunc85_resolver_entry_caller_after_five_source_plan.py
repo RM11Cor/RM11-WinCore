@@ -59,8 +59,8 @@ class IFUNC85OriginalGNUJITHeaderWatch(gdb.Breakpoint):
         try:
             state["jit_watch_scan"]+=1
             scan=state["jit_watch_scan"]
-            if scan>1536:
-                state["failure"]="IFUNC85 real FEX header hardware scan exceeded 1536"
+            if scan>16384:
+                state["failure"]="IFUNC85 real FEX header hardware scan exceeded 16384"
                 jmark("IFUNC85_JIT_SCAN_BOUNDED_REJECT",count=scan)
                 return True
             pid=gdb.selected_inferior().pid
@@ -79,6 +79,10 @@ class IFUNC85OriginalGNUJITHeaderWatch(gdb.Breakpoint):
             rsp=int(gdb.parse_and_eval("$x8"))
             rax=int(gdb.parse_and_eval("$x4"))
             r14=int(gdb.parse_and_eval("$x19"))
+            if scan<=16 or scan%512==0 or entry in (0x8040c8570,0x80100fd5c,0x80100fd60):
+                jmark("IFUNC85_JIT_HEADER_DIAGNOSTIC",pid=pid,scan=scan,
+                      guest_entry=hex(entry),guest_size=size,native_ops=ops,
+                      guest_rsp=hex(rsp),guest_rax=hex(rax),guest_r14=hex(r14))
             if entry==0x8040c8570 and state["resolver_jit_first"] is None:
                 ret=qword(rsp)
                 evt={"pid":pid,"scan":scan,"native_pc":hex(nativepc),
