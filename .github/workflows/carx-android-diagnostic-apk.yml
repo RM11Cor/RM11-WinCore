@@ -1,4 +1,4 @@
-name: CarX Street PC PortLab v0.3 - permanent signing continuity
+name: CarX Street PC PortLab v0.4 - Unity SerializedFile and IL2CPP header evidence
 on:
   push:
     branches: [carx-street-pc-port-v1]
@@ -6,6 +6,7 @@ on:
       - '.github/workflows/carx-android-diagnostic-apk.yml'
       - 'app/**'
       - 'tests/UnityFormatProbeTest.java'
+      - 'tests/UnitySerializedProbeTest.java'
       - 'carx-signing/**'
   workflow_dispatch:
 permissions:
@@ -26,8 +27,11 @@ jobs:
           mkdir -p build/header-test
           javac -d build/header-test \
             app/src/main/java/com/rm11cor/carxstreet/portlab/UnityFormatProbe.java \
-            tests/UnityFormatProbeTest.java
+            tests/UnityFormatProbeTest.java \
+            app/src/main/java/com/rm11cor/carxstreet/portlab/UnitySerializedProbe.java \
+            tests/UnitySerializedProbeTest.java
           java -cp build/header-test UnityFormatProbeTest
+          java -cp build/header-test UnitySerializedProbeTest
       - name: Verify and decrypt permanent CARX signing key from protected secret
         shell: bash
         env:
@@ -72,7 +76,7 @@ jobs:
           test -s "$CARX_STABLE_KEYSTORE"
           gradle :app:assembleRelease --no-daemon --stacktrace
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
+          cp app/build/outputs/apk/release/app-release.apk dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
           sha256sum dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk >dist/SHA256.txt
       - name: Verify identical pinned CarX certificate package ID and higher versionCode
         shell: bash
@@ -88,45 +92,47 @@ jobs:
           fi
           details=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
           printf '%s\n' "$details" | head -n 5
-          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='3' versionName='0.3.0-permanent-signing-baseline'" <<<"$details"
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='4' versionName='0.4.0-unity-serialized-probe'" <<<"$details"
           echo CARX_PERMANENT_CERT_AND_UPDATE_IDENTITY_VERIFIED_NO_DEBUG_SIGNATURE
       - name: Write accurate migration instructions
         shell: bash
         run: |
           set -euo pipefail
           cat >dist/RELEASE_SCOPE.txt <<'EOF'
-          CarX Street PC PortLab v0.3.0 - read-only inspector, NOT a playable game.
+          CarX Street PC PortLab v0.4.0 - read-only inspector, NOT a playable game.
           Permanent CarX-specific signing SHA256:
           73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
-          Package ID com.rm11cor.carxstreet.portlab ; versionCode 3.
-          The old v0.1/v0.2 debug-signed app CANNOT be updated in place without its lost
-          private key. Export report and uninstall old inspector ONCE, install v0.3.
-          All v0.4+ releases must use this same permanent certificate and higher
-          versionCode, allowing installation directly over v0.3 without reinstall.
+          Package ID com.rm11cor.carxstreet.portlab ; versionCode 4.
+          The old v0.1/v0.2 debug APKs cannot be updated in place to v0.4.
+          Export report then install the permanent-signed v0.3 first if migrating.
+          v0.4 can update v0.3 IN PLACE with the same stable CarX certificate,
+          same package identifier and strictly higher versionCode4.
           EOF
           cat >dist/release-notes.md <<'EOF'
-          ## CarX Street PC PortLab v0.3.0 — permanent-signing baseline
+          ## CarX Street PC PortLab v0.4.0 — serialized Unity version diagnostics
 
           **File inspector only — NOT a playable CarX Street Android game port.**
 
-          New: dedicated, password-protected permanent signing identity.
-          Package: com.rm11cor.carxstreet.portlab, versionCode 3.
+          Dedicated password-protected CarX permanent signing identity REUSED without rotation.
+          Package: com.rm11cor.carxstreet.portlab, versionCode 4.
           Signer SHA256: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc.
 
-          **One-time migration:** The previous v0.1/v0.2 APKs were signed with
-          ephemeral debug keys. Android requires the original private key
-          to update those builds, which was not preserved in GitHub Actions.
-          Export your JSON report, uninstall ONLY the old CarX inspector app,
-          then install v0.3. Your original game files remain untouched.
-          Future CarX releases using this exact certificate and a higher
-          versionCode will update directly over v0.3, with no uninstall.
+          **No uninstall required from v0.3:** Same dedicated CarX certificate
+          and same application ID, incremented versionCode from 3 to 4.
+          This v0.4 reads the first 256 bytes of original globalgamemanagers
+          and resources.assets to seek a strict Unity editor version candidate.
+          It reports the first 16 original global-metadata.dat bytes as HEX and
+          scans only the first 4096 bytes for standard IL2CPP magic.
+          No encryption conclusion, no extraction, no Android ARM64 runtime.
+          If still on v0.1/v0.2, export report and uninstall old debug-signed
+          inspector ONCE before entering this permanent signing channel.
 
-          Same offline original Unity/IL2CPP header inspector capabilities as v0.2.
+          Same offline original Unity/IL2CPP header inspector plus bounded serialized headers.
           No original PC game binary is executed or converted by this APK.
           EOF
       - uses: actions/upload-artifact@v4
         with:
-          name: CarXStreet-v0.3.0-PERMANENT-SIGNED-update-baseline
+          name: CarXStreet-v0.4.0-PERMANENT-SIGNED-Unity-Serialized-Header-Inspector
           path: |
             dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
             dist/SHA256.txt
