@@ -20,14 +20,18 @@ from win64_callable_source_gate import evaluate_win64_source_function
 
 ZIP_SCHEMA="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
 ZIP_SCHEMA_V3="rm11carx.original-win64-gameassembly-bounded-function-samples.v3"
+ZIP_SCHEMA_V4="rm11carx.original-win64-gameassembly-bounded-function-samples.v4"
 MAX_SIZE=8*1024*1024
 MAX_CODE_BYTES=256*320
 MAX_UNWIND_FILES=1024
 MAX_PARENT_FILES=1024
+MAX_GAP_FILES=1024
+MAX_GAP_SOURCE_BYTES=2*1024*1024
 MAX_PARENT_SOURCE_BYTES=2*1024*1024
 CODE=re.compile(r"code/rva_([0-9a-f]{8})\.bin$")
 UNWIND=re.compile(r"unwind/rva_([0-9a-f]{8})\.bin$")
 PARENT=re.compile(r"parents/rva_([0-9a-f]{8})\.bin$")
+GAP=re.compile(r"gaps/rva_([0-9a-f]{8})\.bin$")
 
 def require(valid,reason):
     if not valid:raise ValueError(reason)
@@ -73,19 +77,36 @@ def verify_parent_member(z:zipfile.ZipFile, parent:dict,
             "original parent code bytes do not match manifest SHA256")
     return raw
 
+def verify_gap_member(z:zipfile.ZipFile,info:dict,
+                      expected_begin:int,expected_end:int)->bytes:
+    member=info.get("zip_member")
+    match=GAP.fullmatch(member or "")
+    require(match is not None and int(match.group(1),16)==expected_begin,
+            "original gap file doesn't match PE source BeginAddress")
+    size=expected_end-expected_begin
+    require(1<=size<=4096 and info.get("length_bytes")==size,
+            "original gap size doesn't match original PE executable RVA interval")
+    require(member in z.NameToInfo and z.getinfo(member).file_size==size,
+            "original gap source file missing or different size")
+    raw=z.read(member)
+    require(len(raw)==size and
+            hashlib.sha256(raw).hexdigest()==info.get("sha256"),
+            "original executable gap source SHA256 verification failed")
+    return raw
+
 def analyze(source:Path)->dict:
     require(source.is_file() and not source.is_symlink() and
             0<source.stat().st_size<=MAX_SIZE,"source ZIP is unavailable or excessive")
     with zipfile.ZipFile(source) as z:
         records=z.infolist()
         names=[r.filename for r in records]
-        require(len(records)<=1+256+MAX_UNWIND_FILES+MAX_PARENT_FILES,
+        require(len(records)<=1+256+MAX_UNWIND_FILES+MAX_PARENT_FILES+MAX_GAP_FILES,
                 "archive entry bound exceeded")
         require(len(names)==len(set(names)),"duplicate original ZIP member")
         require("manifest.json" in names,"source manifest missing")
         require(all(name=="manifest.json" or CODE.fullmatch(name) or
-                    UNWIND.fullmatch(name) or PARENT.fullmatch(name)
-                    for name in names),
+                    UNWIND.fullmatch(name) or PARENT.fullmatch(name) or
+                    GAP.fullmatch(name) for name in names),
                 "unknown source ZIP members or unsafe archive paths")
         require(sum(x.file_size for x in records)<6*1024*1024,
                 "uncompressed archive outside original sampling limit")
@@ -93,14 +114,22 @@ def analyze(source:Path)->dict:
                 "source manifest too large")
         manifest=json.loads(z.read("manifest.json"))
         source_schema=manifest.get("schema")
-        require(source_schema in (ZIP_SCHEMA,ZIP_SCHEMA_V3),
+        require(source_schema in (ZIP_SCHEMA,ZIP_SCHEMA_V3,ZIP_SCHEMA_V4),
                 "owner archive is not actual v1.1-v1.3 Win64 unwind source package")
-        v3=(source_schema==ZIP_SCHEMA_V3)
+        v3=(source_schema in (ZIP_SCHEMA_V3,ZIP_SCHEMA_V4))
+        v4=(source_schema==ZIP_SCHEMA_V4)
         if v3:
-            require(manifest.get("version")=="1.3-parent-code-bounded" and
+            require(manifest.get("version") in (
+                    "1.3-parent-code-bounded",
+                    "1.4-inter-region-executable-source-gaps") and
                     manifest.get("max_parent_code_fragment_bytes")==4096 and
                     manifest.get("max_parent_code_total_bytes")==MAX_PARENT_SOURCE_BYTES,
-                    "v1.3 original parent-code export limits not documented")
+                    "v1.3/v1.4 original parent-code export limits not documented")
+        if v4:
+            require(manifest.get("version")=="1.4-inter-region-executable-source-gaps" and
+                    manifest.get("max_executable_inter_region_gap_bytes")==4096 and
+                    manifest.get("max_executable_inter_region_gap_total_bytes")==MAX_GAP_SOURCE_BYTES,
+                    "v1.4 original source gap export limits not documented")
         functions=manifest.get("functions")
         require(isinstance(functions,list) and 1<=len(functions)<=256,
                 "source manifest function list absent or over bound")
@@ -108,7 +137,8 @@ def analyze(source:Path)->dict:
             x.get("win64_unwind_info_rva") for x in functions
         }
         if manifest.get("version") in ("1.2-source-diverse",
-                                       "1.3-parent-code-bounded"):
+                                       "1.3-parent-code-bounded",
+                                       "1.4-inter-region-executable-source-gaps"):
             require(
                 manifest.get("sampler_policy")==
                     "one_source_function_per_distinct_unwind_rva",
@@ -126,6 +156,9 @@ def analyze(source:Path)->dict:
         used={"manifest.json"}
         unique_unwind=set()
         unique_parent_code={}
+        unique_gap_code={}
+        original_gap_references_verified=0
+        gap_source_references_missing=0
         parent_code_references_verified=0
         parent_code_references_missing=0
         code_bytes=0
@@ -160,6 +193,7 @@ def analyze(source:Path)->dict:
             require(isinstance(raw_chain,list) and len(raw_chain)<=4,
                     "invalid bounded unwind chain list")
             decoded_for_function=0
+            original_executable_intervals=[(rva,rva+len(sample))]
             independently_decoded_chain=[]
             status=function.get("unwind_status")
             chain_record=[]
@@ -212,6 +246,8 @@ def analyze(source:Path)->dict:
                                     "original parent source reused with conflicting code bytes")
                             unique_parent_code[member]=fingerprint
                             used.add(member)
+                            original_executable_intervals.append(
+                                (expected[0],expected[1]))
                             parent_code_references_verified+=1
                         else:
                             require(
@@ -250,6 +286,65 @@ def analyze(source:Path)->dict:
                 require(raw_chain and decoded_for_function==len(raw_chain) and
                         not chain_record[-1]["chained"],
                         "Android completion claim unsupported by source chain")
+            # Verify executable PE gaps *between* original disjoint
+            # source ranges. A gap may include unrelated original code or
+            # padding and is never promoted to callable method identity.
+            if v4:
+                supplied=function.get("inter_region_gaps")
+                require(isinstance(supplied,list) and len(supplied)<=4,
+                        "v1.4 bounded inter-region gap list malformed")
+                ordered=sorted(original_executable_intervals)
+                if not all(ordered[i][1]<=ordered[i+1][0]
+                           for i in range(len(ordered)-1)):
+                    require(
+                        function.get("inter_region_gap_status")==
+                            "ORIGINAL_SOURCE_REGIONS_OVERLAP_CANNOT_INFER_GAP"
+                        and not supplied,
+                        "v1.4 ambiguous source intervals cannot claim valid gap")
+                elif function.get("inter_region_gap_status")==(
+                        "RECORDED_BOUNDED_ORIGINAL_PE_SOURCE_INTERVALS"):
+                    expected_gaps=[
+                        (ordered[i][1],ordered[i+1][0])
+                        for i in range(len(ordered)-1)
+                        if ordered[i+1][0]>ordered[i][1]
+                    ]
+                    require(len(supplied)==len(expected_gaps),
+                            "original PE inter-region source gaps omitted/fabricated")
+                    for g,(begin,end) in zip(supplied,expected_gaps):
+                        require(g.get("begin_rva")==begin and
+                                g.get("end_rva")==end,
+                                "source gap RVA doesn't match actual parent/child ranges")
+                        gstatus=g.get("gap_source_status")
+                        if gstatus=="EXPORTED_RAW_PE_EXECUTABLE_INTERVAL":
+                            source_info={
+                                "zip_member":g.get("zip_member"),
+                                "length_bytes":g.get("length_bytes"),
+                                "sha256":g.get("sha256"),
+                            }
+                            raw=verify_gap_member(z,source_info,begin,end)
+                            member=source_info["zip_member"]
+                            fingerprint=(len(raw),source_info["sha256"])
+                            old=unique_gap_code.get(member)
+                            require(old is None or old==fingerprint,
+                                    "source gap duplicate path conflicting content")
+                            unique_gap_code[member]=fingerprint
+                            used.add(member)
+                            original_gap_references_verified+=1
+                        else:
+                            require(gstatus in (
+                                "ORIGINAL_SOURCE_GAP_CONFLICTING_LENGTH",
+                                "ORIGINAL_SOURCE_GAP_EXTRACTION_BUDGET",
+                                "ORIGINAL_PE_GAP_NOT_FILE_BACKED_OR_TOO_LARGE"),
+                                "unexpected original source gap extraction status")
+                            require(not g.get("zip_member"),
+                                    "declared missing gap must not claim original bytes")
+                            gap_source_references_missing+=1
+                else:
+                    require(function.get("inter_region_gap_status") in (
+                        "NO_PARENT_OR_INCOMPLETE_UNWIND_SOURCE",
+                        "ORIGINAL_SOURCE_REGIONS_OVERLAP_CANNOT_INFER_GAP")
+                        and not supplied,
+                        "v1.4 gaps declared without validated source intervals")
             # Attach actual decoded xdata and source CFG to one stringent
             # admission result; a small pdata range is not necessarily a
             # standalone or identifiable Unity game method.
@@ -290,6 +385,18 @@ def analyze(source:Path)->dict:
             require(sum(v[0] for v in unique_parent_code.values())<=
                         MAX_PARENT_SOURCE_BYTES,
                     "v1.3 original parent source export over total budget")
+        if v4:
+            require(
+                len(unique_gap_code)==
+                    manifest.get("unique_executable_inter_region_gap_fragments") and
+                sum(v[0] for v in unique_gap_code.values())==
+                    manifest.get("original_executable_gap_code_bytes_exported") and
+                gap_source_references_missing==
+                    manifest.get("executable_gap_extraction_issues"),
+                "v1.4 original gap source ZIP and declared counters mismatch")
+            require(sum(v[0] for v in unique_gap_code.values())<=
+                        MAX_GAP_SOURCE_BYTES,
+                    "v1.4 original gap source export over total budget")
         return {
             "schema":"rm11carx.owner-real-gameassembly-win64-unwind-analyzed.v1",
             "original_source_archive_type":"owner Android PortLab v1.1 Windows PE x64 .pdata/.xdata",
@@ -300,6 +407,13 @@ def analyze(source:Path)->dict:
             "original_source_code_bytes_verified":code_bytes,
             "sha256_verified_unique_unwind_records":len(unique_unwind),
             "original_parent_code_archive_schema_v3":v3,
+            "original_executable_gap_archive_schema_v4":v4,
+            "sha256_verified_unique_executable_gap_fragments":len(unique_gap_code),
+            "sha256_verified_unique_executable_gap_bytes":
+                sum(v[0] for v in unique_gap_code.values()),
+            "sha256_verified_gap_source_references":original_gap_references_verified,
+            "unavailable_original_inter_region_gap_references":
+                gap_source_references_missing,
             "sha256_verified_unique_parent_code_fragments":len(unique_parent_code),
             "sha256_verified_parent_code_references":parent_code_references_verified,
             "missing_bounded_parent_code_references":parent_code_references_missing,
