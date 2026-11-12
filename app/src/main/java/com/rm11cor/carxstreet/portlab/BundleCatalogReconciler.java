@@ -22,7 +22,10 @@ public final class BundleCatalogReconciler {
     private final Map<String,Integer> actual=new HashMap<>();
     private final Map<String,Integer> referenced=new HashMap<>();
     private final ArrayList<String> androidNamedExamples=new ArrayList<>();
+    private final ArrayList<String> invalidPhysicalNameExamples=new ArrayList<>();
+    private final ArrayList<String> ambiguousCatalogNameExamples=new ArrayList<>();
     private int actualEntries=0;
+    private int invalidPhysicalNames=0;
     private int windowsReferences=0;
     private int invalidWindowsReferences=0;
     private int androidNamedReferences=0;
@@ -33,7 +36,14 @@ public final class BundleCatalogReconciler {
     public void addPhysicalWindowsBundle(String basename) {
         actualEntries++;
         String normalized=normalizedBundleBasename(basename);
-        if(normalized==null||actual.size()>=MAX_BUNDLES && !actual.containsKey(normalized)) {
+        if(normalized==null) {
+            invalidPhysicalNames++;
+            if(invalidPhysicalNameExamples.size()<MAX_EXAMPLES)
+                invalidPhysicalNameExamples.add(sanitizedNonSecretSuffix(
+                        basename==null?"":basename));
+            return;
+        }
+        if(actual.size()>=MAX_BUNDLES && !actual.containsKey(normalized)) {
             limitHit=true;
             return;
         }
@@ -73,11 +83,18 @@ public final class BundleCatalogReconciler {
         // Do not infer nested path or URL mappings or create false matches.
         if(after.indexOf('/')>=0) {
             invalidWindowsReferences++;
+            if(ambiguousCatalogNameExamples.size()<MAX_EXAMPLES)
+                ambiguousCatalogNameExamples.add(
+                        "nested_Windows64_path:" + sanitizedNonSecretSuffix(after));
             return;
         }
         String normalized=normalizedBundleBasename(after);
         if(normalized==null) {
             invalidWindowsReferences++;
+            if(ambiguousCatalogNameExamples.size()<MAX_EXAMPLES)
+                ambiguousCatalogNameExamples.add(
+                        "unsupported_Windows64_bundle_basename:"+
+                        sanitizedNonSecretSuffix(after));
             return;
         }
         if(referenced.size()>=MAX_BUNDLES&&!referenced.containsKey(normalized)){
@@ -109,6 +126,7 @@ public final class BundleCatalogReconciler {
         public int physicalEntries;
         public int distinctPhysicalFilenames;
         public int physicalDuplicateCasefoldNames;
+        public int unsupportedPhysicalBasenameCount;
         public int catalogWindowsReferences;
         public int distinctCatalogReferencedFilenames;
         public int catalogDuplicateReferenceEntries;
@@ -122,6 +140,8 @@ public final class BundleCatalogReconciler {
         public ArrayList<String> unreferencedPhysicalExamples=new ArrayList<>();
         public ArrayList<String> notPresentOnDiskExamples=new ArrayList<>();
         public ArrayList<String> androidNameExamples=new ArrayList<>();
+        public ArrayList<String> unsupportedPhysicalNameExamples=new ArrayList<>();
+        public ArrayList<String> ambiguousCatalogNameExamples=new ArrayList<>();
         public String status;
     }
 
@@ -129,6 +149,9 @@ public final class BundleCatalogReconciler {
                              boolean catalogFullyParsed) {
         Summary r=new Summary();
         r.physicalEntries=actualEntries;
+        r.unsupportedPhysicalBasenameCount=invalidPhysicalNames;
+        r.unsupportedPhysicalNameExamples.addAll(invalidPhysicalNameExamples);
+        r.ambiguousCatalogNameExamples.addAll(ambiguousCatalogNameExamples);
         r.distinctPhysicalFilenames=actual.size();
         r.catalogWindowsReferences=windowsReferences;
         r.distinctCatalogReferencedFilenames=referenced.size();
@@ -156,11 +179,14 @@ public final class BundleCatalogReconciler {
         truncate(r.unreferencedPhysicalExamples);
         truncate(r.notPresentOnDiskExamples);
         r.fullReconciliationValid=sourceFileListingComplete && catalogFullyParsed &&
-                !limitHit && invalidWindowsReferences==0;
+                !limitHit && invalidWindowsReferences==0 && invalidPhysicalNames==0;
         r.status=!sourceFileListingComplete?"physical_SAF_scan_incomplete":
                 !catalogFullyParsed?"Addressables_catalog_not_fully_parsed":
-                limitHit?"bundle_count_or_input_limit_exceeded":
-                invalidWindowsReferences>0?"ambiguous_windows_bundle_path_cannot_exact_match":
+                limitHit?"bundle_count_limit_exceeded":
+                invalidWindowsReferences>0&&invalidPhysicalNames>0?
+                    "both_physical_and_catalog_names_need_review":
+                invalidPhysicalNames>0?"unsupported_physical_bundle_basename":
+                invalidWindowsReferences>0?"ambiguous_windows_catalog_bundle_reference":
                 "complete_filename_level_comparison_not_bundle_content_integrity";
         return r;
     }
