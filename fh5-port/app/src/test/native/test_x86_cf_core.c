@@ -72,12 +72,39 @@ static void test_bounds(void) {
     assert(fh5_cf_analyze(undecodeable,sizeof(undecodeable),0,0x1000,&r)<0);
     puts("PASS malformed/truncated/out-of-budget decode rejected");
 }
+
+static void test_deep_target_stack_and_simd(void) {
+    /* 24 register pushes, MOVUPD XMM0,XMM1, then first CALL.
+     * A 16-insn scan would fail to locate the first control transfer. */
+    uint8_t code[64];
+    memset(code,0x90,sizeof(code));
+    for(int i=0;i<24;i++)code[i]=0x50;
+    code[24]=0x66;code[25]=0x0f;code[26]=0x10;code[27]=0xc1;
+    code[28]=0xe8;code[29]=0;code[30]=0;code[31]=0;code[32]=0;
+    code[33]=0xc3;
+    fh5_cf_result r;
+    assert(fh5_cf_analyze(code,sizeof(code),0x5000,0x7000,&r)==0);
+    assert(r.push_count==24);
+    assert(r.pop_count==0);
+    assert(r.vector_xmm_count>=1);
+    assert(r.vector_ymm_count==0 && r.vector_zmm_count==0);
+    assert(r.transfer_found);
+    assert(r.first_block_count==26);
+    assert(r.first_block_bytes==33);
+    assert(r.direct_target_rva==0x5021);
+    assert(r.decoded_count>16);
+    assert(strcmp(r.first_block_mnemonics[24],"movupd")==0);
+    assert(strcmp(r.first_block_mnemonics[25],"call")==0);
+    puts("PASS >16 instruction deeper target, XMM categorization, stack pushes and call target");
+}
+
 int main(void) {
     test_first_call();
     test_indirect_call();
     test_jumps();
     test_outside_module();
     test_bounds();
+    test_deep_target_stack_and_simd();
     puts("ALL P2.6 control-flow tests PASS");
     return 0;
 }
