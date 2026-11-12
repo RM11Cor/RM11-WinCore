@@ -1,0 +1,27 @@
+name: FH5 Runtime R1 Actual EXE Import Gate
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - fh5-runtime/boot_r1.py
+      - .github/workflows/fh5-runtime-r1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-pe-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: PE32+ imports, ZIP extraction and report privacy tests
+        working-directory: fh5-runtime
+        run: |
+          python -m py_compile boot_r1.py
+          python -m unittest -v boot_r1.Checks
