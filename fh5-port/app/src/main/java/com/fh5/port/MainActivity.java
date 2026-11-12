@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P2.3 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P2.4 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -102,7 +102,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P2.3", () -> exportReport()));
+        root.addView(button("تصدير تقرير P2.4", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P2.3: اختَر ZIP ثم اضغط فحص تعليمات بداية فورزا الأصلية. القراءة والترجمة فقط، بدون استخراج ولا تنفيذ اللعبة.");
+        updateStatus("P2.4: اختَر ZIP ثم افحص تعليمات فورزا الأصلية، وشغّل اختبار x64 المصغّر للتحقق من دعم تعديل المكدس. لا ننفذ كود اللعبة.");
     }
 
     private int dp(int v) {
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_3_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_4_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -163,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P2.3. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P2.4. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -423,7 +423,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
-                        "\nهذه ترجمة تجريبية فقط، لم نشغّل كود اللعبة.";
+                        "\nتعليمات معروفة بالبداية: "+translated.optInt("recognizedInstructionCount",0)+
+                        "\nبايتات متعرف عليها: "+translated.optInt("recognizedPrefixBytes",0)+
+                        "\nأول موضع غير مدعوم: "+translated.optInt("firstUnsupportedOffset",0)+
+                        "\nترجمة تجريبية فقط؛ لم نشغّل كود اللعبة.";
                 }
             } catch(Exception ex) {
                 String kind="zip_entry_or_storage_error";
@@ -458,7 +461,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P2.3")
+                .put("stage", "P2.4")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
