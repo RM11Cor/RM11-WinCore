@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.2  /  فحص ملفات Unity",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.4  /  فحص إصدار Unity",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 02 — فحص بنية Unity وIL2CPP",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 03 — تشخيص رؤوس ملفات Unity",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("نفحص ملفات CarX Street PC ونقرأ رؤوس IL2CPP وUnityFS وكتالوج Addressables بدون نسخ ملفات اللعبة أو رفعها. هذا الإصدار تشخيصي فقط وليس لعبة قابلة للتشغيل.",14,SUB,false));
+        banner.addView(label("هذا الإصدار يفحص رؤوس Unity وglobalgamemanagers وIL2CPP بشكل محلي وآمن، حتى نعرف إصدار اللعبة الحقيقي أو سبب تعذر تحديده. التطبيق ليس بورت تشغيل بعد.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -221,6 +221,10 @@ public final class MainActivity extends Activity {
                     JSONObject machines=result.optJSONObject("machine");
                     JSONObject deep=result.optJSONObject("unity_deep_probe");
                     JSONObject meta=deep==null?null:deep.optJSONObject("global_metadata");
+                    JSONObject serial=deep==null?null:deep.optJSONObject("unity_serialized_file_headers");
+                    org.json.JSONArray engineCandidates=serial==null?null:serial.optJSONArray("candidate_unity_editor_versions");
+                    String engineVersion=(engineCandidates!=null && engineCandidates.length()>0)?
+                            engineCandidates.optString(0):"غير مثبت من الملف";
                     org.json.JSONArray v=deep==null?null:deep.optJSONArray("sampled_bundle_unity_versions");
                     String sampleVersion=(v!=null&&v.length()>0)?v.optString(0):"غير معروف";
                     int bundleCount=deep==null?0:deep.optInt("windows64_bundle_count");
@@ -237,7 +241,9 @@ public final class MainActivity extends Activity {
                         "\nUnity + IL2CPP: "+eligible+
                         "\nإصدار IL2CPP metadata: "+(metadataVersion>=0?metadataVersion:"غير معروف")+
                         "\nUnityFS Windows bundles: "+bundleCount+
-                        "\nإصدار Unity من عينة الحزم: "+sampleVersion+
+                        "\nUnityFS header (معلومات عامة): "+sampleVersion+
+                        "\nإصدار المحرك من globalgamemanagers: "+engineVersion+
+                        "\nتوقيع IL2CPP القياسي: "+(meta!=null&&meta.optBoolean("classic_il2cpp_magic")?"موجود":"غير موجود")+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -262,7 +268,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.2.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.4.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
