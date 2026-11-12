@@ -86,7 +86,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.4 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.5 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -107,14 +107,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص رأس ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
-        importButton=button("فحص مكتبات Windows و DLL من Forza EXE", () -> testPeImports());
+        importButton=button("فحص DLL المطلوبة والموجودة بجانب EXE", () -> testPeImports());
         root.addView(importButton);
         entryButton = button("تحليل Forza EXE مباشرة (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.4", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.5", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -124,7 +124,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.4: اختَر مجلد فورزا المستخرج ثم اضغط فحص DLL المطلوبة من Windows. لا يتم تشغيل اللعبة.");
+        updateStatus("P3.5: افحص DLL المستوردة وقارن أسماءها مع الملفات المجاورة لملف EXE. هذا ليس اختبار تشغيل اللعبة.");
     }
 
     private int dp(int v) {
@@ -176,7 +176,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_4_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_5_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -187,7 +187,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.4. ارفع FH5_PORT_P3_4_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.5. ارفع FH5_PORT_P3_5_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -662,7 +662,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         importBusy=true;
         importButton.setEnabled(false);
-        updateStatus("جاري تحليل جدول Import Directory الأصلي، بدون تنفيذ تعليمات اللعبة...");
+        updateStatus("جاري فحص أسماء DLL المستوردة ومقارنتها بمجلد اللعبة، بدون تشغيل...");
         final String uri=chosen;
         Thread worker=new Thread(() -> {
             JSONObject result=new JSONObject();
@@ -674,7 +674,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     PeImportProbe.Result scan=PeImportProbe.inspectDirect(in.getChannel());
                     JSONArray names=new JSONArray();
                     for(String dll:scan.dllNames)names.put(dll);
-                    result.put("stage",scan.stage);
+                    result.put("stage","P3_5_DEPENDENCY_FOLDER_INVENTORY_READ_ONLY");
                     result.put("status",scan.status);
                     result.put("source","EXTRACTED_PE64_DIRECT");
                     result.put("source_size_bytes",scan.sourceFileBytes);
@@ -685,6 +685,46 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     result.put("descriptors_scanned",scan.descriptorCount);
                     result.put("unique_dll_names",scan.uniqueNameCount);
                     result.put("dll_names",names);
+                    // P3.5: verify immediate sibling filenames only under
+                    // the previously user-approved SAF folder. A match does
+                    // not validate DLL architecture, imports or loadability.
+                    java.util.Set<String> fileNames=java.util.Collections.emptySet();
+                    boolean verifiedFolder=false;
+                    String folderReason="FOLDER_NOT_SELECTED";
+                    String tree=prefs.getString(GAME_FOLDER,"");
+                    if(!tree.isEmpty()) {
+                        try {
+                            fileNames=SafGameFolderProbe.listSiblingDllNames(
+                                getContentResolver(),Uri.parse(tree),Uri.parse(uri));
+                            verifiedFolder=true;
+                            folderReason="EXE_SIBLINGS_ENUMERATED";
+                        } catch(java.io.IOException err) {
+                            folderReason=err.getMessage();
+                            if(folderReason==null ||
+                               !folderReason.matches("saf_[a-z0-9_]{2,90}"))
+                                folderReason="SAF_DIRECTORY_UNAVAILABLE";
+                        }
+                    }
+                    DllDependencyPlanner.Report plan=DllDependencyPlanner.assess(
+                        scan.dllNames,fileNames,verifiedFolder);
+                    JSONArray inventory=new JSONArray();
+                    for(DllDependencyPlanner.Entry item:plan.entries) {
+                        JSONObject dep=new JSONObject();
+                        dep.put("dll",item.name);
+                        dep.put("compatibility_group",item.group);
+                        dep.put("beside_exe_filename_status",item.localStatus);
+                        inventory.put(dep);
+                    }
+                    result.put("dll_compatibility_inventory",inventory);
+                    result.put("exe_folder_listed",verifiedFolder);
+                    result.put("exe_folder_scan_status",folderReason);
+                    result.put("import_names_matched_beside_exe",plan.localCount);
+                    result.put("import_names_not_found_beside_exe",plan.notLocalCount);
+                    result.put("import_names_unchecked",plan.notCheckedCount);
+                    result.put("windows_api_set_contracts",plan.apiSetCount);
+                    result.put("sibling_check_depth",0);
+                    result.put("binary_abi_or_export_validation_completed",false);
+                    result.put("windows_loader_ready",false);
                     result.put("max_descriptors",PeImportProbe.MAX_DLL_DESCRIPTORS);
                     result.put("max_dll_name_bytes",PeImportProbe.MAX_DLL_NAME_BYTES);
                     result.put("delay_load_directory_not_scanned",true);
@@ -699,18 +739,21 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         if(i>0)sample.append(", ");
                         sample.append(scan.dllNames.get(i));
                     }
-                    visible="نتيجة استيرادات Windows: "+scan.status
-                        +"\nمكتبات DLL مختلفة: "+scan.uniqueNameCount
-                        +"\nأمثلة: "+sample
-                        +"\nهذه استيرادات ثابتة وليست دليلاً على تشغيل Windows أو فورزا.";
+                    visible="نتيجة فحص DLL: "+scan.status
+                        +"\nعدد الاستيرادات: "+scan.uniqueNameCount
+                        +"\nملفات DLL موجودة بجانب EXE: "+plan.localCount
+                        +"\nغير موجودة بجانبه: "+plan.notLocalCount
+                        +"\nغير مفحوصة: "+plan.notCheckedCount
+                        +"\nعقود Windows API Set: "+plan.apiSetCount
+                        +"\nوجود اسم DLL لا يثبت إمكان تحميله أو تشغيل فورزا.";
                 }
             } catch(Exception ex) {
                 String reason=ex.getMessage();
                 if(reason==null||!reason.matches("pe_import_[a-z0-9_]{2,95}"))
                     reason="pe_import_source_or_parser_error";
                 try {
-                    result.put("stage","P3_4_PE64_STATIC_IMPORT_DIRECTORY_READ_ONLY");
-                    result.put("status","P3_4_IMPORT_SCAN_FAILED");
+                    result.put("stage","P3_5_DEPENDENCY_FOLDER_INVENTORY_READ_ONLY");
+                    result.put("status","P3_5_DEPENDENCY_SCAN_FAILED");
                     result.put("error_code",reason);
                     result.put("original_game_code_executed",false);
                 } catch(Exception ignored) { }
@@ -980,7 +1023,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.4")
+                .put("stage", "P3.5")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
