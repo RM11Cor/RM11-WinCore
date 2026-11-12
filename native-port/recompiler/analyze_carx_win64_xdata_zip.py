@@ -16,6 +16,7 @@ import zipfile
 
 from win64_unwind_boundary import UnsupportedWin64Unwind, decode_unwind_info
 from x64_control_flow_gate import inspect_cfg
+from win64_callable_source_gate import evaluate_win64_source_function
 
 ZIP_SCHEMA="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
 MAX_SIZE=8*1024*1024
@@ -75,6 +76,7 @@ def analyze(source:Path)->dict:
         unsupported=Counter()
         chain_types=Counter()
         cfg_totals=Counter()
+        source_gate_totals=Counter()
         per_function=[]
         for function in functions:
             rva=function.get("relative_rva")
@@ -101,6 +103,7 @@ def analyze(source:Path)->dict:
             require(isinstance(raw_chain,list) and len(raw_chain)<=4,
                     "invalid bounded unwind chain list")
             decoded_for_function=0
+            independently_decoded_chain=[]
             status=function.get("unwind_status")
             chain_record=[]
             if raw_chain:
@@ -145,6 +148,7 @@ def analyze(source:Path)->dict:
                     chain_types["handler_record"]+=1
                 decoded+=1
                 decoded_for_function+=1
+                independently_decoded_chain.append(parsed)
                 chain_record.append({
                     "rva_hex":hex(unwind_rva),
                     "status":"independently_decoded",
@@ -158,8 +162,18 @@ def analyze(source:Path)->dict:
                 require(raw_chain and decoded_for_function==len(raw_chain) and
                         not chain_record[-1]["chained"],
                         "Android completion claim unsupported by source chain")
+            # Attach actual decoded xdata and source CFG to one stringent
+            # admission result; a small pdata range is not necessarily a
+            # standalone or identifiable Unity game method.
+            source_gate=evaluate_win64_source_function(
+                rva,len(sample),cfg,independently_decoded_chain,
+                status if isinstance(status,str) else "UNWIND_NOT_READ")
+            source_gate_totals[source_gate.status]+=1
+            for blocker in source_gate.blockers:
+                source_gate_totals["blocked_by_"+blocker]+=1
             per_function.append({
                 "function_rva_hex":hex(rva),
+                "callable_source_admission":source_gate.safe_report(),
                 "original_function_code_bytes":len(sample),
                 "unwind_metadata_status":status,
                 "independently_decoded_unwind_count":decoded_for_function,
@@ -180,6 +194,8 @@ def analyze(source:Path)->dict:
             "unsupported_unwind_records":dict(sorted(unsupported.items())),
             "source_chain_observations":dict(sorted(chain_types.items())),
             "source_reachable_x64_cfg_categories":dict(sorted(cfg_totals.items())),
+            "merged_unwind_plus_cfg_admission":dict(sorted(source_gate_totals.items())),
+            "merged_admission_never_proves_original_gameplay_identity":True,
             "reachable_cfg_does_not_prove_whole_original_function":True,
             "reported_complete_unwind_chains":sum(x["unwind_metadata_status"]==
                                                    "COMPLETE_UNWIND_CHAIN_READ"
