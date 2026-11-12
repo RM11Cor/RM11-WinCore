@@ -9,6 +9,9 @@ import android.provider.DocumentsContract.Document;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Locale;
 
 /**
  * Android SAF tree resolver. Some system file pickers filter ".exe" from
@@ -28,10 +31,11 @@ public final class SafGameFolderProbe {
 
     public static final class Found {
         public final Uri documentUri;
+        public final String parentDocumentId;
         public final long byteSize;
         public final int directoriesVisited, rowsScanned;
-        private Found(Uri uri,long size,int dirs,int rows) {
-            documentUri=uri;byteSize=size;
+        private Found(Uri uri,String parentId,long size,int dirs,int rows) {
+            documentUri=uri;parentDocumentId=parentId;byteSize=size;
             directoriesVisited=dirs;rowsScanned=rows;
         }
     }
@@ -98,7 +102,7 @@ public final class SafGameFolderProbe {
                         size=input.getChannel().size();
                     }
                 }
-                return new Found(exe,size,budget.dirs,budget.rows);
+                return new Found(exe,parentId,size,budget.dirs,budget.rows);
             }
         } catch(SecurityException ex) {
             throw new IOException("saf_tree_permission_denied",ex);
@@ -110,5 +114,43 @@ public final class SafGameFolderProbe {
         if(subFolder!=null && depth==0)
             return scan(resolver,treeUri,subFolder,1,budget);
         return null;
+    }
+
+    /**
+     * P3.5: Only list immediate DLL siblings of the exact verified EXE.
+     * The file name itself is not sufficient to prove binary compatibility,
+     * architecture, presence of exports, runtime installation or licensing.
+     * No URIs, private paths or file bytes are exported.
+     */
+    public static Set<String> listSiblingDllNames(ContentResolver resolver,
+                                                   Uri treeUri,Uri selectedExe)
+            throws IOException {
+        Found found=find(resolver,treeUri);
+        if(selectedExe==null || !found.documentUri.equals(selectedExe))
+            throw new IOException("saf_selected_exe_outside_selected_tree");
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,found.parentDocumentId);
+        final String[] columns={Document.COLUMN_DISPLAY_NAME,Document.COLUMN_MIME_TYPE};
+        Set<String> names=new HashSet<>();
+        try(Cursor c=resolver.query(children,columns,null,null,null)) {
+            if(c==null)throw new IOException("saf_sibling_query_unavailable");
+            int n=c.getColumnIndex(Document.COLUMN_DISPLAY_NAME);
+            int m=c.getColumnIndex(Document.COLUMN_MIME_TYPE);
+            if(n<0||m<0)throw new IOException("saf_sibling_columns_unavailable");
+            int rows=0;
+            while(c.moveToNext()) {
+                if(++rows>MAX_DIRECTORY_ROWS)
+                    throw new IOException("saf_sibling_rows_over_budget");
+                if(Document.MIME_TYPE_DIR.equals(c.getString(m)))continue;
+                String name=c.getString(n);
+                if(name!=null && name.matches("(?i)[a-z0-9_.-]{1,128}\\.dll"))
+                    names.add(name.toLowerCase(Locale.ROOT));
+            }
+        } catch(SecurityException ex) {
+            throw new IOException("saf_sibling_permission_denied",ex);
+        } catch(IllegalArgumentException ex) {
+            throw new IOException("saf_sibling_query_unsupported",ex);
+        }
+        return names;
     }
 }
