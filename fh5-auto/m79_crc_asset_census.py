@@ -205,7 +205,7 @@ def sample_crc(z, files, until):
             if complete and length==info.file_size and crc==info.CRC:
                 out["verified"]+=1;done+=length
                 out["exe_verified"]+=is_exe(info.filename)
-                out["asset_verified"]+=file_ext(info) in DATA_EXTS
+                out["asset_verified"]+=file_ext(info) in DATA_EXT
             elif complete:
                 out["crc_or_length_failures"]+=1
         except (OSError,RuntimeError,ValueError,EOFError,zipfile.BadZipFile,zlib.error):
