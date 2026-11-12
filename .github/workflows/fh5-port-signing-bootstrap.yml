@@ -1,0 +1,56 @@
+name: FH5 One-Time Private Signing Identity Bootstrap
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-signing-bootstrap.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  generate-once:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate FH5-specific signing key once and encrypt at rest
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_PASSWORD" || { echo "Protected encryption password is unavailable"; exit 1; }
+          output=fh5-port/signing/fh5-release.p12.enc.b64
+          if test -s "$output"; then
+            echo "Stable FH5 encrypted keystore already exists; never regenerate."
+            exit 0
+          fi
+          mkdir -p fh5-port/signing
+          keytool -genkeypair -noprompt \
+            -alias fh5-release -keyalg RSA -keysize 3072 \
+            -sigalg SHA256withRSA -validity 10950 \
+            -dname "CN=FH5 Native Port,O=RM11Cor,OU=Android Engineering" \
+            -keystore "$RUNNER_TEMP/fh5-release.p12" -storetype PKCS12 \
+            -storepass "$RM11_RELEASE_PASSWORD" -keypass "$RM11_RELEASE_PASSWORD"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 250000 -salt \
+            -in "$RUNNER_TEMP/fh5-release.p12" -out "$RUNNER_TEMP/fh5-release.p12.enc" \
+            -pass env:RM11_RELEASE_PASSWORD
+          base64 -w 0 "$RUNNER_TEMP/fh5-release.p12.enc" > "$output"
+          printf "\n" >> "$output"
+          keytool -list -v -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/fh5-release.p12" -storepass "$RM11_RELEASE_PASSWORD" \
+            -alias fh5-release | grep -E "SHA256:"
+          sha256sum "$RUNNER_TEMP/fh5-release.p12" | cut -d" " -f1 > "$RUNNER_TEMP/fh5-key-file-sha256"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$output"
+          git commit -m "FH5: save own encrypted permanent Android signing key (never plaintext)"
+          git push origin HEAD:fh5-android-auto-tests
+          echo "Encrypted signing identity persisted; private key never committed in plaintext."
