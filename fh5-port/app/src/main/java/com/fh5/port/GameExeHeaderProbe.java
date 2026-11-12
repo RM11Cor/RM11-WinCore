@@ -409,6 +409,18 @@ public final class GameExeHeaderProbe {
         throw new IOException("pe_entry_rva_unmapped");
     }
     public static EntryResult inspectEntry(SeekableByteChannel ch) throws IOException {
+        return inspectAtRva(ch,-1);
+    }
+
+    /**
+     * P2.6: resolve one confirmed direct call target RVA to its executable PE
+     * section and stream 128 target bytes from the original ZIP64 member.
+     * The sentinel -1 selects the original entrypoint; other negative values
+     * are refused. No target is executed or saved to shared storage.
+     */
+    public static EntryResult inspectAtRva(SeekableByteChannel ch,long targetRva)
+            throws IOException {
+        if(targetRva < -1)throw new IOException("pe_target_rva_invalid");
         Directory d=directory(ch);
         Member m=findExe(ch,d);
         if(m.localOffset<0 || m.localOffset>ch.size()-30)
@@ -422,7 +434,10 @@ public final class GameExeHeaderProbe {
             throw new IOException("zip_local_payload_bounds");
         byte[] pePrefix=decompressHeader(ch,dataAt,m);
         Result pe=readPe(pePrefix,ch.size(),m);
-        long[] mapped=mapEntrypointToFile(pePrefix,pe.entryPointRva,m.unpacked);
+        long lookupRva=(targetRva==-1)?pe.entryPointRva:targetRva;
+        if(lookupRva<=0 || lookupRva>=pe.imageSize)
+            throw new IOException("pe_target_rva_outside_image");
+        long[] mapped=mapEntrypointToFile(pePrefix,lookupRva,m.unpacked);
         Range range=readUncompressedRange(ch,dataAt,m,mapped[1],SAMPLE_LENGTH);
         return new EntryResult(pe,(int)mapped[0],mapped[1],
                 range.outProcessed,range.compressedRead,range.bytes);
