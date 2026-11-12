@@ -1,0 +1,71 @@
+name: Publish FH5 Native Port P2.4 Stack x64
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p24-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download signed and verified P2.4 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43171284648 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.4-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'f2aaac158ed19dd656ed30d6ce97bd45e04786e282bbf2492e1d42057d410300' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.4-Permanent-Signed.apk
+      - name: Publish P2.4 prerelease with known signer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-4-stack-x64-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "P2.4 already published"; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.4 — First x64 stack instruction support (Experimental)
+
+          This APK stays completely independent of Bannerlator, Winlator or GameHub UI.
+          It retains Vulkan surface, ZIP64 inventory, real PE64 header and real entrypoint
+          read-only probe, and reports early instruction translation progress.
+
+          **New in P2.4:**
+          - Bounded translator can encode Windows-style `SUB RSP,+imm` and `ADD RSP,+imm`
+            into AArch64 SP immediate arithmetic, with stack balance guards.
+          - Synthetic PE64 smoke test: `SUB RSP,40; MOV EAX,2; ADD EAX,40; ADD RSP,40; RET`
+            is now used for the ARM64 execution test (expected result 42).
+          - Original Forza exe entrypoint is only **read and decoded**, never executed.
+          - Reports decoded instruction prefix length, number of instructions and first unsupported offset.
+          - Real original game-code execution, Windows API / FEX or Wine process runtime,
+            Steam authentication and D3D12 rendering are **not implemented**.
+
+          **Installation:**
+          - App id `com.fh5.port`; Android `versionCode=7` (P2.3 used 6).
+          - SAME permanent signing certificate as P2.1, P2.2 and P2.3.
+          - Certificate SHA256: `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA256: `f2aaac158ed19dd656ed30d6ce97bd45e04786e282bbf2492e1d42057d410300`.
+          - Install *over* previous permanent-signed P2.3. Do not uninstall it.
+
+          **Phone steps:** select original Forza ZIP, press original-entry probe,
+          press x64 synthetic smoke test, export `FH5_PORT_P2_4_REPORT.json`.
+          The report has no game bytes, passwords, or private paths.
+
+          GitHub Actions build (passed): https://github.com/RM11Cor/RM11-WinCore/actions/runs/43171284648
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.4-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.4 - x64 Stack Translation (Experimental)' \
+            --notes-file notes.md --prerelease
