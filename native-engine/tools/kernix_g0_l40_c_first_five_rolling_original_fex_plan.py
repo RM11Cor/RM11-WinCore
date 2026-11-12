@@ -92,7 +92,7 @@ end
 quit
 '''.replace("__FIFTH_ROW__", repr(fifth))
     combined = prefix + extra
-    blocks = re.findall(r"\npython\n(.*?)\nend\n", combined, re.S)
+    blocks = re.findall(r"(?:^|\n)python\n(.*?)\nend(?=\n|$)", combined, re.S)
     need(len(blocks) == 4 and combined.count("\nrun\n") == 1
          and combined.count("\ncontinue\n") == 1
          and combined.count("\nquit\n") == 1
