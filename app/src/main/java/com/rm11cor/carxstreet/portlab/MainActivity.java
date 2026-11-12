@@ -81,16 +81,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v1.0  /  استخراج دوال اللعبة للترجمة",15,SUB,false));
+        root.addView(label("PC PORT LAB v1.1  /  استخراج UNWIND_INFO الحقيقي",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 09 — بداية Static Recompilation من GameAssembly",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 10 — ربط حدود الدوال بـ Win64 UNWIND_INFO",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("أثبتنا ترجمة دوال Windows x86-64 إلى ARM64 على 80 تجربة. الآن نقرأ دوال حقيقية صغيرة من GameAssembly.dll باستخدام صلاحية المجلد، ونحفظ عينات محدودة للترجمة اللاحقة دون نسخ اللعبة كاملة.",14,SUB,false));
+        banner.addView(label("بعد نجاح 330 مقارنة بين x86 وARM64، نأخذ عينات GameAssembly مع معلومات حدود الدوال الأصلية UNWIND_INFO وعلاقات CHAININFO. نريد نميّز الدوال الكاملة عن نهايات المكدس قبل تشغيل كود CarX على ARM64.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -104,12 +104,12 @@ public final class MainActivity extends Activity {
         root.addView(rescan);
         rescan.setOnClickListener(v -> {if(tree!=null)scan();});
         gap(root,9);
-        aotSource=button("استخراج دوال GameAssembly الحقيقية (AOT)",BLUE,0xFF071520);
+        aotSource=button("استخراج دوال CarX + UNWIND_INFO الأصلي",BLUE,0xFF071520);
         aotSource.setEnabled(false);
         root.addView(aotSource);
         aotSource.setOnClickListener(v -> requestAotCodeExport());
         gap(root,9);
-        root.addView(label("يصنع ملف ZIP صغيراً لعينات دوال x86-64 محدودة مأخوذة من ملف GameAssembly الموجود بجهازك. لا ينسخ اللعبة الكاملة ولا يشغّل تعليمات Windows. الملف يبقى بالمكان الذي تختاره.",12,SUB,false));
+        root.addView(label("يحفظ ZIP محدوداً من دوال GameAssembly ومعلومات Win64 .xdata الفعلية، ويتتبع روابط CHAININFO. لا يغيّر ملفات اللعبة ولا ينفذ كود Windows.",12,SUB,false));
         gap(root,20);
         LinearLayout reportCard=new LinearLayout(this);
         reportCard.setPadding(dp(16),dp(18),dp(16),dp(18));
@@ -328,7 +328,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/zip");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_SourceFunctions_v1.0.zip");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_Unwind_v1.1.zip");
         startActivityForResult(i,EXPORT_AOT_CODE);
     }
     private void exportAotCode(Uri output) {
@@ -336,7 +336,7 @@ public final class MainActivity extends Activity {
         scanning=true;
         rescan.setEnabled(false);
         aotSource.setEnabled(false);
-        status.setText("جاري استخراج دوال x86-64 الأصلية بصورة محدودة...");
+        status.setText("جاري استخراج دوال CarX وربط Win64 UNWIND_INFO...");
         Uri savedTree=tree;
         worker.execute(() -> {
             try(OutputStream out=getContentResolver().openOutputStream(output,"w")) {
@@ -348,13 +348,17 @@ public final class MainActivity extends Activity {
                     scanning=false;
                     rescan.setEnabled(true);
                     aotSource.setEnabled(true);
-                    status.setText("نجح استخراج الدوال الحقيقية من GameAssembly");
+                    status.setText("نجح استخراج كود CarX ومعلومات UNWIND_INFO");
                     details.setText("دوال PE x86-64 الأصلية المؤهلة: "+
                             result.eligibleExecutableFunctions+
                             "\nعينات الدوال المصدّرة: "+result.chosenActualFunctionSamples+
                             "\nبايتات الكود المصدرة: "+result.bytesExported+
-                            "\nالنتيجة: ZIP صغير يحتوي عينات الدوال وmanifest.json"+
-                            "\nماكو تشغيل للعبة بهذا الاختبار. ارفع ملف ZIP للمحادثة حتى نجرب المترجم المسبق على كود CarX الحقيقي.");
+                            "\nسجلات UNWIND_INFO الأصلية: "+result.uniqueUnwindRecordsExported+
+                            "\nروابط CHAININFO: "+result.chainedUnwindReferences+
+                            "\nسلاسل UNWIND المكتملة: "+result.functionsWithCompleteUnwindChain+
+                            "\nسلاسل تحتاج مراجعة: "+result.functionsWithUnwindReadIssues+
+                            "\nالنتيجة: ZIP يحتوي code/ وunwind/ وmanifest.json"+
+                            "\nهذا يجلب بيانات الدوال الحقيقية؛ مو تشغيل اللعبة. ارفع ملف ZIP حتى نربط CFG وUNWIND بمترجم ARM64.");
                 });
             }catch(Exception error) {
                 main.post(() -> {
