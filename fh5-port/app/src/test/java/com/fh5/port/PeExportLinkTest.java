@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 public final class PeExportLinkTest {
-    private static byte[] dll() {
+    static byte[] dll() {
         byte[] b=PeImportProbeTest.sample();
         ByteBuffer out=ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
         out.putShort(0x80+22,(short)0x2022); // x64 DLL
