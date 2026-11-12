@@ -30,7 +30,7 @@ jobs:
           aarch64-linux-gnu-g++ --version | head -1
           qemu-aarch64 --version | head -1
           python -c 'import capstone; print("CARX_AOT_DECODER_CAPSTONE",capstone.__version__)'
-      - name: Test original x86 function machine code and compiled AArch64 semantics on 80 behavioral inputs
+      - name: Test 17 real x86 machine-code functions against compiled AArch64 results for 170 vectors
         shell: bash
         run: |
           set -euo pipefail
@@ -42,7 +42,7 @@ jobs:
             -s native-port/recompiler/tests \
             -p 'test_screen_carx_pdata_zip.py' -v
           echo CARX_AOT_REAL_GAMEASSEMBLY_SAMPLE_ARCHIVE_SCREEN_AND_SHA_NEGATIVE_TESTS_PASS
-          echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_80_CROSS_ISA_MACHINE_EXECUTIONS_PASS
+          echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_170_CROSS_ISA_MACHINE_EXECUTIONS_PASS
       - name: Scope gate no game claim without original CarX GameAssembly method run
         shell: bash
         run: |
