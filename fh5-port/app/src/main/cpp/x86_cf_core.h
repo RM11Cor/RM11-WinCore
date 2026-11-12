@@ -23,6 +23,16 @@ typedef struct {
     uint64_t direct_target_rva;
     int target_within_sample;
     int target_within_image;
+    /* P2.8: taken JCC vs. not-taken fall-through. */
+    int first_transfer_is_conditional;
+    int fallthrough_rva_valid;
+    uint64_t fallthrough_rva;
+    int fallthrough_next_insn_present;
+    char fallthrough_next_mnemonic[FH5_CF_MNEMONIC_MAX];
+    int fallthrough_next_is_jump;
+    char fallthrough_jump_target_kind[24];
+    int fallthrough_jump_direct_target_valid;
+    uint64_t fallthrough_jump_direct_target_rva;
 } fh5_cf_result;
 
 /* Only decode, never copy to executable memory or call original code. */
