@@ -81,16 +81,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v1.2  /  تنويع دوال GameAssembly",15,SUB,false));
+        root.addView(label("PC PORT LAB v1.3  /  جلب كود الدوال الأم",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 11 — اختيار دوال متنوعة بـ UNWIND_INFO",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 12 — استخراج كود CHAININFO الأصلي",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("نعالج تكرار عينات GameAssembly التي تشترك بنفس عنوان UNWIND_INFO. نختار عناوين متنوعة أولاً، ثم نربط الدوال بمعلومات CHAININFO وCFG بدون تغيير ملفات اللعبة.",14,SUB,false));
+        banner.addView(label("فحص حزمة v1.2 الأصلية بيّن أن 228 عينة مرتبطة بكود دالة أم غير موجود بالحزمة. هسه نأخذ كود الأجزاء الأم نفسها مع بصماتها حتى نربط مخطط التنفيذ CFG الحقيقي. ما نغيّر ملفات اللعبة.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -104,7 +104,7 @@ public final class MainActivity extends Activity {
         root.addView(rescan);
         rescan.setOnClickListener(v -> {if(tree!=null)scan();});
         gap(root,9);
-        aotSource=button("استخراج 256 عينة متنوعة + UNWIND_INFO",BLUE,0xFF071520);
+        aotSource=button("استخراج كود CarX والدوال الأم CHAININFO",BLUE,0xFF071520);
         aotSource.setEnabled(false);
         root.addView(aotSource);
         aotSource.setOnClickListener(v -> requestAotCodeExport());
@@ -328,7 +328,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/zip");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_DiverseUnwind_v1.2.zip");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_ParentCode_v1.3.zip");
         startActivityForResult(i,EXPORT_AOT_CODE);
     }
     private void exportAotCode(Uri output) {
@@ -336,7 +336,7 @@ public final class MainActivity extends Activity {
         scanning=true;
         rescan.setEnabled(false);
         aotSource.setEnabled(false);
-        status.setText("جاري استخراج دوال CarX وربط Win64 UNWIND_INFO...");
+        status.setText("جاري استخراج كود CarX والدوال الأم المرتبطة بها...");
         Uri savedTree=tree;
         worker.execute(() -> {
             try(OutputStream out=getContentResolver().openOutputStream(output,"w")) {
@@ -348,7 +348,7 @@ public final class MainActivity extends Activity {
                     scanning=false;
                     rescan.setEnabled(true);
                     aotSource.setEnabled(true);
-                    status.setText("نجح استخراج كود CarX ومعلومات UNWIND_INFO");
+                    status.setText("نجح استخراج مقاطع كود CarX والدوال الأم");
                     details.setText("دوال PE x86-64 الأصلية المؤهلة: "+
                             result.eligibleExecutableFunctions+
                             "\nعينات الدوال المصدّرة: "+result.chosenActualFunctionSamples+
@@ -356,10 +356,13 @@ public final class MainActivity extends Activity {
                             "\nسجلات UNWIND_INFO الأصلية: "+result.uniqueUnwindRecordsExported+
                             "\nعناوين UNWIND متنوعة: "+result.chosenActualFunctionSamples+
                             "\nروابط CHAININFO: "+result.chainedUnwindReferences+
+                            "\nمقاطع كود الدوال الأم: "+result.uniqueParentCodeFragments+
+                            "\nحجم كود الأم بالبايت: "+result.parentCodeBytesExported+
+                            "\nمقاطع أم لم تُستخرج: "+result.parentCodeReferencesNotExtracted+
                             "\nسلاسل UNWIND المكتملة: "+result.functionsWithCompleteUnwindChain+
                             "\nسلاسل تحتاج مراجعة: "+result.functionsWithUnwindReadIssues+
-                            "\nالنتيجة: ZIP يحتوي code/ وunwind/ وmanifest.json"+
-                            "\nهذا يجلب بيانات الدوال الحقيقية؛ مو تشغيل اللعبة. ارفع ملف ZIP حتى نربط CFG وUNWIND بمترجم ARM64.");
+                            "\nالنتيجة: ZIP يحتوي code/ وunwind/ وparents/ وmanifest.json"+
+                            "\nالحزمة تشمل كود الدوال الأم الحقيقي؛ مو تشغيل اللعبة. ارفعها حتى نربط الأجزاء ونختبر CFG قبل الترجمة.");
                 });
             }catch(Exception error) {
                 main.post(() -> {
