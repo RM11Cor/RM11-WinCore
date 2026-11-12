@@ -1,0 +1,27 @@
+name: FH5 M80 Nested ZIP Index Tests
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - fh5-auto/m80_nested_archive_index.py
+      - .github/workflows/fh5-m80-nested-index.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M80 syntax, nested metadata and bounded seek tests
+        working-directory: fh5-auto
+        run: |
+          python -m py_compile m80_nested_archive_index.py
+          python -m unittest -v m80_nested_archive_index.Tests
