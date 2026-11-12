@@ -1,0 +1,119 @@
+name: Publish CarX v1.2 signed diverse original Win64 UNWIND source sampling
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v120-diverse-unwind.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable source-built and signed Android PortLab v1.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=43243017442
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq '.conclusion')" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V120_BUILD_AND_INDEPENDENT_SIGNATURE_STEP_VERIFIED
+      - name: Retrieve exact signed v1.2 immutable build artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43243017442
+          name: CarXStreet-v1.2.0-Diverse-GameAssembly-Unwind-Xdata-Original-Samples-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently check original signature, version 12 and actual ARM64 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v1.2.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          sig=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$sig"
+          info=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='12' versionName='1.2.0-carx-diverse-unwind-function-selection'" <<<"$info"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V120_STABLE_CERT_SAME_PACKAGE_MONOTONIC_VCODE12_NATIVE_ARM64_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v1.2 — real GameAssembly source diversity fix
+
+          *This is an original machine-code source extraction tool for
+          developing a future static ARM64 recompiler. It is NOT a playable
+          CarX Street Android game or a game engine.*
+
+          After the owner exported the actual bounded v1.0 PC
+          GameAssembly.dll snippets, inspection confirmed 256 original
+          x86-64 code samples but only 149 distinct Win64 UNWIND_INFO RVAs.
+          Twenty-one xdata addresses were reused; one appeared 24 times.
+          A shared unwind RVA alone is NOT evidence that multiple entries
+          represent the same game method; it can be metadata sharing.
+
+          This v1.2 APK corrects the selection strategy:
+          - Choose up to 256 DISTINCT Win64 UNWIND_INFO RVAs from eligible
+            executable RUNTIME_FUNCTION entries.
+          - Use a stable hashed bounded selection requiring O(256) memory
+            regardless of the original game's 341,700 eligible PE regions.
+          - Export one representative original executable code range for
+            each selected unwind metadata RVA, plus source PE .xdata
+            UNWIND_INFO/CHAININFO chains and manifest SHA256.
+          - Save only a small user-selected offline ZIP named
+            CarX_GameAssembly_AOT_DiverseUnwind_v1.2.zip.
+          - Preserve original GameAssembly.dll and all 22GB game data
+            byte-for-byte; the app never runs or edits x86 Windows code.
+
+          There are 1,349 synthetic Java test assertions including
+          selection stability over 1,800 synthetic entries and strict
+          256-sample cap. The owner's actual output must be analyzed
+          after it is exported; the UI source selection algorithm,
+          actual source game functions and phone run are not
+          interchangeable test results.
+
+          Install directly OVER v1.1: original Android package ID and
+          permanent signing certificate stay unchanged, versionCode
+          increases from 11 to 12.
+
+          The existing AOT compiler has 330/330 matched outputs for
+          33 SYNTHETIC Windows-ABI x86-64 functions compiled into
+          AArch64 code; this is not proof any actual CarX method runs
+          on Android. Real IL2CPP gameplay entry points, dependencies,
+          full Unity scene, car physics and original game frames remain
+          unimplemented.
+          EOF
+      - name: Publish tested signed v1.2 artifact to permanent GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v1.2.0-distinct-win64-unwind-source-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.2.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.2.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX PortLab v1.2 - Distinct Win64 Unwind Source Sampling (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
