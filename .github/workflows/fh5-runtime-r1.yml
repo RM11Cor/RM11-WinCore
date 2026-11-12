@@ -4,7 +4,7 @@ on:
     branches:
       - fh5-android-auto-tests
     paths:
-      - fh5-runtime/boot_r1.py
+      - fh5-runtime/**
       - .github/workflows/fh5-runtime-r1.yml
   workflow_dispatch:
 
@@ -25,3 +25,9 @@ jobs:
         run: |
           python -m py_compile boot_r1.py
           python -m unittest -v boot_r1.Checks
+      - name: Manifest integrity and Termux runner shell syntax
+        run: |
+          bash -n fh5-runtime/run.sh
+          test "$(sed -n '1p' fh5-runtime/manifest.txt)" = "R1"
+          test "$(sha256sum fh5-runtime/boot_r1.py | cut -d' ' -f1)" = "$(sed -n '2p' fh5-runtime/manifest.txt)"
+          test "$(sha256sum fh5-runtime/FH5_BOOT_TEST.bat | cut -d' ' -f1)" = "$(sed -n '3p' fh5-runtime/manifest.txt)"
