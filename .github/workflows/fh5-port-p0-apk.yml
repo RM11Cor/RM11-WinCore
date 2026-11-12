@@ -1,0 +1,57 @@
+name: FH5 Standalone APK P0 - Native Vulkan
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - fh5-port/**
+      - .github/workflows/fh5-port-p0-apk.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-p0-arm64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install platform, NDK, and CMake for arm64-v8a
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build independent Android APK
+        working-directory: fh5-port
+        run: |
+          gradle --no-daemon :app:assembleDebug
+      - name: Verify APK is native and has no game binaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          p=Path("fh5-port/app/build/outputs/apk/debug/app-debug.apk")
+          assert p.is_file() and p.stat().st_size>100000, "APK missing"
+          with zipfile.ZipFile(p) as z:
+              names=set(z.namelist())
+              assert "classes.dex" in names
+              assert "lib/arm64-v8a/libfh5_renderer.so" in names
+              assert not any(x.lower().endswith((".exe",".modelbin",".carbin",".rpf")) for x in names), "Game files cannot ship in APK"
+              assert not any(x.startswith("lib/x86") for x in names)
+          print("APK size bytes:",p.stat().st_size)
+          print("Standalone P0 native Vulkan verified; this is not a playable game port.")
+          PY
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FH5-Native-Port-P0-arm64-APK
+          path: fh5-port/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
