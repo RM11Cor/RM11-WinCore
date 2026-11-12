@@ -1,0 +1,62 @@
+name: Publish FH5 Native Port P1 to Releases
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p1-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-p1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified P1 Android APK from successful build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh run download 43163615024 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P1-ZIP64-arm64-APK --dir dist
+          test -s dist/app-debug.apk
+          printf '%s  %s\n' 'ab769c66d750d33cf14180f3352a8df9013430b7b75f641fca0fda3c9beb3af5' 'dist/app-debug.apk' | sha256sum -c -
+          mv dist/app-debug.apk dist/FH5-Native-Port-P1-arm64-debug.apk
+      - name: Create verified P1 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag='fh5-native-port-p1-zip64-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: $tag"
+            exit 0
+          fi
+          cat > release-notes.md <<'EOF'
+          ## FH5 Native Port P1 – Android ARM64 (experimental)
+
+          Independent Android APK for the Forza Horizon 5 Android port project.
+          - Direct native Vulkan swapchain/presentation test (Adreno ARM64).
+          - Read-only ZIP/ZIP64 central-directory game-data inventory, using Android storage picker.
+          - Does not unpack the complete game and does not include copyrighted game assets.
+          - Smaller Vulkan test view and corrected status-bar layout.
+
+          **NOT A PLAYABLE FORZA HORIZON 5 PORT.**
+          The original game EXE, x86-64 translation, Windows runtime, Steam authentication,
+          DirectX 12-to-Vulkan and game engine are not executing in this build.
+
+          APK is a debug/testing build. May require uninstalling prior P0 due to different debug signing keys.
+          SHA256 APK: ab769c66d750d33cf14180f3352a8df9013430b7b75f641fca0fda3c9beb3af5
+
+          Source branch: fh5-android-auto-tests
+          Verified Android CI build: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43163615024
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P1-arm64-debug.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P1 - ZIP64 + Vulkan (Experimental)' \
+            --notes-file release-notes.md \
+            --prerelease
