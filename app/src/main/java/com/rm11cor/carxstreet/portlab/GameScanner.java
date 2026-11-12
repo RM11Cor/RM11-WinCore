@@ -241,7 +241,7 @@ public final class GameScanner {
         machine.put("gameassembly_relative_path",assemblyPath);
         JSONObject report=new JSONObject();
         report.put("schema","rm11carx.pc-port-readonly-inspector.v1");
-        report.put("inspector_version","0.5.0");
+        report.put("inspector_version","0.6.0");
         report.put("source_game","CarX Street PC (Unity IL2CPP)");
         report.put("user_selected_folder_name",rootName);
         report.put("game_files_transmitted",false);
@@ -262,7 +262,7 @@ public final class GameScanner {
         report.put("notes",notes);
         report.put("device",device(context));
         report.put("native_arm64_vulkan_preflight",NativeVulkanProbe.inspect());
-        report.put("next_gate","Native ARM64 Vulkan preflight tests only; a GPU instance is not CarX gameplay. Original Windows IL2CPP logic must be lawfully rebuilt for ARM64 and Android-target game assets must be compatible before any genuine game frame.");
+        report.put("next_gate","Independent ARM64 Vulkan offscreen GPU clear/readback is tested. It is NOT a displayed game frame or original CarX logic. Native Android game code, platform-correct Unity assets, and gameplay remain unproven.");
         return report;
     }
 
