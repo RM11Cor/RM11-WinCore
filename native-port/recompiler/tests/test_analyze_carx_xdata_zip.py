@@ -138,6 +138,53 @@ class ActualSourceUnwindPackageTests(unittest.TestCase):
         self.assertEqual(screening["aot_supported_source_functions"],1)
         self.assertFalse(report["original_carx_machine_code_executed_on_android"])
 
+    def with_diversity_manifest(self,source,modify=None):
+        with ZipFile(source) as z:
+            members={name:z.read(name) for name in z.namelist()}
+        manifest=json.loads(members["manifest.json"])
+        manifest["version"]="1.2-source-diverse"
+        manifest["sampler_policy"]="one_source_function_per_distinct_unwind_rva"
+        manifest["sampled_distinct_unwind_rva_count"]=len({
+            item["win64_unwind_info_rva"] for item in manifest["functions"]
+        })
+        if modify:
+            modify(manifest,members)
+        members["manifest.json"]=json.dumps(manifest).encode()
+        dest=self.root/"diverse.zip"
+        with ZipFile(dest,"w") as out:
+            for name,raw in members.items():
+                out.writestr(name,raw)
+        return dest
+
+    def test_v12_source_unique_unwind_metadata_verified(self):
+        source=self.with_diversity_manifest(self.make_package())
+        report=analyzer.analyze(source)
+        self.assertEqual(report["observed_distinct_source_unwind_rvas"],1)
+        self.assertTrue(report["v12_source_sampling_diversity_verified"])
+        screening=screener.screen(source)
+        self.assertTrue(screening["xdata_admission_enforced_before_cpp_codegen"])
+
+    def test_v12_reject_duplicate_primary_unwind_source_rvas(self):
+        def duplicate(manifest,members):
+            first=manifest["functions"][0]
+            other=dict(first)
+            other["relative_rva"]=0x1300
+            other["zip_member"]="code/rva_00001300.bin"
+            members[other["zip_member"]]=members[first["zip_member"]]
+            manifest["functions"].append(other)
+            manifest["sampled_distinct_unwind_rva_count"]=1
+        source=self.with_diversity_manifest(self.make_package(),duplicate)
+        with self.assertRaises(ValueError):
+            analyzer.analyze(source)
+
+    def test_v12_reject_false_distinct_unwind_claim(self):
+        source=self.with_diversity_manifest(
+            self.make_package(),
+            lambda manifest,members:
+                manifest.update({"sampled_distinct_unwind_rva_count":256}))
+        with self.assertRaises(ValueError):
+            analyzer.analyze(source)
+
     def test_unwind_sha_mismatch_never_accepted(self):
         with self.assertRaises(ValueError):
             analyzer.analyze(self.make_package(corrupt=True))
