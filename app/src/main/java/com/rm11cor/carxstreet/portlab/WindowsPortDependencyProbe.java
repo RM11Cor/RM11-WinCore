@@ -31,7 +31,9 @@ public final class WindowsPortDependencyProbe {
     private static final int MAX_INTERNAL_IDS=100_000;
 
     public static JSONObject inspect(ContentResolver resolver,Map<String,Uri> docs,
-                                     Map<String,Long> sizes) throws Exception {
+                                     Map<String,Long> sizes,
+                                     Iterable<String> physicalWindowsBundleNames,
+                                     boolean sourceFileListingComplete) throws Exception {
         JSONObject result=new JSONObject();
         result.put("schema","rm11carx.android-saf-windows-gamecode-asset-gate.v1");
         result.put("read_only",true);
@@ -118,6 +120,8 @@ public final class WindowsPortDependencyProbe {
         }
         result.put("pc_executable_dependencies",code);
 
+        BundleCatalogReconciler reconciler=new BundleCatalogReconciler();
+        for(String name:physicalWindowsBundleNames)reconciler.addPhysicalWindowsBundle(name);
         JSONObject catalog=new JSONObject();
         Uri source=docs.get("addressables_catalog");
         catalog.put("present",source!=null);
@@ -126,7 +130,7 @@ public final class WindowsPortDependencyProbe {
         if(source!=null) {
             try {
                 catalog.put("byte_limit",MAX_CATALOG_BYTES);
-                Map<String,Integer> counts=parseAddressables(resolver,source);
+                Map<String,Integer> counts=parseAddressables(resolver,source,reconciler);
                 for(Map.Entry<String,Integer> e:counts.entrySet())
                     catalog.put(e.getKey(),e.getValue());
                 catalog.put("full_file_parsed",true);
@@ -138,6 +142,32 @@ public final class WindowsPortDependencyProbe {
         catalog.put("android_target_bundle_shaders_compatible_proven",false);
         catalog.put("original_pc_windows_bundle_conversion_proven",false);
         result.put("addressables_platform_references",catalog);
+        BundleCatalogReconciler.Summary compared=reconciler.summarize(
+                sourceFileListingComplete,catalog.optBoolean("full_file_parsed"));
+        JSONObject diff=new JSONObject();
+        diff.put("schema","rm11carx.physical-vs-catalog-windows64-bundle-names.v1");
+        diff.put("fully_comparable",compared.fullReconciliationValid);
+        diff.put("audit_status",compared.status);
+        diff.put("physical_windows64_bundle_entries",compared.physicalEntries);
+        diff.put("distinct_physical_windows64_filenames",compared.distinctPhysicalFilenames);
+        diff.put("casefold_duplicate_physical_names",compared.physicalDuplicateCasefoldNames);
+        diff.put("catalog_windows64_reference_entries",compared.catalogWindowsReferences);
+        diff.put("distinct_catalog_windows64_bundle_names",compared.distinctCatalogReferencedFilenames);
+        diff.put("duplicate_catalog_reference_entries",compared.catalogDuplicateReferenceEntries);
+        diff.put("ambiguous_windows64_reference_names",compared.invalidOrNonlocalWindowsReferences);
+        diff.put("exact_filename_matches",compared.filenameMatches);
+        diff.put("physical_files_not_in_catalog_count",compared.unreferencedPhysicalCount);
+        diff.put("catalog_names_missing_from_physical_files_count",compared.notPresentOnDiskCount);
+        diff.put("physical_only_name_examples",new JSONArray(compared.unreferencedPhysicalExamples));
+        diff.put("catalog_only_name_examples",new JSONArray(compared.notPresentOnDiskExamples));
+        diff.put("android_word_reference_count",compared.androidNamedCount);
+        diff.put("android_target_path_reference_count",compared.androidPlatformPathCount);
+        diff.put("android_reference_safe_filename_examples",new JSONArray(compared.androidNameExamples));
+        diff.put("android_target_asset_compatibility_proven",false);
+        diff.put("original_windows_unity_assetbundle_contents_inspected",false);
+        diff.put("match_granularity","casefolded_basenames_only_not_hashes_or_asset_dependencies");
+        diff.put("note","808 vs 807 total entries alone never proves missing data; compare distinct source filenames.");
+        result.put("windows64_asset_bundle_filename_reconciliation",diff);
         result.put("native_android_carx_game_code_gate","BLOCKED_NO_PROVEN_ANDROID_ARM64_IL2CPP_BINARY");
         result.put("native_android_carx_asset_gate","BLOCKED_NO_PROVEN_ANDROID_PLATFORM_GAME_ASSETS");
         result.put("next_gate","Original Windows PE and AssetBundle catalog source evidence. An actual authorized Android ARM64 gameplay build and Android-target assets are still necessary. Do not claim playable CarX.");
@@ -163,7 +193,8 @@ public final class WindowsPortDependencyProbe {
         }
     }
 
-    private static Map<String,Integer> parseAddressables(ContentResolver resolver,Uri uri)
+    private static Map<String,Integer> parseAddressables(ContentResolver resolver,Uri uri,
+                     BundleCatalogReconciler reconciler)
             throws Exception {
         HashMap<String,Integer> counts=new HashMap<>();
         for(String key:new String[]{
@@ -193,6 +224,7 @@ public final class WindowsPortDependencyProbe {
                             if(total>MAX_INTERNAL_IDS)
                                 throw new IOException("too many Addressables internal IDs");
                             counts.put("internal_id_count",total);
+                            reconciler.addCatalogInternalId(path);
                             String p=path.toLowerCase(Locale.ROOT);
                             addIf(counts,"standalone_windows64_references",
                                     p.contains("standalonewindows64"));
