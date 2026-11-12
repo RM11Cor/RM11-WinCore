@@ -1,0 +1,63 @@
+name: CarX PC v0.7 original source dependencies native Android no-emulation acceptance gate
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'tools/carx_v07_verified_pc_native_port_gate.py'
+      - 'tests/test_carx_v07_verified_pc_native_port_gate.py'
+      - '.github/workflows/carx-v07-native-port-no-emulation-acceptance-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independently-audit-pe-dll-addressables-native-code-and-assets-no-go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original v0.7 report interpretation, privacy, no fake G0 G1 G2 gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            tools/carx_v07_verified_pc_native_port_gate.py \
+            tests/test_carx_v07_verified_pc_native_port_gate.py
+          python -m unittest discover -s tests \
+            -p 'test_carx_v07_verified_pc_native_port_gate.py' -v
+          echo CARX_NATIVE_PORT_REPORT_GATES_19_SYNTHETIC_ADVERSARIAL_TESTS_PASS
+      - name: Audit only synthetic inputs, no proprietary game or private phone report
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e 'CarX_Street_PC_Port_Report_v0.7.json'
+          test ! -e GameAssembly.dll
+          test ! -e UnityPlayer.dll
+          mkdir -p dist
+          python - <<'PY'
+          import json,sys
+          sys.path.insert(0,"tests")
+          sys.path.insert(0,"tools")
+          from test_carx_v07_verified_pc_native_port_gate import original_header_fixture
+          from carx_v07_verified_pc_native_port_gate import evaluate
+          d=evaluate(original_header_fixture())
+          assert d["addressables"]["bundle_file_minus_catalog_reference_count"]==1
+          assert d["addressables"]["bundle_file_count_vs_catalog_reference_count_is_missing_file_proof"] is False if "bundle_file_count_vs_catalog_reference_count_is_missing_file_proof" in d["addressables"] else d["addressables"]["bundle_file_count_vs_catalog_count_is_missing_file_proof"] is False
+          assert d["addressables"]["catalog_android_name_substring_count"]==1
+          assert d["native_port_acceptance"]["strict_no_emulation_playable_pc_port"] is False
+          assert d["native_port_acceptance"]["G0_authorized_original_android_arm64_gameplay_code_verified"] is False
+          assert d["native_port_acceptance"]["G1_original_android_platform_asset_bundle_verified"] is False
+          assert d["native_port_acceptance"]["G2_original_carx_game_scene_frame_and_controls_verified"] is False
+          out="dist/carx-v07-native-port-acceptance-SYNTHETIC-NOT-ORIGINAL.json"
+          with open(out,"w") as f: json.dump(d,f,indent=2)
+          print("CARX_NATIVE_PORT_NO_GO_WITHOUT_ANDROID_ARM64_GAMECODE_AND_ASSETS_INDICATED_ONLY_NOT_DEVICE_PROOF")
+          PY
+      - name: Save synthetic contract test, not user's game report
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-Street-Native-PC-To-Android-G0-G1-G2-Synthetic-Contract-Only
+          path: dist/carx-v07-native-port-acceptance-SYNTHETIC-NOT-ORIGINAL.json
+          retention-days: 30
+          if-no-files-found: warn
