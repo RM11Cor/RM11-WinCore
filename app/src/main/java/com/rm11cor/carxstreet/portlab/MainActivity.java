@@ -81,16 +81,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v1.1  /  استخراج UNWIND_INFO الحقيقي",15,SUB,false));
+        root.addView(label("PC PORT LAB v1.2  /  تنويع دوال GameAssembly",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 10 — ربط حدود الدوال بـ Win64 UNWIND_INFO",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 11 — اختيار دوال متنوعة بـ UNWIND_INFO",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("بعد نجاح 330 مقارنة بين x86 وARM64، نأخذ عينات GameAssembly مع معلومات حدود الدوال الأصلية UNWIND_INFO وعلاقات CHAININFO. نريد نميّز الدوال الكاملة عن نهايات المكدس قبل تشغيل كود CarX على ARM64.",14,SUB,false));
+        banner.addView(label("نعالج تكرار عينات GameAssembly التي تشترك بنفس عنوان UNWIND_INFO. نختار عناوين متنوعة أولاً، ثم نربط الدوال بمعلومات CHAININFO وCFG بدون تغيير ملفات اللعبة.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -104,7 +104,7 @@ public final class MainActivity extends Activity {
         root.addView(rescan);
         rescan.setOnClickListener(v -> {if(tree!=null)scan();});
         gap(root,9);
-        aotSource=button("استخراج دوال CarX + UNWIND_INFO الأصلي",BLUE,0xFF071520);
+        aotSource=button("استخراج 256 عينة متنوعة + UNWIND_INFO",BLUE,0xFF071520);
         aotSource.setEnabled(false);
         root.addView(aotSource);
         aotSource.setOnClickListener(v -> requestAotCodeExport());
@@ -328,7 +328,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/zip");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_Unwind_v1.1.zip");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_DiverseUnwind_v1.2.zip");
         startActivityForResult(i,EXPORT_AOT_CODE);
     }
     private void exportAotCode(Uri output) {
@@ -354,6 +354,7 @@ public final class MainActivity extends Activity {
                             "\nعينات الدوال المصدّرة: "+result.chosenActualFunctionSamples+
                             "\nبايتات الكود المصدرة: "+result.bytesExported+
                             "\nسجلات UNWIND_INFO الأصلية: "+result.uniqueUnwindRecordsExported+
+                            "\nعناوين UNWIND متنوعة: "+result.chosenActualFunctionSamples+
                             "\nروابط CHAININFO: "+result.chainedUnwindReferences+
                             "\nسلاسل UNWIND المكتملة: "+result.functionsWithCompleteUnwindChain+
                             "\nسلاسل تحتاج مراجعة: "+result.functionsWithUnwindReadIssues+
