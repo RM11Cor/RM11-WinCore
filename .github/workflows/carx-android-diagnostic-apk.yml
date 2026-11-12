@@ -1,4 +1,4 @@
-name: CarX Street PC PortLab v0.9 - reject unsupported bundle names without claiming 808 input overflow
+name: CarX Street PC PortLab v1.0 - real GameAssembly Win64 function code bridge for native AOT
 on:
   push:
     branches: [carx-street-pc-port-v1]
@@ -95,13 +95,13 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk \
-            dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
-          sha256sum dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk >dist/SHA256.txt
+            dist/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk
+          sha256sum dist/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk >dist/SHA256.txt
       - name: Independently verify permanent CarX certificate app versionCode 7 and native ELF
         shell: bash
         run: |
           set -euo pipefail
-          apk=dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
+          apk=dist/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk
           signature=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$signature"
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$signature"
@@ -110,19 +110,19 @@ jobs:
             echo 'No verified Android APK v2/v3 signature'; exit 1
           fi
           info=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
-          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='9' versionName='0.9.0-asset-reference-classification'" <<<"$info"
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='10' versionName='1.0.0-carx-gameassembly-aot-code-bridge'" <<<"$info"
           unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
           count=$(unzip -Z1 "$apk" | grep '^lib/' | grep -c '\.so$')
           test "$count" -eq 1
           unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/libcarx_native_probe.so"
           readelf -h "$RUNNER_TEMP/libcarx_native_probe.so" | grep -Fq 'AArch64'
-          echo CARX_V090_WINDOWS_BUNDLE_SOURCE_REJECTION_REASON_ELF_CERT_VCODE9_READY_FOR_PHONE_TEST
+          echo CARX_V100_REAL_GAMEASSEMBLY_FUNCTION_CODE_BRIDGE_CERT_VCODE10_READY_FOR_PHONE_TEST
       - name: Preserve correct scope for actual device-side JNI Vulkan verification
         shell: bash
         run: |
           set -euo pipefail
           cat >dist/RELEASE_SCOPE.txt <<'EOF'
-          CarX Street PC PortLab v0.9.0 true physical/catalog name rejection classification inspector ONLY.
+          CarX Street PortLab v1.0.0 adds bounded original GameAssembly x86-64 code sample export for AOT translation; this is NOT a playable port.
           This app includes original independent JNI C++ ARM64 native code.
           It calls Android Vulkan system API to enumerate GPU, extensions and memory.
           No native CarX game engine or original Windows executable is executed.
@@ -132,6 +132,11 @@ jobs:
           NEW: compare distinct physical Windows64 bundle filenames with
           catalog-referenced bundle names, never infer file missing from counts.
           Android word occurrence is not an Android-target asset proof.
+          New v1.0: user-initiated extraction of small original Windows
+          x64 GameAssembly RUNTIME_FUNCTION code slices via SAF, total
+          <= 256 samples * 320 bytes, into owner-selected offline ZIP.
+          This is the first REAL original game-code input for static AOT.
+          The original 142MB DLL and all game assets remain untouched.
           v0.8 detected 1 unaccepted physical bundle name plus 1 ambiguous
           Windows64 catalog reference. They are source-name classification
           gaps, not evidence of missing assets or source count exhaustion.
@@ -139,18 +144,18 @@ jobs:
           The user report must verify actual source read success.
           No game Vulkan surface, swapchain or first gameplay frame is rendered.
           User selected PC game files remain read-only and offline.
-          Android appID com.rm11cor.carxstreet.portlab, versionCode 9.
+          Android appID com.rm11cor.carxstreet.portlab, versionCode 10.
           Same protected permanent CarX signing certificate SHA256:
           73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
-          Installs IN-PLACE over stable signed v0.3-v0.8; device test still pending.
+          Installs IN-PLACE over stable signed v0.3-v0.9; device test still pending.
           EOF
       - name: Upload permanent-signed actual ARM64 Vulkan native test APK and SHA
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: CarXStreet-v0.9.0-SAF-Bundle-Names-Mismatch-Cause-Permanent-Signed
+          name: CarXStreet-v1.0.0-Owner-Original-GameAssembly-AOT-Code-Bridge-Permanent-Signed
           path: |
-            dist/CarXStreet_PC_PortLab_v0.9.0_Permanent_Signed.apk
+            dist/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk
             dist/SHA256.txt
             dist/RELEASE_SCOPE.txt
           retention-days: 30
