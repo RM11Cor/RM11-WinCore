@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P2.8 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P2.9 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -97,12 +97,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
-        entryButton = button("فحص مساري القفزة JNE في فورزا (بدون تشغيل)", () -> testActualEntry());
+        entryButton = button("فحص تفرّع والتقاء مسارات فورزا (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P2.8", () -> exportReport()));
+        root.addView(button("تصدير تقرير P2.9", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P2.8: نفحص مساري JNE القفزة الشرطية في دالة فورزا الأصلية، بدون تنفيذ أو استخراج.");
+        updateStatus("P2.9: نفحص أهداف JMP التالية لكلا فرعي JNE ونحدد هل تلتقي المسارات. تحليل فقط بدون تشغيل اللعبة.");
     }
 
     private int dp(int v) {
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_8_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_9_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -163,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P2.8. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P2.9. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -402,6 +402,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             output.put("first_basic_block_mnemonics",
                 parsed.optJSONArray("first_basic_block_mnemonics"));
             output.put("first_transfer_kind",parsed.optString("first_transfer_kind","none"));
+            output.put("first_transfer_target_kind",
+                parsed.optString("first_transfer_target_kind","none"));
+            if(parsed.optBoolean("first_transfer_target_within_exe_image",false)
+                && !parsed.isNull("first_transfer_target_rva"))
+                output.put("first_transfer_target_rva",
+                    parsed.optLong("first_transfer_target_rva",-1));
             output.put("sample_compressed_bytes_read",sample.compressedBytesRead);
         } catch(java.io.IOException ex) {
             String reason=ex.getMessage();
@@ -424,6 +430,47 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         return output;
     }
 
+    /** Only an explicitly direct in-image JMP target can be followed. */
+    private long eligibleNextJumpRva(JSONObject node,long imageSize) {
+        if(node==null || !"EXECUTABLE_TARGET_SECTION_DECODED".equals(
+            node.optString("status","")))
+            return -1;
+        if(!"unconditional_jump".equals(node.optString("first_transfer_kind","")))
+            return -1;
+        if(!"direct".equals(node.optString("first_transfer_target_kind","")))
+            return -1;
+        long rva=node.optLong("first_transfer_target_rva",-1);
+        return rva>0 && rva<imageSize?rva:-1;
+    }
+
+    /** Hard stop at one more JMP per JNE arm. No recursion/cycle execution. */
+    private JSONObject inspectNextJump(FileChannel channel,long nextRva,
+                                       long imageSize,long firstArmRva,
+                                       long secondArmRva,long callTargetRva) {
+        JSONObject result=new JSONObject();
+        try {
+            if(nextRva<=0 || nextRva>=imageSize) {
+                result.put("status","NO_RESOLVED_IN_IMAGE_DIRECT_JMP");
+            } else if(nextRva==firstArmRva || nextRva==secondArmRva ||
+                      nextRva==callTargetRva) {
+                result.put("status","TARGET_ALREADY_VISITED_CYCLE_OR_CROSS_LINK");
+                result.put("target_rva",nextRva);
+            } else {
+                result=probeBranchRva(channel,nextRva,imageSize);
+                result.put("one_hop_only",true);
+            }
+            result.put("original_game_code_executed",false);
+            result.put("raw_game_bytes_exported",false);
+        } catch(Exception ex) {
+            try {
+                result.put("status","FOLLOWUP_TARGET_PROBE_FAILED");
+                result.put("error_class",ex.getClass().getSimpleName());
+                result.put("original_game_code_executed",false);
+            } catch(Exception ignored) {}
+        }
+        return result;
+    }
+
     private void testActualEntry() {
         if (entryBusy || archiveBusy || exeBusy) {
             updateStatus("يوجد فحص آخر جارٍ. أكمله أولاً.");
@@ -436,7 +483,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         entryBusy=true;
         entryButton.setEnabled(false);
-        updateStatus("P2.8: نحلّل فرعي JNE وعنوان JMP اللاحقة بصورة ثابتة دون تشغيل تعليمات اللعبة.");
+        updateStatus("P2.9: نفحص أهداف JMP التالية للفرعين بصورة محدودة دون تشغيل تعليمات اللعبة.");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -487,19 +534,54 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                                     paths.put("not_taken_next_mnemonic",
                                         decodedTarget.optString("not_taken_next_mnemonic","none"));
                                     long takenRva=decodedTarget.optLong("first_transfer_target_rva",-1);
-                                    paths.put("taken",probeBranchRva(
-                                        file.getChannel(),takenRva,e.pe.imageSize));
+                                    JSONObject taken=probeBranchRva(
+                                        file.getChannel(),takenRva,e.pe.imageSize);
+                                    paths.put("taken",taken);
+                                    JSONObject notTaken;
+                                    long otherRva=-1;
                                     if(decodedTarget.optBoolean("not_taken_next_is_jump",false)) {
                                         paths.put("not_taken_jump_target_kind",
                                             decodedTarget.optString("not_taken_jump_target_kind","none"));
-                                        long otherRva=decodedTarget.optLong("not_taken_jump_target_rva",-1);
-                                        paths.put("not_taken_jump",probeBranchRva(
-                                            file.getChannel(),otherRva,e.pe.imageSize));
+                                        otherRva=decodedTarget.optLong("not_taken_jump_target_rva",-1);
+                                        notTaken=probeBranchRva(
+                                            file.getChannel(),otherRva,e.pe.imageSize);
                                     } else {
-                                        paths.put("not_taken_jump",
-                                            new JSONObject().put("status","NO_DIRECT_JUMP_AT_FALLTHROUGH"));
+                                        notTaken=new JSONObject().put("status",
+                                            "NO_DIRECT_JUMP_AT_FALLTHROUGH");
                                     }
-                                    paths.put("maximum_followed_new_targets",2);
+                                    paths.put("not_taken_jump",notTaken);
+                                    // P2.9: each branch target itself starts with JMP.
+                                    // Resolve the two next destinations without recursively
+                                    // exploring arbitrary game control flow.
+                                    long takenNext=eligibleNextJumpRva(taken,e.pe.imageSize);
+                                    long notTakenNext=eligibleNextJumpRva(notTaken,e.pe.imageSize);
+                                    paths.put("taken_second_jmp_target_rva",
+                                        takenNext>0?takenNext:JSONObject.NULL);
+                                    paths.put("not_taken_second_jmp_target_rva",
+                                        notTakenNext>0?notTakenNext:JSONObject.NULL);
+                                    paths.put("branch_paths_were_executed",false);
+                                    boolean bothKnown=takenNext>0 && notTakenNext>0;
+                                    paths.put("both_next_targets_direct_and_in_image",bothKnown);
+                                    paths.put("static_next_jump_join_status",
+                                        !bothKnown?"ONE_OR_BOTH_UNRESOLVED":
+                                        takenNext==notTakenNext?
+                                        "SAME_IMMEDIATE_JMP_DESTINATION":
+                                        "DISTINCT_IMMEDIATE_JMP_DESTINATIONS");
+                                    if(bothKnown && takenNext==notTakenNext) {
+                                        JSONObject shared=inspectNextJump(file.getChannel(),
+                                            takenNext,e.pe.imageSize,takenRva,otherRva,targetRva);
+                                        paths.put("shared_next_jump_target_probe",shared);
+                                        paths.put("duplicate_target_read_avoided",true);
+                                    } else {
+                                        paths.put("taken_next_jump_target_probe",
+                                            inspectNextJump(file.getChannel(),takenNext,
+                                            e.pe.imageSize,takenRva,otherRva,targetRva));
+                                        paths.put("not_taken_next_jump_target_probe",
+                                            inspectNextJump(file.getChannel(),notTakenNext,
+                                            e.pe.imageSize,takenRva,otherRva,targetRva));
+                                    }
+                                    paths.put("maximum_followed_new_targets",4);
+                                    paths.put("maximum_followup_depth",1);
                                 }
                                 targetProbe.put("conditional_branch_paths",paths);
                                 targetProbe.put("target_executed",false);
@@ -515,8 +597,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                             }
                         }
                     }
-                    info.put("stage","P2_8_ORIGINAL_JCC_DUAL_PATH_STATIC_ANALYSIS");
-                    info.put("status","P2_8_FIRST_CONDITIONAL_PATHS_ANALYZED");
+                    info.put("stage","P2_9_JCC_SECOND_HOP_STATIC_ANALYSIS");
+                    info.put("status","P2_9_JMP_JOIN_CLASSIFIED");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -534,7 +616,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     info.put("game_file_crc_fully_checked",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
-                    message="P2.8: تحليل مساري JNE في دالة فورزا الأصلية!" +
+                    message="P2.9: فحصنا أهداف JMP التالية لمساري JNE!" +
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
@@ -558,7 +640,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P2_8_DUAL_PATH_SCAN_FAILED");
+                    info.put("status","P2_9_NEXT_JUMP_SCAN_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
@@ -583,7 +665,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P2.8")
+                .put("stage", "P2.9")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
