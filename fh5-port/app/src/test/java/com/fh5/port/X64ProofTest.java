@@ -17,14 +17,22 @@ public final class X64ProofTest {
         assertEquals(0x1000,x.getInt(0x98+16));
         assertEquals(0x60000020,x.getInt(0x98+0xf0+36));
     }
-    @Test public void x86SequenceIsExactlyMovAddRet() {
+    @Test public void x86SequenceUsesBalancedGameLikeStackAndReturns42() {
         byte[] b=X64Proof.syntheticPe42();
         int i=0x200;
-        assertEquals((byte)0xb8,b[i]);
-        assertEquals(2,b[i+1]);
-        assertEquals((byte)0x05,b[i+5]);
-        assertEquals(40,b[i+6]);
-        assertEquals((byte)0xc3,b[i+10]);
+        assertEquals((byte)0x48,b[i]);
+        assertEquals((byte)0x83,b[i+1]);
+        assertEquals((byte)0xEC,b[i+2]);
+        assertEquals(40,b[i+3]);
+        assertEquals((byte)0xb8,b[i+4]);
+        assertEquals(2,b[i+5]);
+        assertEquals((byte)0x05,b[i+9]);
+        assertEquals(40,b[i+10]);
+        assertEquals((byte)0x48,b[i+14]);
+        assertEquals((byte)0x83,b[i+15]);
+        assertEquals((byte)0xC4,b[i+16]);
+        assertEquals(40,b[i+17]);
+        assertEquals((byte)0xc3,b[i+18]);
     }
     @Test public void syntheticFixtureHasNoGameData() {
         byte[] b=X64Proof.syntheticPe42();
