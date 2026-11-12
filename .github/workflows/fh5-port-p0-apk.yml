@@ -1,4 +1,4 @@
-name: FH5 Standalone APK P2.5 - Capstone x86-64 Decoder
+name: FH5 Standalone APK P2.6 - First x64 Control Transfer
 on:
   push:
     branches:
@@ -36,6 +36,16 @@ jobs:
             fh5-port/app/src/test/native/test_pe64_core.c \
             -o /tmp/fh5_pe64_host_tests
           /tmp/fh5_pe64_host_tests
+      - name: Test first control transfer analyzer with bounded synthetic x86
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libcapstone-dev
+          cc -std=c11 -Wall -Wextra -Werror \
+            -I fh5-port/app/src/main/cpp \
+            fh5-port/app/src/main/cpp/x86_cf_core.c \
+            fh5-port/app/src/test/native/test_x86_cf_core.c \
+            -lcapstone -o /tmp/fh5_x86_cf_host_tests
+          /tmp/fh5_x86_cf_host_tests
       - name: Decrypt dedicated stable FH5 signing key using protected GitHub secret
         shell: bash
         env:
@@ -69,7 +79,7 @@ jobs:
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6' <<< "$cert"
           pkg="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$apk")"
           printf "%s\n" "$pkg" | head -n 8
-          grep -Fq "package: name='com.fh5.port' versionCode='8' versionName='P2.5-capstone-x64'" <<< "$pkg"
+          grep -Fq "package: name='com.fh5.port' versionCode='9' versionName='P2.6-control-flow'" <<< "$pkg"
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
@@ -88,7 +98,7 @@ jobs:
       - name: Upload permanent signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: FH5-Native-Port-P2.5-PERMANENT-SIGNED-arm64
+          name: FH5-Native-Port-P2.6-PERMANENT-SIGNED-arm64
           path: fh5-port/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
