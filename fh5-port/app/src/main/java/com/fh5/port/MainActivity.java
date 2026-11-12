@@ -40,6 +40,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private TextView status;
     private boolean surfaceReady = false;
     private boolean gpuBusy = false;
+    private boolean x64Busy = false;
+    private Button x64Button;
+    private JSONObject x64Result = new JSONObject();
     private volatile boolean archiveBusy = false;
     private JSONObject gpuResult = new JSONObject();
     private JSONObject archiveInfo = new JSONObject();
@@ -68,7 +71,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P1 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P2 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -84,10 +87,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         gpuButton = button("اختبار Vulkan داخل تطبيق فورزا", () -> testGpu());
         gpuButton.setEnabled(false);
         root.addView(gpuButton);
+        x64Button = button("اختبار تنفيذ x64 داخل APK — برنامج مصغّر", () -> testX64());
+        root.addView(x64Button);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P1", () -> exportReport()));
+        root.addView(button("تصدير تقرير P2", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -97,7 +102,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P1: اختَر ZIP حتى يقرأ التطبيق فهرس ملفاته مباشرة، بدون استخراج. ثم اختبر Vulkan. تشغيل فورزا لم يكتمل بعد.");
+        updateStatus("P2: تم الحفاظ على فحص ZIP64 وVulkan، وأضفنا تجربة x64 مصغرة داخل APK. لا تعني تشغيل كود فورزا الأصلي.");
     }
 
     private int dp(int v) {
@@ -137,7 +142,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P1_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -148,7 +153,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P1. ارفع ملف FH5_PORT_P1_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P2. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -262,11 +267,30 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }, "fh5-native-vulkan");
         thread.start();
     }
+    private void testX64() {
+        if (x64Busy) return;
+        x64Busy=true;
+        x64Button.setEnabled(false);
+        updateStatus("نجرب تنفيذ تعليمات PE64 مصغرة من داخل تطبيق فورزا نفسه...");
+        Thread worker=new Thread(() -> {
+            JSONObject result=X64Proof.run();
+            runOnUiThread(() -> {
+                x64Result=result;
+                x64Busy=false;
+                x64Button.setEnabled(true);
+                boolean passed=result.optBoolean("smoke_result_is_42",false);
+                updateStatus("اختبار x64 على ARM64: " + (passed ? "نجح: النتيجة 42" : "لم يجتز الاختبار") +
+                    "\nNative status: " + result.optString("status","unknown") +
+                    "\nنفذنا برنامج x86-64 اصطناعياً محدوداً، وليس كود Forza Horizon 5.");
+            });
+        },"fh5-native-x64-proof");
+        worker.start();
+    }
     private JSONObject buildReport() {
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P1")
+                .put("stage", "P2")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
@@ -275,6 +299,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 .put("game_folder_selected", prefs.contains(GAME_FOLDER))
                 .put("archive_header", archiveInfo)
                 .put("vulkan_surface_result", gpuResult)
+                .put("synthetic_x64_execution_result", x64Result)
+                .put("x64_translation_component_present", true)
+                .put("x64_original_game_executed", false)
                 .put("game_code_loaded", false)
                 .put("wine_fex_embedded", false)
                 .put("game_playable", false)
