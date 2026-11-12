@@ -15,16 +15,16 @@ public final class X86Disasm {
         catch(LinkageError | SecurityException ignored) {}
         NATIVE_LOADED=ok;
     }
-    private static native String nativeInspect(byte[] bytes);
-    public static JSONObject inspect(byte[] bytes) {
+    private static native String nativeInspect(byte[] bytes,long startRva,long sizeOfImage);
+    public static JSONObject inspect(byte[] bytes,long startRva,long sizeOfImage) {
         JSONObject out=new JSONObject();
         try {
             if(!NATIVE_LOADED) {
                 out.put("status","capstone_native_library_unavailable");
-            } else if(bytes==null || bytes.length<1 || bytes.length>512) {
+            } else if(bytes==null || bytes.length<1 || bytes.length>512 || startRva<0 || sizeOfImage<=0 || startRva>=sizeOfImage) {
                 out.put("status","entry_sample_invalid");
             } else {
-                out=new JSONObject(nativeInspect(bytes));
+                out=new JSONObject(nativeInspect(bytes,startRva,sizeOfImage));
             }
             out.put("game_code_executed",false);
             out.put("original_game_bytes_exported",false);
