@@ -28,6 +28,15 @@ REGS={
     "ebp":5, "esi":6, "edi":7, "r8d":8, "r9d":9,
     "r10d":10, "r11d":11, "r12d":12, "r13d":13,
     "r14d":14, "r15d":15,
+    "ax":0, "cx":1, "dx":2, "bx":3, "sp":4,
+    "bp":5, "si":6, "di":7, "r8w":8, "r9w":9,
+    "r10w":10, "r11w":11, "r12w":12, "r13w":13,
+    "r14w":14, "r15w":15,
+    "al":0, "cl":1, "dl":2, "bl":3, "spl":4,
+    "bpl":5, "sil":6, "dil":7, "r8b":8, "r9b":9,
+    "r10b":10, "r11b":11, "r12b":12, "r13b":13,
+    "r14b":14, "r15b":15,
+    "ah":0, "ch":1, "dh":2, "bh":3,
 }
 JCC={
     "je":"zf","jz":"zf","jne":"!zf","jnz":"!zf",
@@ -81,8 +90,8 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
         def memaddr(op):
             if op.type!=X86_OP_MEM:
                 _unsupported(ins,"not a memory operand")
-            if op.size not in (4,8) or op.mem.index!=0:
-                _unsupported(ins,"only 32/64-bit nonindexed memory operands")
+            if op.size not in (1,2,4,8) or op.mem.index!=0:
+                _unsupported(ins,"only 8/16/32/64-bit nonindexed memory operands")
             if op.mem.base==0:
                 _unsupported(ins,"memory operand without base")
             r=ins.reg_name(op.mem.base)
@@ -93,31 +102,45 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
         def val(op):
             if op.type==X86_OP_IMM:
                 return "uint64_t(%d)"%op.imm
-            if op.size not in (4,8):
-                _unsupported(ins,"only 32/64-bit-width operands supported")
+            if op.size not in (1,2,4,8):
+                _unsupported(ins,"only 8/16/32/64-bit-width operands supported")
             if op.type==X86_OP_REG:
                 r=ins.reg_name(op.reg)
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
-                return ("static_cast<uint64_t>(static_cast<uint32_t>(r[%d]))" if op.size==4
-                        else "r[%d]")%REGS[r]
+                idx=REGS[r]
+                if r in ("ah","bh","ch","dh"):
+                    return "((r[%d]>>8)&0xffULL)"%idx
+                if op.size==1:
+                    return "(r[%d]&0xffULL)"%idx
+                if op.size==2:
+                    return "(r[%d]&0xffffULL)"%idx
+                if op.size==4:
+                    return "(r[%d]&0xffffffffULL)"%idx
+                return "r[%d]"%idx
             if op.type==X86_OP_MEM:
-                return ("read32(%s)" if op.size==4 else "read64(%s)")%memaddr(op)
+                return "read%d(%s)"%(op.size*8,memaddr(op))
             _unsupported(ins,"unknown source operand")
 
         def assign(op,value):
-            if op.size not in (4,8):
-                _unsupported(ins,"only 32/64-bit write supported")
+            if op.size not in (1,2,4,8):
+                _unsupported(ins,"only 8/16/32/64-bit write supported")
             if op.type==X86_OP_REG:
                 r=ins.reg_name(op.reg)
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
+                idx=REGS[r]
+                if r in ("ah","bh","ch","dh"):
+                    return "r[%d]=(r[%d]&~0xff00ULL)|(((uint64_t(%s))&0xffULL)<<8);"%(idx,idx,value)
+                if op.size==1:
+                    return "r[%d]=(r[%d]&~0xffULL)|((uint64_t(%s))&0xffULL);"%(idx,idx,value)
+                if op.size==2:
+                    return "r[%d]=(r[%d]&~0xffffULL)|((uint64_t(%s))&0xffffULL);"%(idx,idx,value)
                 if op.size==4:
-                    return "r[%d]=static_cast<uint64_t>(static_cast<uint32_t>(%s));"%(REGS[r],value)
-                return "r[%d]=%s;"%(REGS[r],value)
+                    return "r[%d]=static_cast<uint64_t>(static_cast<uint32_t>(%s));"%(idx,value)
+                return "r[%d]=%s;"%(idx,value)
             if op.type==X86_OP_MEM:
-                return ("write32(%s,%s);" if op.size==4
-                        else "write64(%s,%s);")%(memaddr(op),value)
+                return "write%d(%s,%s);"%(op.size*8,memaddr(op),value)
             _unsupported(ins,"invalid assignment target")
 
         if mnemonic in ("nop","endbr64"):
@@ -127,6 +150,30 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
                 _unsupported(ins,"mov operand count")
             lines.append("uint64_t rhs=%s;"%val(ops[1]))
             lines.append(assign(ops[0],"rhs"))
+            lines.append("pc=0x%xULL;"%nxt)
+        elif mnemonic in ("movzx","movsx","movsxd"):
+            if len(ops)!=2 or ops[0].size not in (4,8):
+                _unsupported(ins,"integer extension operand count/destination width")
+            source_width=ops[1].size
+            if mnemonic=="movsxd":
+                if source_width!=4 or ops[0].size!=8:
+                    _unsupported(ins,"movsxd requires 32->64 bits")
+                signedtype="int32_t"
+                target="uint64_t(int64_t(%s))"
+            elif mnemonic=="movzx":
+                if source_width not in (1,2):
+                    _unsupported(ins,"movzx requires byte/word source")
+                signedtype=None
+            else:
+                if source_width not in (1,2):
+                    _unsupported(ins,"movsx requires byte/word source")
+                signedtype="int8_t" if source_width==1 else "int16_t"
+            lines.append("uint64_t rhs=%s;"%val(ops[1]))
+            if signedtype:
+                cast="uint64_t(int64_t(%s(rhs)))"%(signedtype,"rhs")
+                lines.append(assign(ops[0],cast))
+            else:
+                lines.append(assign(ops[0],"rhs"))
             lines.append("pc=0x%xULL;"%nxt)
         elif mnemonic=="lea":
             if len(ops)!=2 or ops[1].type!=X86_OP_MEM:
@@ -139,10 +186,12 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
             if ops[0].type==X86_OP_IMM:
                 _unsupported(ins,"arithmetic destination is immediate")
             width=ops[0].size
-            if width not in (4,8):
+            if width not in (1,2,4,8):
                 _unsupported(ins,"arithmetic width not yet supported")
-            mask="0xffffffffULL" if width==4 else "0xffffffffffffffffULL"
-            sign="0x80000000ULL" if width==4 else "0x8000000000000000ULL"
+            mask={1:"0xffULL",2:"0xffffULL",4:"0xffffffffULL",
+                  8:"0xffffffffffffffffULL"}[width]
+            sign={1:"0x80ULL",2:"0x8000ULL",4:"0x80000000ULL",
+                  8:"0x8000000000000000ULL"}[width]
             lines.append("constexpr uint64_t MASK=%s,SIGNBIT=%s;"%(mask,sign))
             lines.append("uint64_t lhs=(%s)&MASK;"%val(ops[0]))
             lines.append("uint64_t rhs=(%s)&MASK;"%val(ops[1]))
@@ -166,11 +215,14 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
             if len(ops)!=1:
                 _unsupported(ins,"unary arithmetic operand count")
             width=ops[0].size
-            if width not in (4,8):
+            if width not in (1,2,4,8):
                 _unsupported(ins,"inc/dec width not supported")
-            mask="0xffffffffULL" if width==4 else "0xffffffffffffffffULL"
-            sign="0x80000000ULL" if width==4 else "0x8000000000000000ULL"
-            signedmax="0x7fffffffULL" if width==4 else "0x7fffffffffffffffULL"
+            mask={1:"0xffULL",2:"0xffffULL",4:"0xffffffffULL",
+                  8:"0xffffffffffffffffULL"}[width]
+            sign={1:"0x80ULL",2:"0x8000ULL",4:"0x80000000ULL",
+                  8:"0x8000000000000000ULL"}[width]
+            signedmax={1:"0x7fULL",2:"0x7fffULL",4:"0x7fffffffULL",
+                       8:"0x7fffffffffffffffULL"}[width]
             lines.append("constexpr uint64_t MASK=%s,SIGNBIT=%s;"%(mask,sign))
             lines.append("uint64_t lhs=(%s)&MASK;"%val(ops[0]))
             lines.append("uint64_t value=(lhs%s1ULL)&MASK;"%("+" if mnemonic=="inc" else "-"))
@@ -246,6 +298,29 @@ static uint64_t run(uint64_t a,uint64_t b,uint64_t c,uint64_t d) {
         if(address<STACK||address-STACK>memory.size()-8)
             throw std::runtime_error("guest stack write outside bounds");
         std::memcpy(&memory[size_t(address-STACK)],&value,8);
+    };
+    auto read8=[&](uint64_t address)->uint64_t {
+        if(address<STACK||address-STACK>memory.size()-1)
+            throw std::runtime_error("guest stack read8 outside bounds");
+        return uint64_t(memory[size_t(address-STACK)]);
+    };
+    auto read16=[&](uint64_t address)->uint64_t {
+        if(address<STACK||address-STACK>memory.size()-2)
+            throw std::runtime_error("guest stack read16 outside bounds");
+        uint16_t x=0;
+        std::memcpy(&x,&memory[size_t(address-STACK)],2);
+        return uint64_t(x);
+    };
+    auto write8=[&](uint64_t address,uint64_t value) {
+        if(address<STACK||address-STACK>memory.size()-1)
+            throw std::runtime_error("guest stack write8 outside bounds");
+        memory[size_t(address-STACK)]=uint8_t(value);
+    };
+    auto write16=[&](uint64_t address,uint64_t value) {
+        if(address<STACK||address-STACK>memory.size()-2)
+            throw std::runtime_error("guest stack write16 outside bounds");
+        uint16_t x=uint16_t(value);
+        std::memcpy(&memory[size_t(address-STACK)],&x,2);
     };
     auto read32=[&](uint64_t address)->uint64_t {
         if(address<STACK||address-STACK>memory.size()-4)
