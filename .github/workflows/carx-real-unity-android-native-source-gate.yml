@@ -1,0 +1,74 @@
+name: CarX native Android Unity 6000.3 authorized project and ELF gamecode admission gate
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'native-port/**'
+      - '.github/workflows/carx-real-unity-android-native-source-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-android-aarch64-il2cpp-eligibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source tool syntax and refuse fabricated Unity Android native game evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            native-port/tools/carx_native_android_artifact_gate.py \
+            native-port/tests/test_carx_native_android_artifact_gate.py
+          python -m unittest discover \
+            -s native-port/tests \
+            -p 'test_carx_native_android_artifact_gate.py' -v
+          echo CARX_NATIVE_UNITY_SOURCE_AND_ELF_ARM64_18_INDEPENDENT_SYNTHETIC_TESTS_PASS
+      - name: Ensure original user-owned CarX source is not in repository and block false playable APK release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e 'GameAssembly.dll'
+          test ! -e 'CarX Street_Data'
+          test ! -e 'Assets/CarXStreetNativePort/Gameplay'
+          test ! -e 'native-port/AuthorizedCarXUnityProject'
+          test ! -e 'native-port/output/carx-native-android.apk'
+          grep -Fq 'BuildPipeline.BuildPlayer' native-port/unity/CarXAuthorizedAndroidExport.cs
+          grep -Fq 'AndroidArchitecture.ARM64' native-port/unity/CarXAuthorizedAndroidExport.cs
+          grep -Fq 'ScriptingImplementation.IL2CPP' native-port/unity/CarXAuthorizedAndroidExport.cs
+          grep -Fq 'exportAsGoogleAndroidProject = true' native-port/unity/CarXAuthorizedAndroidExport.cs
+          grep -Fq 'NO_AUTHORIZED_GAMEPLAY_SOURCE' native-port/unity/CarXAuthorizedAndroidExport.cs
+          echo CARX_TRUE_GAMEPLAY_UNITY_SOURCE_NOT_PRESENT_CANNOT_BUILD_OR_CLAIM_NATIVE_PC_GAME_PORT
+      - name: Report honest source-only CI conclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result={
+              "schema":"rm11carx.native-android-authorized-source-ci.v1",
+              "original_user_carx_unity_source_available":False,
+              "actual_carx_gameplay_compiled_to_android":False,
+              "unity_editor_6000_3_8f1_executed_in_ci":False,
+              "original_pc_carx_game_frame_rendered":False,
+              "source_to_android_export_script_added":True,
+              "real_original_user_files_used_in_tests":False,
+              "game_provenance_or_permissions_verified":False,
+              "status":"BLOCKED_UNTIL_ACTUAL_AUTHORIZED_UNITY_GAME_PROJECT_AND_ANDROID_ASSETS",
+          }
+          Path("dist/carx-real-native-unity-export-source-gate.json").write_text(
+              json.dumps(result,indent=2)+"\n",encoding="utf8")
+          print("CARX_NATIVE_NO_PC_GAME_PORT_CLAIM_BEFORE_ORIGINAL_AUTHORIZED_SOURCE")
+          PY
+      - name: Preserve only truthful source-gate diagnostic JSON not a counterfeit game APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-True-Android-ARM64-Unity-IL2CPP-Source-Not-Available-18-Tests
+          path: dist/carx-real-native-unity-export-source-gate.json
+          retention-days: 30
