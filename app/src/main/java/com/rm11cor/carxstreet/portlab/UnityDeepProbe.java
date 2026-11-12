@@ -24,7 +24,7 @@ public final class UnityDeepProbe {
                                      int windowsBundleCount, long windowsBundleBytes)
             throws Exception {
         JSONObject report=new JSONObject();
-        report.put("schema","rm11carx.unity-header-audit.v1");
+        report.put("schema","rm11carx.unity-header-audit.v2");
         report.put("read_only",true);
         report.put("native_game_runtime_available",false);
         report.put("exe_is_android_arm64_compatible",false);
@@ -37,10 +37,31 @@ public final class UnityDeepProbe {
         metadata.put("present",docs.containsKey("il2cpp_metadata"));
         if (docs.containsKey("il2cpp_metadata")) {
             try {
-                byte[] head=readPrefix(resolver,docs.get("il2cpp_metadata"),64);
+                byte[] head=readPrefix(resolver,docs.get("il2cpp_metadata"),4096);
                 UnityFormatProbe.Metadata parsed=UnityFormatProbe.metadata(head);
                 metadata.put("classic_il2cpp_magic",parsed.classicMagic);
                 metadata.put("header_bytes_read",head.length);
+                int prefixSize=Math.min(head.length,16);
+                StringBuilder hex=new StringBuilder(prefixSize*2);
+                for(int i=0;i<prefixSize;i++) {
+                    int v=head[i]&0xff;
+                    hex.append(Character.forDigit(v>>>4,16));
+                    hex.append(Character.forDigit(v&15,16));
+                }
+                metadata.put("first_16_header_bytes_hex",hex.toString());
+                int otherMagicOffset=-1;
+                for(int i=0;i+4<=head.length;i++) {
+                    if((head[i]&255)==0xaf && (head[i+1]&255)==0x1b
+                            && (head[i+2]&255)==0xb1 && (head[i+3]&255)==0xfa) {
+                        otherMagicOffset=i;
+                        break;
+                    }
+                }
+                metadata.put("classic_magic_offset_within_first_4096",otherMagicOffset);
+                metadata.put("nonstandard_header_needs_independent_explanation",
+                        otherMagicOffset!=0);
+                metadata.put("metadata_encryption_or_protection_confirmed",false);
+                metadata.put("metadata_source_code_reconstructed",false);
                 metadata.put("metadata_version",parsed.classicMagic?parsed.rawVersion:-1);
                 metadata.put("version_plausible",parsed.plausibleVersion);
                 metadata.put("source_code_or_arm64_binary_recovered",false);
@@ -49,6 +70,45 @@ public final class UnityDeepProbe {
             }
         }
         report.put("global_metadata",metadata);
+        JSONObject serialized=new JSONObject();
+        serialized.put("header_probe_scope","first 256 bytes per selected source file");
+        serialized.put("unity_player_exact_version_verified",false);
+        JSONArray candidates=new JSONArray();
+        for(String name:new String[]{"globalgamemanagers","unity_resources"}) {
+            JSONObject item=new JSONObject();
+            item.put("source_key",name);
+            item.put("present",docs.containsKey(name));
+            if(docs.containsKey(name)) {
+                try {
+                    byte[] sample=readPrefix(resolver,docs.get(name),256);
+                    UnitySerializedProbe.Result parsed=UnitySerializedProbe.inspect(sample);
+                    item.put("bytes_sampled",sample.length);
+                    item.put("serialized_format_version",parsed.serializedFormat);
+                    item.put("serialized_header_plausible",parsed.headerPlausible);
+                    item.put("serialized_endian_flag",parsed.endianFlag);
+                    item.put("unity_editor_version_candidate",parsed.unityVersionCandidate);
+                    item.put("version_from_known_header_offset",parsed.candidateFromKnownHeader);
+                    item.put("version_read_method",parsed.versionPosition);
+                    item.put("version_note",parsed.reason);
+                    if(parsed.candidateFromKnownHeader) {
+                        boolean duplicate=false;
+                        for(int n=0;n<candidates.length();n++) {
+                            if(parsed.unityVersionCandidate.equals(candidates.optString(n))) {
+                                duplicate=true;
+                                break;
+                            }
+                        }
+                        if(!duplicate)candidates.put(parsed.unityVersionCandidate);
+                    }
+                } catch(Exception e) {
+                    item.put("read_error",e.getClass().getSimpleName());
+                }
+            }
+            serialized.put(name,item);
+        }
+        serialized.put("candidate_unity_editor_versions",candidates);
+        serialized.put("candidate_is_original_windows_game_version_not_android_runtime",true);
+        report.put("unity_serialized_file_headers",serialized);
 
         JSONObject boot=new JSONObject();
         boot.put("present",docs.containsKey("boot_config"));
@@ -129,6 +189,7 @@ public final class UnityDeepProbe {
         report.put("sampled_unity_container_headers_valid",valid);
         report.put("sampled_bundle_unity_versions",versions);
         report.put("unity_player_exact_version_verified",false);
+        report.put("platform_specific_windows64_bundle_shader_compatibility_unproven",true);
         report.put("game_logic_on_android_arm64_proven",false);
         report.put("actual_android_unity_asset_load_proven",false);
         report.put("renderer_first_frame_proven",false);
