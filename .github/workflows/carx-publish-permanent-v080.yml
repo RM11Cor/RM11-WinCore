@@ -1,0 +1,107 @@
+name: Publish CarX v0.8 permanent-signed original Windows64 bundle reconciliation APK
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v080.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verified-v080-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original successful v0.8 builder and verified package identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43200816948
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V080_SIGNATURE_AND_PACKAGE_VERIFICATION_ORIGINAL_CI_PASS
+      - name: Retrieve immutable original successfully signed v0.8 Android APK
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43200816948
+          name: CarXStreet-v0.8.0-SAF-Bundle-Catalog-Reconciliation-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Recheck original artifact checksum and exact cert and monotonic package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          app=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='8' versionName='0.8.0-assetbundle-reconciliation'" <<<"$app"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V080_SAME_PERMANENT_CERT_PACKAGE_ID_HIGHER_VERSION_CODE8_PUBLISH_VERIFIED
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.8.0 - Windows64 bundle reconciliation
+
+          This APK is a read-only inspector, not a playable CarX Street PC port.
+
+          New: compare each actual Windows64 bundle filename from the already
+          selected Android SAF game folder to distinct filenames referenced in
+          the complete Addressables catalog. Report file-only names,
+          catalog-only references, duplicate names, ambiguous references and
+          a sanitized sample of the one Android-named catalog entry.
+
+          The old raw counts were 808 physical Windows64 files versus 807
+          catalog references. That is NOT proof a file is missing.
+          The v0.8 on-device scan provides the real filename comparison.
+
+          A bare Android word in a catalog ID is not proof of Android-built
+          assets. No file content is extracted, modified or uploaded.
+
+          In-place upgrade: Same permanent signing certificate and package ID
+          com.rm11cor.carxstreet.portlab as v0.7; versionCode 8 (was 7).
+          You can install v0.8 OVER v0.7 without uninstalling or deleting
+          your previous game-folder permission.
+          If still using old debug-signed v0.1/v0.2, first export any report
+          and uninstall that debug version once; its old private key is lost.
+
+          On device, open CarX PortLab, select Re-scan same folder, export
+          CarX_Street_PC_Port_Report_v0.8.json and share only the small report.
+
+          Original Windows x86-64 IL2CPP CarX game code and Windows-target
+          AssetBundles do not become native Android ARM64 game logic/assets.
+          Real Android gameplay, original scene and first game frame remain
+          unproven. Generic Vulkan GPU proof from v0.6 is preserved.
+          EOF
+      - name: Publish exact independently verified signed v0.8 APK to GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.8.0-bundle-catalog-reconcile-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.8.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PortLab v0.8 - Windows Bundle/Catalog Reconciliation (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
