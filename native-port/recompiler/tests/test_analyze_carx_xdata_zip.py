@@ -90,8 +90,53 @@ class ActualSourceUnwindPackageTests(unittest.TestCase):
         self.assertFalse(r["original_carx_machine_code_executed_on_android"])
         screening=screener.screen(src)
         self.assertEqual(screening["original_function_samples_examined"],1)
-        self.assertEqual(screening["aot_supported_source_functions"],1)
+        self.assertEqual(screening["aot_supported_source_functions"],0)
+        self.assertEqual(screening["aot_rejected_source_functions"],1)
+        self.assertTrue(screening["xdata_admission_enforced_before_cpp_codegen"])
+        self.assertEqual(
+            screening["rejection_categories"][
+                "original_unwind_parent_or_boundary_dependencies_unresolved"],1)
         self.assertEqual(screening["original_unwind_records_sha_verified"],2)
+        self.assertIn(
+            "chained_parent_source_function_body_not_exported",
+            r["source_function_unwind_details"][0]["callable_source_admission"]["blockers"])
+
+    def test_complete_nonchained_xdata_still_allows_cpp_candidate_not_game_proof(self):
+        src=self.make_package()
+        with ZipFile(src) as z:
+            code=z.read("code/rva_00001100.bin")
+        plain=b"\x01\x00\x00\x00"
+        manifest={
+            "schema":analyzer.ZIP_SCHEMA,
+            "functions":[{
+                "relative_rva":0x1100,
+                "length_bytes":len(code),
+                "win64_unwind_info_rva":0x2100,
+                "zip_member":"code/rva_00001100.bin",
+                "sha256":sha(code),
+                "unwind_records":[{
+                    "unwind_rva":0x2100,
+                    "zip_member":"unwind/rva_00002100.bin",
+                    "length_bytes":len(plain),
+                    "sha256":sha(plain),
+                    "version":1,"flags":0,"code_slots":0,
+                }],
+                "unwind_status":"COMPLETE_UNWIND_CHAIN_READ",
+            }],
+            "unwind_records_exported_unique":1,
+        }
+        path=self.root/"unchained.zip"
+        with ZipFile(path,"w") as z:
+            z.writestr("code/rva_00001100.bin",code)
+            z.writestr("unwind/rva_00002100.bin",plain)
+            z.writestr("manifest.json",json.dumps(manifest))
+        report=analyzer.analyze(path)
+        admission=report["source_function_unwind_details"][0]["callable_source_admission"]
+        self.assertEqual(admission["status"],
+                         "STRUCTURALLY_LOCAL_CANDIDATE_NEEDS_REFERENCE_EXECUTION")
+        screening=screener.screen(path)
+        self.assertEqual(screening["aot_supported_source_functions"],1)
+        self.assertFalse(report["original_carx_machine_code_executed_on_android"])
 
     def test_unwind_sha_mismatch_never_accepted(self):
         with self.assertRaises(ValueError):
