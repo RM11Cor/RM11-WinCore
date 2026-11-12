@@ -54,7 +54,7 @@ class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
     def __init__(self,slot):
         self.slot=slot
         super().__init__("*(unsigned long long *)"+hex(slot),
-                         type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_READ)
+                         type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_ACCESS)
         self.silent=True
     def stop(self):
         try:
@@ -84,7 +84,8 @@ class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
                 and retval==0x80100fd5c
                 and entry==0x8040c860d and size==1
                 and 1<=ops<=128 and c3=="c3"
-                and rsp in (self.slot,self.slot+8))
+                and rsp in (self.slot,self.slot+8)
+                and re.search(r"\b(?:ldr|ldar|ldur|ldp)\s+",instruction)!=None)
             if good:
                 state["actual_ret_hw_read"]=evt
                 jmark("IFUNC85_ORIGINAL_C3_RET_NATIVE_STACK_HW_READ",**evt)
@@ -116,7 +117,7 @@ class OriginalIFUNC85ActualGuestC3RETRead(gdb.Breakpoint):
                     saved.enabled=False
                 jmark("IFUNC85_OTHER_TWO_SOURCE_WATCHES_SUSPENDED_FOR_C3_READ",pid=pid,count=2)
                 OriginalIFUNC85ActualGuestC3RETRead(rsp)
-                jmark("IFUNC85_SOURCE_C3_RET_STACK_HW_RWATCH_ARMED",
+                jmark("IFUNC85_SOURCE_C3_RET_STACK_HW_AWATCH_ARMED",
                       pid=pid,stack_slot=hex(rsp),expected_return=hex(ret),
                       source_guest_C3_RET="0x8040c860d",
                       original_ret_hardware_read_proven_yet=False,
@@ -146,7 +147,7 @@ quit
     need(len(blocks)==8 and patched.count("\nrun\n")==1
          and patched.count("\ncontinue\n")==2
          and patched.count("\nquit\n")==1
-         and patched.count("wp_class=gdb.WP_READ")==1,
+         and patched.count("wp_class=gdb.WP_ACCESS")==2,
          "native GNU stack hardware rwatch dynamic after resolver and before return")
     for code in blocks:ast.parse(code)
     out.mkdir(parents=True,exist_ok=True)
@@ -160,7 +161,7 @@ quit
         "original_GNU_caller_return_guest_RIP":hex(CALLER_RETURN),
         "original_GNU_source_writer":hex(STORE),
         "source_original_source85_target":"0x8042014c8",
-        "native_ret_read_watch_armed_dynamically_at_actual_guest_RSP":True,
+        "native_ret_access_watch_armed_dynamically_at_actual_guest_RSP":True,
         "generated_native_GDB_script_sha256":hashlib.sha256(patched.encode()).hexdigest(),
         "native_guest_ret_stack_read_proven_by_source":False,
         "native_ifunc85_full_chain_proven_by_source":False,
