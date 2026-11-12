@@ -62,6 +62,7 @@ def evaluate_win64_source_function(
     cfg:CfgResult,
     unwind_chain:list[UnwindRecord],
     manifest_status:str,
+    parent_code_segments_verified:bool=False,
 ) -> SourceAdmission:
     if not (0x1000<=source_rva<2**32 and
             1<=source_length<=MAX_ADMISSION_CODE_BYTES and
@@ -86,7 +87,10 @@ def evaluate_win64_source_function(
     if has_parent:
         # The original sample is a .pdata range; CHAININFO describes a
         # parent RUNTIME_FUNCTION, NOT an automatic merged function body.
-        blockers.append("chained_parent_source_function_body_not_exported")
+        if parent_code_segments_verified:
+            blockers.append("chained_parent_code_fragments_require_merged_cfg")
+        else:
+            blockers.append("chained_parent_source_function_body_not_exported")
     if complete and unwind_chain and unwind_chain[-1].chained_runtime_function:
         blockers.append("last_unwind_record_still_chained")
     if unwind_chain and unwind_chain[0].prologue_bytes>source_length:
