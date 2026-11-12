@@ -32,7 +32,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fh5_capstone)
 set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-add_library(fh5_x64_disasm SHARED x86_disasm_jni.c)
+add_library(fh5_x64_disasm SHARED x86_disasm_jni.c x86_cf_core.c)
 target_compile_features(fh5_x64_disasm PRIVATE c_std_11)
 target_compile_options(fh5_x64_disasm PRIVATE -Wall -Wextra)
 target_link_libraries(fh5_x64_disasm PRIVATE capstone_static)
