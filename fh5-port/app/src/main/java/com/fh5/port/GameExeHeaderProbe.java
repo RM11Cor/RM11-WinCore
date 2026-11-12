@@ -263,4 +263,168 @@ public final class GameExeHeaderProbe {
         byte[] pePrefix=decompressHeader(ch,dataAt,m);
         return readPe(pePrefix,ch.size(),m);
     }
+
+    /**
+     * P2.3 read-only mapping of the *actual* game entrypoint bytes.
+     * This never executes, stores, uploads, or JIT-maps bytes from the game.
+     * Streams at most 256 MiB of uncompressed EXE output with ~128 KiB scratch.
+     */
+    public static final class EntryResult {
+        public final Result pe;
+        public final int sectionIndex, sampleLength;
+        public final long entryFileOffset, bytesInflated, compressedBytesRead;
+        public final String leadingOpcodeFamily;
+        // Volatile diagnostic sample stays only inside the APK process and is
+        // fed to a NON-EXECUTING translator probe. Never exported to reports.
+        public final byte[] entrySample;
+        private EntryResult(Result pe,int sectionIndex,long fileOffset,
+                            long inflated,long compressedRead,byte[] sample) {
+            this.pe=pe;
+            this.sectionIndex=sectionIndex;
+            this.entryFileOffset=fileOffset;
+            this.bytesInflated=inflated;
+            this.compressedBytesRead=compressedRead;
+            this.entrySample=sample;
+            this.sampleLength=sample.length;
+            this.leadingOpcodeFamily=classifyLeadingOpcode(sample);
+        }
+    }
+    private static String classifyLeadingOpcode(byte[] op) {
+        if(op.length<1)return "missing";
+        int a=op[0]&255;
+        if(a==0xE9 || a==0xEB)return "relative-jump";
+        if(a==0xE8)return "relative-call";
+        if(a==0xC3 || a==0xC2)return "return";
+        if(a==0xCC)return "int3-breakpoint";
+        if(a==0x90)return "nop";
+        if(a>=0x50 && a<=0x5f)return "push-or-pop";
+        if(a==0x48 && op.length>=3) {
+            int b=op[1]&255,c=op[2]&255;
+            if(b==0x83 && c==0xEC)return "stack-sub-imm8";
+            if(b==0x81 && c==0xEC)return "stack-sub-imm32";
+            if(b==0x89 || b==0x8B)return "rex-mov-modrm";
+            if(b==0x8D)return "rex-lea-modrm";
+            return "rex-prefixed-other";
+        }
+        if(a>=0x40 && a<=0x4F)return "rex-prefix";
+        if(a==0x0f)return "two-byte-opcode";
+        if(a==0xf3 || a==0xf2)return "rep-prefix";
+        if(a==0xff)return "group5-indirect";
+        if(a==0xe0 || a==0xe1 || a==0xe2)return "loop";
+        return "other-or-unclassified";
+    }
+    private static final int SAMPLE_LENGTH=128;
+    private static final long MAX_INFLATE_OUT=256L*1024*1024;
+    private static final int IN_BUFFER=65536;
+    private static final int OUT_BUFFER=65536;
+
+    private static final class Range {
+        final byte[] bytes;
+        final long outProcessed, compressedRead;
+        Range(byte[] bytes,long out,long in){this.bytes=bytes;outProcessed=out;compressedRead=in;}
+    }
+    private static Range readUncompressedRange(SeekableByteChannel ch,long dataAt,
+                  Member m,long first,int count) throws IOException {
+        if(first<0 || count<=0 || count>1024 ||
+           first>m.unpacked || count>m.unpacked-first)
+            throw new IOException("pe_entry_range_out_of_exe");
+        if(first+count>MAX_INFLATE_OUT)
+            throw new IOException("pe_entry_exceeds_stream_budget");
+        if(dataAt<0 || dataAt>ch.size() || m.compressed>ch.size()-dataAt)
+            throw new IOException("zip_exe_payload_outside_archive");
+        if(m.method==0) {
+            if(m.compressed!=m.unpacked)throw new IOException("zip_stored_size_mismatch");
+            return new Range(read(ch,dataAt+first,count),first+count,count);
+        }
+        if(m.method!=8)throw new IOException("zip_exe_compression_unsupported");
+        Inflater inflater=new Inflater(true);
+        byte[] inBuf=new byte[IN_BUFFER],outBuf=new byte[OUT_BUFFER],found=new byte[count];
+        long readCompressed=0,processed=0;
+        int copied=0;
+        try {
+            while(copied<count) {
+                if(inflater.needsInput()) {
+                    long remaining=m.compressed-readCompressed;
+                    if(remaining<=0)throw new IOException("zip_entry_deflate_truncated");
+                    int n=(int)Math.min(inBuf.length,remaining);
+                    // One bounded Android SAF random read, no staging file created.
+                    byte[] bytes=read(ch,dataAt+readCompressed,n);
+                    System.arraycopy(bytes,0,inBuf,0,n);
+                    inflater.setInput(inBuf,0,n);
+                    readCompressed+=n;
+                }
+                int n=inflater.inflate(outBuf);
+                if(n>0) {
+                    long next=processed+n;
+                    if(next>MAX_INFLATE_OUT || next>m.unpacked)
+                        throw new IOException("zip_stream_output_budget");
+                    long start=Math.max(processed,first);
+                    long end=Math.min(next,first+count);
+                    if(end>start) {
+                        int from=(int)(start-processed),take=(int)(end-start);
+                        System.arraycopy(outBuf,from,found,(int)(start-first),take);
+                        copied+=take;
+                    }
+                    processed=next;
+                } else if(inflater.finished())
+                    throw new IOException("zip_exe_ended_before_entry");
+                else if(inflater.needsDictionary())
+                    throw new IOException("zip_deflate_dictionary_unsupported");
+                else if(!inflater.needsInput())
+                    throw new IOException("zip_deflate_stalled");
+            }
+        } catch(DataFormatException ex) {
+            throw new IOException("zip_entry_deflate_corrupt",ex);
+        } finally {inflater.end();}
+        return new Range(found,processed,readCompressed);
+    }
+    private static long[] mapEntrypointToFile(byte[] prefix,long entry,long fileLength)
+            throws IOException {
+        long pe=u32(prefix,0x3c);
+        if(pe>prefix.length-24)throw new IOException("pe_section_table_unavailable");
+        int nt=(int)pe;
+        int count=u16(prefix,nt+6),optSize=u16(prefix,nt+20);
+        long sectionAt=pe+24L+optSize;
+        if(count<1 || count>96 || sectionAt<0 || sectionAt+40L*count>prefix.length)
+            throw new IOException("pe_section_table_bounds");
+        for(int i=0;i<count;i++) {
+            int p=(int)sectionAt+i*40;
+            long virtualSize=u32(prefix,p+8);
+            long virtualAddress=u32(prefix,p+12);
+            long rawSize=u32(prefix,p+16);
+            long rawOffset=u32(prefix,p+20);
+            long characteristics=u32(prefix,p+36);
+            long memorySize=Math.max(virtualSize,rawSize);
+            if(entry>=virtualAddress && entry-virtualAddress<memorySize) {
+                long delta=entry-virtualAddress;
+                if((characteristics&0x20000000L)==0)
+                    throw new IOException("pe_entry_section_not_executable");
+                if(delta>=rawSize || rawOffset>fileLength ||
+                   delta>fileLength-rawOffset ||
+                   SAMPLE_LENGTH>fileLength-rawOffset-delta)
+                    throw new IOException("pe_entry_not_backed_by_file");
+                return new long[]{i,rawOffset+delta};
+            }
+        }
+        throw new IOException("pe_entry_rva_unmapped");
+    }
+    public static EntryResult inspectEntry(SeekableByteChannel ch) throws IOException {
+        Directory d=directory(ch);
+        Member m=findExe(ch,d);
+        if(m.localOffset<0 || m.localOffset>ch.size()-30)
+            throw new IOException("zip_local_header_bounds");
+        byte[] local=read(ch,m.localOffset,30);
+        if(u32(local,0)!=LOCAL || (u16(local,6)&1)!=0 ||
+           u16(local,8)!=m.method)
+            throw new IOException("zip_local_header_invalid");
+        long dataAt=m.localOffset+30L+u16(local,26)+u16(local,28);
+        if(dataAt>ch.size() || m.compressed>ch.size()-dataAt)
+            throw new IOException("zip_local_payload_bounds");
+        byte[] pePrefix=decompressHeader(ch,dataAt,m);
+        Result pe=readPe(pePrefix,ch.size(),m);
+        long[] mapped=mapEntrypointToFile(pePrefix,pe.entryPointRva,m.unpacked);
+        Range range=readUncompressedRange(ch,dataAt,m,mapped[1],SAMPLE_LENGTH);
+        return new EntryResult(pe,(int)mapped[0],mapped[1],
+                range.outProcessed,range.compressedRead,range.bytes);
+    }
 }
