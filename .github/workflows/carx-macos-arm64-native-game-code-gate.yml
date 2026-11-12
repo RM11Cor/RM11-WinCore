@@ -1,0 +1,58 @@
+name: CarX Street macOS Apple Silicon Mach-O GameAssembly source architecture no-emulator gate
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'tools/carx_macho_architecture_gate.py'
+      - 'tests/test_carx_macho_architecture_gate.py'
+      - '.github/workflows/carx-macos-arm64-native-game-code-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-darwin-mach-o-architecture-source-only-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate original code compiles but cannot infer proprietary user game binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/carx_macho_architecture_gate.py \
+            tests/test_carx_macho_architecture_gate.py
+          python -m unittest discover -s tests \
+            -p 'test_carx_macho_architecture_gate.py' -v
+          echo 'CARX_MACOS_ARM64_MACHO_HEADER_PARSER_SYNTHETIC_TESTS_PASS_ONLY'
+      - name: Assert the CI checkout has no original macOS proprietary game files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e 'CarX Street.app/Contents/Frameworks/GameAssembly.dylib'
+          test ! -e 'CarX Street.app/Contents/Frameworks/UnityPlayer.dylib'
+          mkdir -p dist/no-proprietary-sources
+          python tools/carx_macho_architecture_gate.py dist/no-proprietary-sources \
+            --out dist/carx-macos-arm64-source-only-ci.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          obj=json.loads(Path("dist/carx-macos-arm64-source-only-ci.json").read_text())
+          assert obj["schema"]=="rm11carx.macos-macho-arm64-source-executability-gate.v1"
+          assert obj["has_mac_game_binaries"] is False
+          assert obj["mac_arm64_game_code_and_engine_headers_both_proven"] is False
+          assert obj["android_bionic_elf_compatible_game_logic_proven"] is False
+          assert obj["fully_native_android_game_port_proven"] is False
+          assert obj["executes_original_game_code"] is False
+          print("CARX_MACOS_STEAM_ARM64_AVAILABLE_PUBLICLY_NOT_IDENTICAL_ANDROID_ABI_NO_GAME_PORT_PROOF")
+          PY
+      - name: Retain synthetic-only falsification evidence, NOT actual CarX game files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-Street-MacOS-ARM64-MachO-Header-Gate-Synthetic-No-Game-Claim
+          path: dist/carx-macos-arm64-source-only-ci.json
+          retention-days: 30
+          if-no-files-found: warn
