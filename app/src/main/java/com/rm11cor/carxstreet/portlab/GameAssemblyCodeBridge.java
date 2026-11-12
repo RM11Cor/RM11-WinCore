@@ -63,6 +63,11 @@ public final class GameAssemblyCodeBridge {
         }
     }
 
+    private static final class ExecutableRange {
+        final long begin,end;
+        ExecutableRange(long b,long e) {begin=b;end=e;}
+    }
+
     public static final class ExportStats {
         public int originalPdataEntries;
         public int eligibleExecutableFunctions;
@@ -75,6 +80,9 @@ public final class GameAssemblyCodeBridge {
         public int uniqueParentCodeFragments;
         public int parentCodeBytesExported;
         public int parentCodeReferencesNotExtracted;
+        public int uniqueExecutableGapCodeRegions;
+        public int executableGapCodeBytes;
+        public int executableGapCodeMissing;
         public long originalAssemblyLength;
         public long exceptionDirectorySize;
     }
@@ -246,8 +254,8 @@ public final class GameAssemblyCodeBridge {
             stats.chosenActualFunctionSamples=selected.size();
 
             JSONObject manifest=new JSONObject();
-            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v3");
-            manifest.put("version","1.3-parent-code-bounded");
+            manifest.put("schema","rm11carx.original-win64-gameassembly-bounded-function-samples.v4");
+            manifest.put("version","1.4-inter-region-executable-source-gaps");
             manifest.put("sampler_policy","one_source_function_per_distinct_unwind_rva");
             manifest.put("sampled_distinct_unwind_rva_count",
                     chosen.distinctUnwindRvasSelected());
@@ -260,6 +268,11 @@ public final class GameAssemblyCodeBridge {
             manifest.put("max_parent_code_total_bytes",
                     Win64ParentCodePolicy.MAX_TOTAL_PARENT_SOURCE_BYTES);
             manifest.put("parent_code_fragment_is_not_full_il2cpp_method",true);
+            manifest.put("inter_region_executable_gap_bytes_proven_to_belong_to_method",false);
+            manifest.put("max_executable_inter_region_gap_bytes",
+                    Win64InterRegionGapPolicy.MAX_GAP_BYTES);
+            manifest.put("max_executable_inter_region_gap_total_bytes",
+                    Win64InterRegionGapPolicy.MAX_TOTAL_GAP_BYTES);
             manifest.put("unwind_metadata_record_source","original GameAssembly.dll PE .xdata RVA");
             manifest.put("win64_unwind_data_is_not_executable_game_logic",true);
             manifest.put("max_chain_depth",MAX_CHAIN_DEPTH);
@@ -280,6 +293,7 @@ public final class GameAssemblyCodeBridge {
             try(ZipOutputStream zip=new ZipOutputStream(destination)) {
                 Set<Long> emittedUnwindRvas=new HashSet<>();
                 Map<Long,ParentCode> emittedParentCode=new HashMap<>();
+                Map<Long,ParentCode> emittedGapCode=new HashMap<>();
                 for(Win64UnwindDiverseSampler.Range f:selected) {
                     int n=(int)(f.end-f.begin);
                     long rawAt=rvaToFile(sections,f.begin,n,fileSize,true);
@@ -297,8 +311,9 @@ public final class GameAssemblyCodeBridge {
                     record.put("zip_member",filename);
                     record.put("sha256",sha256(code));
                     appendActualUnwindChain(
-                            zip,fd,fileSize,sections,f.unwind,
-                            emittedUnwindRvas,emittedParentCode,record,stats);
+                            zip,fd,fileSize,sections,f.begin,f.end,f.unwind,
+                            emittedUnwindRvas,emittedParentCode,emittedGapCode,
+                            record,stats);
                     record.put("original_function_gameplay_identity_confirmed",false);
                     entries.put(record);
                     stats.bytesExported+=n;
@@ -312,6 +327,12 @@ public final class GameAssemblyCodeBridge {
                 manifest.put("original_parent_code_bytes_exported",stats.parentCodeBytesExported);
                 manifest.put("parent_code_reference_extraction_issues",
                         stats.parentCodeReferencesNotExtracted);
+                manifest.put("unique_executable_inter_region_gap_fragments",
+                        stats.uniqueExecutableGapCodeRegions);
+                manifest.put("original_executable_gap_code_bytes_exported",
+                        stats.executableGapCodeBytes);
+                manifest.put("executable_gap_extraction_issues",
+                        stats.executableGapCodeMissing);
                 manifest.put("full_callable_il2cpp_method_verified",false);
                 manifest.put("functions",entries);
                 zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -325,10 +346,15 @@ public final class GameAssemblyCodeBridge {
 
     private static void appendActualUnwindChain(
             ZipOutputStream zip,ParcelFileDescriptor fd,long fileSize,
-            List<Section> sections,long firstUnwindRva,Set<Long> emitted,
+            List<Section> sections,long childBegin,long childEnd,
+            long firstUnwindRva,Set<Long> emitted,
             Map<Long,ParentCode> emittedParentCode,
+            Map<Long,ParentCode> emittedGapCode,
             JSONObject sourceFunction,ExportStats stats) throws Exception {
         JSONArray chain=new JSONArray();
+        ArrayList<ExecutableRange> executableRanges=new ArrayList<>();
+        executableRanges.add(new ExecutableRange(childBegin,childEnd));
+        boolean missingParentCode=false;
         Set<Long> visited=new HashSet<>();
         long next=firstUnwindRva;
         String status="UNWIND_NOT_READ";
@@ -376,6 +402,13 @@ public final class GameAssemblyCodeBridge {
                             zip,fd,fileSize,sections,
                             details.chainedBeginRva,details.chainedEndRva,
                             details.chainedUnwindRva,emittedParentCode,item,stats);
+                    if("EXPORTED_VERIFIED_BOUNDED_FRAGMENT".equals(
+                            item.optString("parent_code_status"))) {
+                        executableRanges.add(new ExecutableRange(
+                                details.chainedBeginRva,details.chainedEndRva));
+                    } else {
+                        missingParentCode=true;
+                    }
                 }
                 chain.put(item);
                 if(!details.chained) {
@@ -401,6 +434,16 @@ public final class GameAssemblyCodeBridge {
         }
         sourceFunction.put("unwind_records",chain);
         sourceFunction.put("unwind_status",status);
+        if("COMPLETE_UNWIND_CHAIN_READ".equals(status) &&
+                !missingParentCode && executableRanges.size()>1) {
+            appendOriginalExecutableInterRegionGaps(
+                    zip,fd,fileSize,sections,executableRanges,
+                    emittedGapCode,sourceFunction,stats);
+        } else {
+            sourceFunction.put("inter_region_gaps",new JSONArray());
+            sourceFunction.put("inter_region_gap_status",
+                    "NO_PARENT_OR_INCOMPLETE_UNWIND_SOURCE");
+        }
         sourceFunction.put("callable_il2cpp_method_proven",false);
     }
 
@@ -473,6 +516,74 @@ public final class GameAssemblyCodeBridge {
                     "ORIGINAL_PARENT_EXECUTABLE_RVA_UNAVAILABLE");
             stats.parentCodeReferencesNotExtracted++;
         }
+    }
+
+    private static void appendOriginalExecutableInterRegionGaps(
+            ZipOutputStream zip,ParcelFileDescriptor fd,long fileSize,
+            List<Section> sections,List<ExecutableRange> sourceRanges,
+            Map<Long,ParentCode> exported,JSONObject function,
+            ExportStats stats) throws Exception {
+        sourceRanges.sort((a,b)->Long.compare(a.begin,b.begin));
+        JSONArray gapRecords=new JSONArray();
+        for(int i=1;i<sourceRanges.size();i++) {
+            ExecutableRange prev=sourceRanges.get(i-1);
+            ExecutableRange next=sourceRanges.get(i);
+            if(next.begin<prev.end) {
+                function.put("inter_region_gaps",gapRecords);
+                function.put("inter_region_gap_status",
+                        "ORIGINAL_SOURCE_REGIONS_OVERLAP_CANNOT_INFER_GAP");
+                stats.executableGapCodeMissing++;
+                return;
+            }
+            if(next.begin==prev.end)continue;
+            long begin=prev.end,end=next.begin;
+            JSONObject rec=new JSONObject();
+            rec.put("begin_rva",begin);
+            rec.put("end_rva",end);
+            try {
+                int bytes=Win64InterRegionGapPolicy.checkedLength(begin,end);
+                String member=Win64InterRegionGapPolicy.memberName(begin,end);
+                ParentCode cached=exported.get(begin);
+                if(cached!=null) {
+                    if(cached.length!=bytes) {
+                        rec.put("gap_source_status","ORIGINAL_SOURCE_GAP_CONFLICTING_LENGTH");
+                        stats.executableGapCodeMissing++;
+                    } else {
+                        rec.put("zip_member",cached.member);
+                        rec.put("length_bytes",bytes);
+                        rec.put("sha256",cached.sha256);
+                        rec.put("gap_source_status","EXPORTED_RAW_PE_EXECUTABLE_INTERVAL");
+                    }
+                } else if(!Win64InterRegionGapPolicy.canInclude(
+                        exported.size(),stats.executableGapCodeBytes,bytes)) {
+                    rec.put("gap_source_status","ORIGINAL_SOURCE_GAP_EXTRACTION_BUDGET");
+                    stats.executableGapCodeMissing++;
+                } else {
+                    long fileAt=rvaToFile(sections,begin,bytes,fileSize,true);
+                    byte[] original=readExact(fd,fileSize,fileAt,bytes);
+                    String hash=sha256(original);
+                    zip.putNextEntry(new ZipEntry(member));
+                    zip.write(original);
+                    zip.closeEntry();
+                    exported.put(begin,new ParentCode(bytes,member,hash));
+                    stats.uniqueExecutableGapCodeRegions++;
+                    stats.executableGapCodeBytes+=bytes;
+                    rec.put("zip_member",member);
+                    rec.put("length_bytes",bytes);
+                    rec.put("sha256",hash);
+                    rec.put("gap_source_status","EXPORTED_RAW_PE_EXECUTABLE_INTERVAL");
+                }
+            }catch(IllegalArgumentException | IOException unsupported) {
+                rec.put("gap_source_status","ORIGINAL_PE_GAP_NOT_FILE_BACKED_OR_TOO_LARGE");
+                stats.executableGapCodeMissing++;
+            }
+            gapRecords.put(rec);
+        }
+        function.put("inter_region_gaps",gapRecords);
+        function.put("inter_region_gap_status",
+                "RECORDED_BOUNDED_ORIGINAL_PE_SOURCE_INTERVALS");
+        function.put("source_gap_bytes_are_not_proven_to_belong_to_one_method",
+                true);
     }
 
     private static String sha256(byte[] input)throws Exception {
