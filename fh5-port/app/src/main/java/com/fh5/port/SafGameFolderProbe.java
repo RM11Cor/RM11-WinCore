@@ -158,6 +158,86 @@ public final class SafGameFolderProbe {
         return names;
     }
 
+
+    public static final class LocalExportIndex {
+        public final Map<String,PeExportIndex.Result> indexes;
+        public final Map<String,String> dllStatuses;
+        public final Set<String> localNames;
+        private LocalExportIndex(Map<String,PeExportIndex.Result> results,
+                 Map<String,String> statuses,Set<String> localNames) {
+            indexes=java.util.Collections.unmodifiableMap(results);
+            dllStatuses=java.util.Collections.unmodifiableMap(statuses);
+            this.localNames=java.util.Collections.unmodifiableSet(localNames);
+        }
+    }
+
+    /**
+     * P3.8. Read-only PE export indexes for imported local DLL siblings.
+     * Reading the export table does not imply the DLL is loadable/runnable.
+     */
+    public static LocalExportIndex inspectLocalDllExports(
+            ContentResolver resolver,Uri treeUri,Uri selectedExe,
+            Set<String> importedNames) throws IOException {
+        Found found=find(resolver,treeUri);
+        if(selectedExe==null||!found.documentUri.equals(selectedExe))
+            throw new IOException("saf_export_exe_not_inside_selected_tree");
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,found.parentDocumentId);
+        String[] cols={Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,Document.COLUMN_MIME_TYPE};
+        Map<String,String> fileIds=new LinkedHashMap<>();
+        Set<String> localNames=new HashSet<>();
+        try(Cursor c=resolver.query(children,cols,null,null,null)){
+            if(c==null)throw new IOException("saf_export_children_query_unavailable");
+            int id=c.getColumnIndex(Document.COLUMN_DOCUMENT_ID);
+            int name=c.getColumnIndex(Document.COLUMN_DISPLAY_NAME);
+            int mime=c.getColumnIndex(Document.COLUMN_MIME_TYPE);
+            if(id<0||name<0||mime<0)
+                throw new IOException("saf_export_query_columns_missing");
+            int rows=0;
+            while(c.moveToNext()){
+                if(++rows>MAX_DIRECTORY_ROWS)
+                    throw new IOException("saf_export_directory_budget");
+                if(Document.MIME_TYPE_DIR.equals(c.getString(mime)))continue;
+                String n=c.getString(name),documentId=c.getString(id);
+                if(n==null||documentId==null)continue;
+                String lower=n.toLowerCase(Locale.ROOT);
+                if(!lower.matches("[a-z0-9_.-]{1,128}\\.dll") ||
+                  importedNames==null||!importedNames.contains(lower))continue;
+                localNames.add(lower);
+                if(!fileIds.containsKey(lower)&&fileIds.size()<MAX_LOCAL_DLL_HEADER_CHECKS)
+                    fileIds.put(lower,documentId);
+            }
+        } catch(SecurityException ex){
+            throw new IOException("saf_export_permission_denied",ex);
+        } catch(IllegalArgumentException ex){
+            throw new IOException("saf_export_query_unsupported",ex);
+        }
+        Map<String,PeExportIndex.Result> indexes=new LinkedHashMap<>();
+        Map<String,String> statuses=new LinkedHashMap<>();
+        for(Map.Entry<String,String> item:fileIds.entrySet()){
+            String state="EXPORT_INDEX_READ_FAILED";
+            try {
+                Uri dll=DocumentsContract.buildDocumentUriUsingTree(
+                    treeUri,item.getValue());
+                try(ParcelFileDescriptor pfd=resolver.openFileDescriptor(dll,"r")){
+                    if(pfd==null)throw new IOException("saf_export_dll_open_failed");
+                    try(FileInputStream in=new FileInputStream(pfd.getFileDescriptor())){
+                        PeExportIndex.Result exports=PeExportIndex.inspect(in.getChannel());
+                        indexes.put(item.getKey(),exports);
+                        state=exports.status;
+                    }
+                }
+            } catch(IOException|SecurityException|IllegalArgumentException ex){
+                String err=ex.getMessage();
+                if(err!=null && err.matches("pe_exports_[a-z0-9_]{2,90}"))
+                    state=err;
+            }
+            statuses.put(item.getKey(),state);
+        }
+        return new LocalExportIndex(indexes,statuses,localNames);
+    }
+
     public static final int MAX_LOCAL_DLL_HEADER_CHECKS=16;
     public static final class LocalDll {
         public final String dll,headerStatus;
