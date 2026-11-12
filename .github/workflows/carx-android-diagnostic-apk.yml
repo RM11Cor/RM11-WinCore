@@ -1,49 +1,118 @@
-name: CarX Street PC Port Lab - real Android APK source inspector
+name: CarX Street PC PortLab v0.2.0 - Unity IL2CPP header audit APK
 on:
   push:
     branches: [carx-street-pc-port-v1]
+    paths:
+      - '.github/workflows/carx-android-diagnostic-apk.yml'
+      - 'app/**'
+      - 'tests/UnityFormatProbeTest.java'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   android-apk:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Check out isolated CarX Street port branch
-        uses: actions/checkout@v4
-      - name: JDK 17 for Android Gradle plugin 8.7
+      - uses: actions/checkout@v4
+      - name: Java 17 for Android and adversarial Unity header tests
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Use runner Android SDK and install platform 35 directly
+      - name: Test real bounded UnityFS and IL2CPP source header parser
         shell: bash
         run: |
           set -euo pipefail
-          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p build/header-unit-tests
+          javac -d build/header-unit-tests \
+            app/src/main/java/com/rm11cor/carxstreet/portlab/UnityFormatProbe.java \
+            tests/UnityFormatProbeTest.java
+          java -cp build/header-unit-tests UnityFormatProbeTest
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >>"$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >>"$GITHUB_ENV"
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print | sort -V | tail -n 1)
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
-      - name: Gradle
+      - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build installable diagnostic APK, not a game runtime
+      - name: Build read-only Unity header Inspector APK (NOT playable)
+        shell: bash
         run: |
           set -euo pipefail
           gradle :app:assembleDebug --no-daemon --stacktrace
           test -s app/build/outputs/apk/debug/app-debug.apk
           sha256sum app/build/outputs/apk/debug/app-debug.apk
-      - name: Upload Android APK for phone-side PC files scan
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            dist/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk
+          sha256sum dist/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk >dist/SHA256.txt
+          cat >dist/RELEASE_SCOPE.txt <<'EOF'
+          CarX Street PC PortLab v0.2.0: offline Unity/IL2CPP header inspector ONLY
+          Does not include any native ARM64 game runtime or gameplay.
+          Inspects original global-metadata.dat header, at most 12 Windows64
+          UnityFS bundle headers, boot.config keys and limited catalog JSON prefix.
+          Original PC asset files are never transferred, extracted or executed.
+          EAC/Steam bypass: not provided.
+          EOF
+          cat >dist/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.2.0 — Unity/IL2CPP Header Inspector
+
+          **Inspector only. NOT a playable Android game port.**
+
+          Select your existing extracted CarX Street PC folder. The offline APK
+          checks real IL2CPP global-metadata.dat version/magic, sampled UnityFS
+          header version/revision, Windows64 bundle counts, boot.config key
+          names and Addressables catalog prefix.
+
+          Save CarX_Street_PC_Port_Report_v0.2.json and send the JSON report.
+          Windows x86-64 game code is NOT executable on Android ARM64 here.
+          Platform-specific Windows shaders/assets may require lawful rebuilding.
+
+          If an in-place update is rejected due to different debug signing keys,
+          export your JSON report, uninstall the previous inspector, then install this.
+          EOF
+      - name: Upload signed Android debug inspector artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: CarXStreet-PC-PortLab-v0.1.0-File-Inspector-Only-ARM64-Gate-Open
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CarXStreet-PC-PortLab-v0.2.0-Unity-IL2CPP-Header-Audit-NOT-Playable
+          path: |
+            dist/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk
+            dist/SHA256.txt
+            dist/RELEASE_SCOPE.txt
           retention-days: 30
+      - name: Publish verified v0.2.0 APK in GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.2.0-unity-header-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              dist/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk \
+              dist/SHA256.txt dist/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              dist/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk \
+              dist/SHA256.txt dist/RELEASE_SCOPE.txt \
+              --target "$GITHUB_SHA" \
+              --title 'CarX Street PC PortLab v0.2.0 — Unity Header Inspector (Not Playable)' \
+              --notes-file dist/release-notes.md \
+              --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
