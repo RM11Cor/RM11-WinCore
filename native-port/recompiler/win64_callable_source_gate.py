@@ -104,6 +104,8 @@ def evaluate_win64_source_function(
         blockers.append("original_unresolved_branch_dependencies")
     if cfg.rip_relative_memory_instructions:
         blockers.append("original_PE_RIP_relative_data_or_relocation_dependency")
+    if cfg.unmatched_epilogue_stack_restore:
+        blockers.append("unbalanced_stack_epilogue_without_source_prologue")
     if cfg.trap_instructions or cfg.unexpected_fallthrough_exits:
         blockers.append("source_trap_or_incomplete_fallthrough")
     if not cfg.return_instructions:
