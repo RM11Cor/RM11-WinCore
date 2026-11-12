@@ -39,9 +39,9 @@ Java_com_fh5_port_X86Disasm_nativeInspect(JNIEnv *env,jclass unused,
     memset(bytes,0,sizeof(bytes));
     if(status!=0)return jstr(env,
         "{\"status\":\"capstone_disassembly_failed\",\"original_game_executed\":false}");
-    char out[3500];
+    char out[10000];
     int nprinted=snprintf(out,sizeof(out),
-       "{\"stage\":\"P2_6_CAPSTONE_ENTRY_CONTROL_FLOW_READ_ONLY\","
+       "{\"stage\":\"P2_7_CAPSTONE_DEEP_TARGET_READ_ONLY\","
        "\"engine\":\"Capstone\",\"engine_version\":\"5.0.9\","
        "\"status\":\"decoded\",\"linear_decode_only\":true,"
        "\"control_flow_validated\":false,\"first_transfer_boundary_identified\":%s,"
@@ -97,11 +97,17 @@ Java_com_fh5_port_X86Disasm_nativeInspect(JNIEnv *env,jclass unused,
        ",\"possible_branch_instructions\":%zu,"
        "\"possible_call_instructions\":%zu,\"possible_return_instructions\":%zu,"
        "\"instructions_with_memory_operands\":%zu,"
-       "\"linear_tail_after_first_transfer_unverified\":true,"
+       "\"push_instruction_count\":%zu,\"pop_instruction_count\":%zu,"
+       "\"xmm_register_instruction_count\":%zu,"
+       "\"ymm_register_instruction_count\":%zu,"
+       "\"zmm_register_instruction_count\":%zu,"
+       "\"linear_tail_after_first_transfer_unverified\":%s,"
        "\"original_game_executed\":false,\"executed\":false,"
        "\"raw_bytes_exported\":false,\"operands_exported\":false,"
        "\"game_playable\":false}",
-       cf.branch_count,cf.call_count,cf.return_count,cf.memory_operand_count);
+       cf.branch_count,cf.call_count,cf.return_count,cf.memory_operand_count,
+       cf.push_count,cf.pop_count,cf.vector_xmm_count,cf.vector_ymm_count,
+       cf.vector_zmm_count,cf.transfer_found?"true":"false");
     if(nprinted<0 || (size_t)nprinted>=sizeof(out)-used)
         return jstr(env,"{\"status\":\"report_overflow\",\"original_game_executed\":false}");
     return jstr(env,out);
