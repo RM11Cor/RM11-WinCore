@@ -10,6 +10,7 @@ on:
       - 'tests/PeImportProbeTest.java'
       - 'tests/BundleCatalogReconcilerTest.java'
       - 'tests/Win64UnwindRecordFormatTest.java'
+      - 'tests/Win64UnwindDiverseSamplerTest.java'
       - 'carx-signing/**'
   workflow_dispatch:
 permissions:
@@ -43,6 +44,9 @@ jobs:
           javac -d build/header-unit-tests app/src/main/java/com/rm11cor/carxstreet/portlab/Win64UnwindRecordFormat.java tests/Win64UnwindRecordFormatTest.java
           java -cp build/header-unit-tests Win64UnwindRecordFormatTest
           echo CARX_V110_WIN64_PDATA_XDATA_UNWIND_ORIGINAL_SOURCE_BOUNDARY_TESTS_PASS
+          javac -d build/header-unit-tests app/src/main/java/com/rm11cor/carxstreet/portlab/Win64UnwindDiverseSampler.java tests/Win64UnwindDiverseSamplerTest.java
+          java -cp build/header-unit-tests Win64UnwindDiverseSamplerTest
+          echo CARX_V120_DIVERSE_OWNER_ORIGINAL_PDATA_UNWIND_SELECTION_TESTS_PASS
           echo CARX_V090_SAF_BUNDLE_RECONCILIATION_DIAGNOSTIC_CLASSIFICATION_TESTS_COMPLETED
       - name: Restore only the original dedicated immutable CarX signing identity
         shell: bash
