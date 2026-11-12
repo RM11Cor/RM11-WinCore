@@ -290,7 +290,7 @@ std::string perform() {
 
         stage="vkMapMemory";
         void* mapped=nullptr;
-        code=vkMapMemory(h.device,h.bufferMemory,0,BYTES,0,&mapped);
+        code=vkMapMemory(h.device,h.bufferMemory,0,VK_WHOLE_SIZE,0,&mapped);
         if(code!=VK_SUCCESS)break;
         bool invalidationOk=true;
         if((bufFlags&VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)==0) {
