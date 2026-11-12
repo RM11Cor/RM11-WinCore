@@ -98,6 +98,45 @@ static void test_deep_target_stack_and_simd(void) {
     puts("PASS >16 instruction deeper target, XMM categorization, stack pushes and call target");
 }
 
+
+static void test_conditional_branch_two_successors(void) {
+    /* TEST EAX,EAX; JNE to offset 14; fall-through JMP to offset 21. */
+    const uint8_t code[]={
+      0x85,0xc0, 0x0f,0x85,0x06,0,0,0,
+      0xe9,0x08,0,0,0,0x90,0xc3,
+      0x90,0x90,0x90,0x90,0x90,0x90,0xc3
+    };
+    fh5_cf_result r;
+    assert(fh5_cf_analyze(code,sizeof(code),0x4000,0x10000,&r)==0);
+    assert(r.first_transfer_is_conditional);
+    assert(strcmp(r.transfer_kind,"conditional_jump")==0);
+    assert(r.first_block_count==2);
+    assert(r.first_block_bytes==8);
+    assert(r.transfer_offset==2);
+    assert(r.direct_target_valid && r.direct_target_rva==0x400e);
+    assert(r.fallthrough_rva_valid && r.fallthrough_rva==0x4008);
+    assert(r.fallthrough_next_insn_present);
+    assert(strcmp(r.fallthrough_next_mnemonic,"jmp")==0);
+    assert(r.fallthrough_next_is_jump);
+    assert(r.fallthrough_jump_direct_target_valid);
+    assert(r.fallthrough_jump_direct_target_rva==0x4015);
+    puts("PASS JCC taken and not-taken JMP direct RVA successors");
+}
+static void test_jcc_outside_image_without_invented_target(void) {
+    const uint8_t code[]={0x75,0x7e,0xff,0xe0};
+    fh5_cf_result r;
+    assert(fh5_cf_analyze(code,sizeof(code),0x1000,0x1020,&r)==0);
+    assert(r.first_transfer_is_conditional);
+    assert(!r.direct_target_valid);
+    assert(strcmp(r.target_kind,"direct_outside_image")==0);
+    assert(r.fallthrough_rva==0x1002);
+    assert(r.fallthrough_next_insn_present);
+    assert(r.fallthrough_next_is_jump);
+    assert(strcmp(r.fallthrough_jump_target_kind,"register_indirect")==0);
+    assert(!r.fallthrough_jump_direct_target_valid);
+    puts("PASS JCC out-of-module and indirect fall-through jump rejected");
+}
+
 int main(void) {
     test_first_call();
     test_indirect_call();
@@ -105,6 +144,8 @@ int main(void) {
     test_outside_module();
     test_bounds();
     test_deep_target_stack_and_simd();
+    test_conditional_branch_two_successors();
+    test_jcc_outside_image_without_invented_target();
     puts("ALL P2.6 control-flow tests PASS");
     return 0;
 }
