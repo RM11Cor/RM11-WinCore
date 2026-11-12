@@ -170,7 +170,7 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
                 signedtype="int8_t" if source_width==1 else "int16_t"
             lines.append("uint64_t rhs=%s;"%val(ops[1]))
             if signedtype:
-                cast="uint64_t(int64_t(%s(rhs)))"%(signedtype,"rhs")
+                cast="uint64_t(int64_t(%s(rhs)))"%signedtype
                 lines.append(assign(ops[0],cast))
             else:
                 lines.append(assign(ops[0],"rhs"))
