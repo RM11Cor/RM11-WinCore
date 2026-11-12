@@ -55,6 +55,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private Button importButton;
     private volatile boolean importBusy=false;
     private volatile boolean linkBusy=false;
+    private volatile boolean forwarderBusy=false;
+    private Button forwarderButton;
+    private JSONObject forwarderResult=new JSONObject();
     private Button linkButton;
     private JSONObject localLinkResult=new JSONObject();
     private JSONObject peImportsResult=new JSONObject();
@@ -89,7 +92,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.8 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.9 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -114,12 +117,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(importButton);
         linkButton=button("مطابقة 95 استيراداً مع Export ملفات DLL الست (بدون تشغيل)", () -> testLocalExports());
         root.addView(linkButton);
+        forwarderButton=button("تحديد وجهة تحويلات AMD AGS من ملفات DLL", () -> testForwarderTargets());
+        root.addView(forwarderButton);
         entryButton = button("تحليل Forza EXE مباشرة (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.8", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.9", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -129,7 +134,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.8: نفحص مطابقة استيرادات Forza مع Export الحقيقي للمكتبات الست المحلية. لا ننفذ تعليمات أو نربط IAT.");
+        updateStatus("P3.9: نفحص وجهات التحويلين في AMD AGS، بدون تحميل ملفات DLL أو تنفيذ فورزا.");
     }
 
     private int dp(int v) {
@@ -181,7 +186,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_8_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_9_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -192,7 +197,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.8. ارفع FH5_PORT_P3_8_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.9. ارفع FH5_PORT_P3_9_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -660,6 +665,132 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
      * P3.8: dry-run Windows PE import/export matching for the six local DLLs.
      * No load, memory mapping, IAT writes, API calls or x64 game execution.
      */
+
+    /**
+     * P3.9: Recompute read-only original PE import/export matches, then
+     * decode only the export-forwarder strings actually imported by the game.
+     * No target DLL load, IAT writes, memory mapping or original game execution.
+     */
+    private void testForwarderTargets() {
+        if(forwarderBusy || linkBusy || entryBusy || exeBusy || archiveBusy || importBusy) {
+            updateStatus("يوجد فحص آخر جارٍ. أكمله قبل اختبار تحويلات AMD AGS.");
+            return;
+        }
+        String exe=prefs.getString(GAME_DIRECT_EXE,"");
+        String tree=prefs.getString(GAME_FOLDER,"");
+        if(exe.isEmpty() || tree.isEmpty()) {
+            updateStatus("اختَر مجلد Forza Horizon 5 المستخرج أولاً.");
+            return;
+        }
+        forwarderBusy=true;
+        forwarderButton.setEnabled(false);
+        updateStatus("P3.9: نفحص وجهات Export Forwarders الأصلية من DLL، بدون تشغيلها...");
+        Thread worker=new Thread(() -> {
+            JSONObject report=new JSONObject();
+            String visible;
+            try(ParcelFileDescriptor pfd=getContentResolver()
+                    .openFileDescriptor(Uri.parse(exe),"r")) {
+                if(pfd==null)throw new java.io.IOException("pe_forwarder_exe_open_failed");
+                try(FileInputStream in=new FileInputStream(pfd.getFileDescriptor())) {
+                    PeImportProbe.Result imports=PeImportProbe.inspectDirect(in.getChannel());
+                    java.util.Set<String> dllNames=new java.util.HashSet<>(imports.dllNames);
+                    SafGameFolderProbe.LocalExportIndex local=
+                        SafGameFolderProbe.inspectLocalDllExports(
+                            getContentResolver(),Uri.parse(tree),Uri.parse(exe),dllNames);
+                    PeLocalImportLinkProbe.Report compared=PeLocalImportLinkProbe.inspect(
+                        in.getChannel(),local.indexes,local.localNames);
+                    java.util.Map<String,java.util.List<String>> wanted=
+                        new java.util.LinkedHashMap<>();
+                    for(PeLocalImportLinkProbe.Entry entry:compared.dlls) {
+                        if(!entry.forwardedImportNames.isEmpty())
+                            wanted.put(entry.dll,entry.forwardedImportNames);
+                    }
+                    SafGameFolderProbe.LocalForwarders forward=
+                        SafGameFolderProbe.inspectForwarderTargets(
+                            getContentResolver(),Uri.parse(tree),Uri.parse(exe),wanted);
+                    JSONArray perDll=new JSONArray();
+                    int expected=0,decoded=0,undecoded=0,available=0;
+                    for(java.util.Map.Entry<String,java.util.List<String>> item:wanted.entrySet()) {
+                        String dll=item.getKey();
+                        expected+=item.getValue().size();
+                        JSONObject src=new JSONObject();
+                        src.put("source_dll",dll);
+                        src.put("source_forwarded_imports",item.getValue().size());
+                        src.put("source_forwarder_scan_status",forward.fileStatuses.get(dll));
+                        JSONArray details=new JSONArray();
+                        PeForwarderProbe.Result values=forward.reports.get(dll);
+                        if(values!=null)for(PeForwarderProbe.Target target:values.targets) {
+                            JSONObject row=new JSONObject();
+                            row.put("original_import",target.requestedImport);
+                            row.put("status",target.status);
+                            row.put("forwarder_string",target.rawForwarder);
+                            row.put("target_module_name",target.targetModule);
+                            row.put("target_symbol_name_or_ordinal",target.targetFunction);
+                            row.put("target_symbol_is_ordinal",target.ordinal);
+                            String module=target.targetModule.toLowerCase(java.util.Locale.ROOT);
+                            String candidate=module.endsWith(".dll")?module:module+".dll";
+                            boolean hasTarget="FORWARDER_TARGET_DECODED".equals(target.status)
+                                && forward.immediateDllNames.contains(candidate);
+                            row.put("candidate_target_dll",candidate);
+                            row.put("candidate_target_file_beside_exe",hasTarget);
+                            row.put("target_export_or_abi_verified",false);
+                            details.put(row);
+                            if("FORWARDER_TARGET_DECODED".equals(target.status)){
+                                decoded++;if(hasTarget)available++;
+                            } else undecoded++;
+                        }
+                        if(values==null)undecoded+=item.getValue().size();
+                        src.put("targets",details);
+                        perDll.put(src);
+                    }
+                    report.put("stage","P3_9_ORIGINAL_PE_FORWARDER_TARGET_STATIC_PROBE");
+                    report.put("status",expected==decoded && undecoded==0?
+                        "FORWARDER_METADATA_DECODED":"FORWARDER_METADATA_PARTIAL");
+                    report.put("prior_local_import_count",compared.importsCompared);
+                    report.put("prior_direct_local_export_matches",compared.directMatches);
+                    report.put("prior_forwarded_local_export_matches",compared.forwardedMatches);
+                    report.put("forwarded_imports_requested",expected);
+                    report.put("forwarder_targets_decoded",decoded);
+                    report.put("forwarder_targets_unresolved",undecoded);
+                    report.put("forwarder_target_filename_present_beside_exe",available);
+                    report.put("forwarded_sources",perDll);
+                    report.put("target_dll_code_loaded",false);
+                    report.put("forwarder_chain_resolved",false);
+                    report.put("windows_api_set_contracts_resolved",false);
+                    report.put("original_game_executed",false);
+                    report.put("dll_abi_verified",false);
+                    report.put("import_address_table_modified",false);
+                    report.put("game_bytes_or_private_paths_exported",false);
+                    visible="P3.9: تحويلات Export المطلوبة: "+expected
+                        +"\nوجهات تم فك اسمها: "+decoded
+                        +"\nوجهات لم تُقرأ بالكامل: "+undecoded
+                        +"\nملفات هدف تحمل الاسم المطلوب بجانب EXE: "+available
+                        +"\nهذه فحوصات للبيانات فقط، وليست تحميل DLL أو تشغيل فورزا.";
+                }
+            } catch(Exception ex) {
+                String code=ex.getMessage();
+                if(code==null||!code.matches("(pe|saf)_[a-z0-9_]{2,100}"))
+                    code="pe_forwarder_scan_unavailable";
+                try {
+                    report.put("stage","P3_9_ORIGINAL_PE_FORWARDER_TARGET_STATIC_PROBE");
+                    report.put("status","FORWARDER_METADATA_SCAN_FAILED");
+                    report.put("error_code",code);
+                    report.put("original_game_executed",false);
+                } catch(Exception ignored) {}
+                visible="تعذر تحليل تحويلات DLL: "+code;
+            }
+            final JSONObject finalReport=report;
+            final String message=visible;
+            runOnUiThread(() -> {
+                forwarderBusy=false;
+                forwarderButton.setEnabled(true);
+                forwarderResult=finalReport;
+                updateStatus(message);
+            });
+        },"fh5-pe-forwarder-target-static");
+        worker.start();
+    }
+
     private void testLocalExports() {
         if(linkBusy || entryBusy || exeBusy || archiveBusy || importBusy) {
             updateStatus("يوجد فحص جارٍ. أكمله أولاً قبل مقارنة تصديرات DLL.");
@@ -1216,7 +1347,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.8")
+                .put("stage", "P3.9")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
@@ -1234,6 +1365,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 .put("real_forza_exe_header_result",realExeMetadata)
                 .put("real_forza_pe_imports",peImportsResult)
                 .put("real_forza_local_import_export_match",localLinkResult)
+                .put("real_forza_forwarder_target_result",forwarderResult)
                 .put("real_forza_entrypoint_result",actualEntryProbe)
                 .put("x64_translation_component_present", true)
                 .put("x64_original_game_executed", false)
