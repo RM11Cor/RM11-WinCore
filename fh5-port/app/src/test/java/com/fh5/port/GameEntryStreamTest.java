@@ -163,4 +163,28 @@ public final class GameEntryStreamTest {
         try {probeAt(data,0x1008);fail("must reject data target");}
         catch(IOException ex){assertTrue(ex.getMessage().contains("pe_entry_section_not_executable"));}
     }
+    @Test public void targetCanStream512BytesReadOnly() throws Exception {
+        byte[] data=zip(syntheticPe(4096,true),false);
+        Path file=tmp.newFile("deep"+System.nanoTime()+".zip").toPath();
+        Files.write(file,data);
+        try(SeekableByteChannel channel=Files.newByteChannel(file,StandardOpenOption.READ)) {
+            GameExeHeaderProbe.EntryResult result=
+                GameExeHeaderProbe.inspectAtRva(channel,0x1004,512);
+            assertEquals(512,result.sampleLength);
+            assertEquals(4100,result.entryFileOffset);
+            assertTrue(result.bytesInflated>=4100+512);
+            assertEquals(0x48,result.entrySample[0]&255);
+        }
+    }
+    @Test public void rejectUnboundedTargetSampleBeforeFileRead() throws Exception {
+        byte[] data=zip(syntheticPe(4096,true),true);
+        Path file=tmp.newFile("bounds"+System.nanoTime()+".zip").toPath();
+        Files.write(file,data);
+        try(SeekableByteChannel channel=Files.newByteChannel(file,StandardOpenOption.READ)) {
+            try {GameExeHeaderProbe.inspectAtRva(channel,0x1000,513);fail("budget");}
+            catch(IOException ex) {
+                assertEquals("pe_target_sample_budget_invalid",ex.getMessage());
+            }
+        }
+    }
 }
