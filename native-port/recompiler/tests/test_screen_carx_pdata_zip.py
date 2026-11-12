@@ -22,7 +22,7 @@ class SampleArchiveValidation(unittest.TestCase):
 
     def make_zip(self,wrong_hash=False,duplicate=False):
         correct=bytes.fromhex("48 89 c8 48 01 d0 c3")
-        unsupported=bytes.fromhex("89 c8 c3 90")
+        unsupported=bytes.fromhex("f3 0f 58 c1 c3")
         functions=[]
         path=self.root/"samples.zip"
         with zipfile.ZipFile(path,"w") as z:
