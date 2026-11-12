@@ -378,7 +378,7 @@ public final class GameExeHeaderProbe {
         } finally {inflater.end();}
         return new Range(found,processed,readCompressed);
     }
-    private static long[] mapEntrypointToFile(byte[] prefix,long entry,long fileLength)
+    private static long[] mapEntrypointToFile(byte[] prefix,long entry,long fileLength,int sampleLength)
             throws IOException {
         long pe=u32(prefix,0x3c);
         if(pe>prefix.length-24)throw new IOException("pe_section_table_unavailable");
@@ -401,7 +401,7 @@ public final class GameExeHeaderProbe {
                     throw new IOException("pe_entry_section_not_executable");
                 if(delta>=rawSize || rawOffset>fileLength ||
                    delta>fileLength-rawOffset ||
-                   SAMPLE_LENGTH>fileLength-rawOffset-delta)
+                   sampleLength>fileLength-rawOffset-delta)
                     throw new IOException("pe_entry_not_backed_by_file");
                 return new long[]{i,rawOffset+delta};
             }
@@ -409,7 +409,7 @@ public final class GameExeHeaderProbe {
         throw new IOException("pe_entry_rva_unmapped");
     }
     public static EntryResult inspectEntry(SeekableByteChannel ch) throws IOException {
-        return inspectAtRva(ch,-1);
+        return inspectAtRva(ch,-1,SAMPLE_LENGTH);
     }
 
     /**
@@ -420,6 +420,13 @@ public final class GameExeHeaderProbe {
      */
     public static EntryResult inspectAtRva(SeekableByteChannel ch,long targetRva)
             throws IOException {
+        return inspectAtRva(ch,targetRva,SAMPLE_LENGTH);
+    }
+    /** P2.7: target may inspect up to 512 bytes, original entry remains 128. */
+    public static EntryResult inspectAtRva(SeekableByteChannel ch,long targetRva,
+                                            int requestedBytes) throws IOException {
+        if(requestedBytes<1 || requestedBytes>512)
+            throw new IOException("pe_target_sample_budget_invalid");
         if(targetRva < -1)throw new IOException("pe_target_rva_invalid");
         Directory d=directory(ch);
         Member m=findExe(ch,d);
@@ -437,8 +444,8 @@ public final class GameExeHeaderProbe {
         long lookupRva=(targetRva==-1)?pe.entryPointRva:targetRva;
         if(lookupRva<=0 || lookupRva>=pe.imageSize)
             throw new IOException("pe_target_rva_outside_image");
-        long[] mapped=mapEntrypointToFile(pePrefix,lookupRva,m.unpacked);
-        Range range=readUncompressedRange(ch,dataAt,m,mapped[1],SAMPLE_LENGTH);
+        long[] mapped=mapEntrypointToFile(pePrefix,lookupRva,m.unpacked,requestedBytes);
+        Range range=readUncompressedRange(ch,dataAt,m,mapped[1],requestedBytes);
         return new EntryResult(pe,(int)mapped[0],mapped[1],
                 range.outProcessed,range.compressedRead,range.bytes);
     }
