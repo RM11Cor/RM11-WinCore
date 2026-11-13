@@ -81,7 +81,7 @@ jobs:
           unzip -l "$apk" | tee /tmp/list-apk.txt
           grep -Fq 'lib/arm64-v8a/libcarx_native.so' /tmp/list-apk.txt
           ! grep -Eiq 'GameAssembly.dll|UnityPlayer.dll|wine|fexcore|qemu' /tmp/list-apk.txt
-          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='800'"
+          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='900'"
           unzip -p "$apk" lib/arm64-v8a/libcarx_native.so > /tmp/libcarx_native.so
           readelf -h /tmp/libcarx_native.so | grep -q 'AArch64'
           sha256sum "$apk" > CarX_v9_debug.apk.sha256
