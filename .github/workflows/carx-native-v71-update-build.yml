@@ -105,7 +105,7 @@ jobs:
           readelf -Ws /tmp/carx-v5-libcarx-native.so | grep -q 'vkCreateAndroidSurfaceKHR'
           readelf -Ws /tmp/carx-v5-libcarx-native.so | grep -q 'Java_com_carx_nativefoundation_MainActivity_nativeInspectBundleFd'
           "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | tee /tmp/carx-v7-badging.txt
-          grep -q "name='com.carx.nativefoundation.test.updates' versionCode='700'" /tmp/carx-v7-badging.txt
+          grep -q "name='com.carx.nativefoundation.test.updates' versionCode='701'" /tmp/carx-v7-badging.txt
           sha256sum "$apk" > app-debug.apk.sha256
       - name: Upload DEBUG-signed build for PRIVATE re-signing (DO NOT DISTRIBUTE)
         uses: actions/upload-artifact@v4
