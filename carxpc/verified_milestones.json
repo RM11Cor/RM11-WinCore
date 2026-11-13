@@ -1,0 +1,157 @@
+{
+  "schema": "carx.pc-runtime.milestone-reuse.v1",
+  "date": "2026-11-13",
+  "intent": "Reuse recorded successful tests. Retest only integration boundaries, component upgrades, failures, and real gameplay.",
+  "observed_device": {
+    "model": "NX809J",
+    "android_sdk": 36,
+    "abi": "arm64-v8a",
+    "gpu": "Adreno 840"
+  },
+  "milestones": [
+    {
+      "id": "R1_GAME_REQUIREMENTS",
+      "status": "PASS_ON_DEVICE",
+      "project": "CarX PC Runtime",
+      "evidence": "CarX_PC_R1_Diagnostics.json",
+      "facts": {
+        "files": 906,
+        "folders": 22,
+        "bytes": 22710138866,
+        "exe_architecture": "x86-64",
+        "engine": "Unity IL2CPP",
+        "steam_dependency_signs": true
+      },
+      "skip": "Do not rescan same unchanged game folder except version/content changes"
+    },
+    {
+      "id": "R2A_NATIVE_VULKAN",
+      "status": "PASS_ON_DEVICE",
+      "project": "CarX PC Runtime",
+      "evidence": "CarX_PC_R2A_Diagnostics.json",
+      "facts": {
+        "gpu": "Adreno 840",
+        "vulkan": "1.4.295",
+        "instance": "VK_SUCCESS",
+        "logical_device": "VK_SUCCESS",
+        "command_buffer": "VK_SUCCESS"
+      },
+      "skip": "Do not repeat isolated enumeration unless driver changes or integration diagnosis requires it"
+    },
+    {
+      "id": "R2B_ANDROID_VULKAN_PRESENT",
+      "status": "PASS_ON_DEVICE",
+      "project": "CarX PC Runtime",
+      "evidence": "CarX_PC_R2B_Diagnostics.json",
+      "facts": {
+        "surface": true,
+        "swapchain": "VK_SUCCESS",
+        "submitted_clear": true,
+        "queue_present_result": 0,
+        "extent": "1098x527",
+        "frame_presented": true
+      },
+      "not_proven": [
+        "triangle",
+        "frames-per-second",
+        "D3D11",
+        "CarX game boot"
+      ],
+      "skip": "Do not rebuild standalone color tests; preserve one lightweight regression when renderer code changes"
+    },
+    {
+      "id": "KERNIX_FEX_NATIVE_LINUX_BUILD",
+      "status": "PASS_BUILD_ONLY",
+      "project": "KERNIX",
+      "evidence_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41494666536",
+      "facts": {
+        "arm64_linux_elf": true
+      },
+      "not_proven": [
+        "Android app runtime",
+        "Windows game launch"
+      ]
+    },
+    {
+      "id": "KERNIX_FEX_ANDROID_BUILD",
+      "status": "HISTORICAL_BUILD_PASS_NOT_RUNTIME_PROOF",
+      "project": "KERNIX",
+      "evidence": "Previous FEXCore Android NDK build artifact; execution in current Android APK not verified",
+      "not_proven": [
+        "x64 guest execution from current CarX APK",
+        "Wine boot"
+      ]
+    },
+    {
+      "id": "KERNIX_VULKAN_X11",
+      "status": "HISTORICAL_DIAGNOSTIC_SUCCESS_NOT_REUSED_AS_GAME_PROOF",
+      "project": "RM11/KERNIX",
+      "evidence_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/40872969726",
+      "not_proven": [
+        "CarX R3 D3D11 draw",
+        "GPU acceleration in the new APK"
+      ],
+      "note": "Historical X11 and software WSI paths are not interchangeable with Android Vulkan surface."
+    },
+    {
+      "id": "KERNIX_GUEST_COMPLEX_EXEC",
+      "status": "HISTORICAL_FAILURE",
+      "project": "KERNIX",
+      "evidence_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42097578226",
+      "note": "MOV+CALL source guest execution segfault; avoid marking full FEX guest process ready"
+    },
+    {
+      "id": "BANNERLATOR_CARX_GAMEPLAY",
+      "status": "USER_REPORTED_PLAYABLE_REFERENCE",
+      "project": "Existing emulator",
+      "evidence": "Previous personal device gameplay tests",
+      "facts": {
+        "track_peak_fps_approx": "170-200",
+        "city_fps_approx": "30-50"
+      },
+      "not_proven": [
+        "FPS of standalone CarX PC Runtime"
+      ]
+    },
+    {
+      "id": "FEX_IN_CARX_APK",
+      "status": "NOT_PACKAGED_OR_TESTED",
+      "source": "CarX_PC_R2B_Diagnostics.json"
+    },
+    {
+      "id": "WINE_IN_CARX_APK",
+      "status": "NOT_PACKAGED_OR_TESTED",
+      "source": "CarX_PC_R2B_Diagnostics.json"
+    },
+    {
+      "id": "DXVK_IN_CARX_APK",
+      "status": "NOT_PACKAGED_OR_TESTED",
+      "source": "CarX_PC_R2B_Diagnostics.json"
+    },
+    {
+      "id": "CARX_GAME_BOOT",
+      "status": "NOT_PROVEN",
+      "source": "CarX_PC_R2B_Diagnostics.json"
+    }
+  ],
+  "chosen_path": {
+    "focus": "R3_INTEGRATE_REAL_X64_EXECUTION",
+    "approach": "Reuse known-working FEX/Wine/DXVK/Turnip versions as reference; do not recreate solved native Vulkan diagnostic.",
+    "candidate_versions_from_user_setup": [
+      "Proton-11.0-7.1-arm64ec-14",
+      "FEXCore 2610",
+      "DXVK 3.1.1 GPLAsync ARM64EC",
+      "Turnip v27 A8xx",
+      "Vulkan X11"
+    ],
+    "priority_tests": [
+      "Invoke real x86-64 guest function from standalone Android APK and verify result",
+      "Launch minimal legitimate Windows PE and capture module/import diagnostics",
+      "Load UnityPlayer/GameAssembly using existing game files with legitimate Steam flow",
+      "Prove D3D11 draw via DXVK GPU path",
+      "Record CarX real game frame and compare 1%-low FPS under city workload"
+    ],
+    "required_gate": "No success claim for a milestone without evidence from the actual target runtime and the correct ABI.",
+    "signing_caveat": "R2B debug APK has inconsistent per-run signing; release signing secret validation failed. Do not claim in-place Android upgrade until same certificate is demonstrated for two successive packages."
+  }
+}
