@@ -4,7 +4,6 @@ on:
     branches:
       - carx-native-apk-v16-3
   workflow_dispatch:
-
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -17,10 +16,9 @@ jobs:
         run: |
           mkdir -p /tmp/carx_android
           cat carx/v16-3.part1.b64 carx/v16-3.part2.b64 carx/v16-3.part3.b64 carx/v16-3.part4.b64 | base64 -d > /tmp/carx-source.tar.xz
-          echo "Source archive checksum:"
           sha256sum /tmp/carx-source.tar.xz
           tar -xJf /tmp/carx-source.tar.xz -C /tmp/carx_android
-          ls -l /tmp/carx_android/app/src/main/cpp/meshdoctor.cpp
+          test -s /tmp/carx_android/app/src/main/cpp/meshdoctor.cpp
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -30,11 +28,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
+      - name: Setup Android SDK command-line tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
       - name: Install Android SDK packages
-        shell: bash
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - name: Compile signed ARM64 diagnostic APK
         working-directory: /tmp/carx_android
         run: gradle --no-daemon --stacktrace :app:assembleDebug
