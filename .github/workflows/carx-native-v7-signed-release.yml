@@ -17,6 +17,26 @@ jobs:
     steps:
       - name: Checkout signed APK(s)
         uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official Android build tools for certificate verification
+        run: |
+          set -euo pipefail
+          SDK_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p "$SDK_HOME/cmdline-tools"
+          SDKMANAGER="$(find "$SDK_HOME/cmdline-tools" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | head -1 || true)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            mkdir -p /tmp/carx-cmdtools
+            curl -fLsS --retry 3 'https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip' -o /tmp/carx-commandlinetools.zip
+            unzip -q /tmp/carx-commandlinetools.zip -d /tmp/carx-cmdtools
+            mv /tmp/carx-cmdtools/cmdline-tools "$SDK_HOME/cmdline-tools/carx-tools"
+            SDKMANAGER="$SDK_HOME/cmdline-tools/carx-tools/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --sdk_root="$SDK_HOME" 'build-tools;35.0.0'
       - name: Verify official signing certificate, package ID and update codes
         run: |
           set -euo pipefail
