@@ -1,8 +1,8 @@
-name: CarX Native v4 ARM64 CPU and Vulkan GPU TEST (NOT GAME)
+name: CarX Native v5 Android Vulkan Surface Swapchain TEST (NOT GAME)
 on:
   push:
     branches:
-      - carx-native-v4-proof
+      - carx-native-v5-proof
   workflow_dispatch:
 
 permissions:
@@ -17,10 +17,12 @@ jobs:
       - name: Extract native app source, without any full game binaries
         run: |
           set -euo pipefail
-          tar -tzf CarX_v4_CI_source_without_reference.tar.gz | head -40
-          tar -xzf CarX_v4_CI_source_without_reference.tar.gz
+          tar -tzf CarX_v5_CI_source_without_reference.tar.gz | head -40
+          tar -xzf CarX_v5_CI_source_without_reference.tar.gz
           test -e app/src/main/cpp/carx_prefix_a.S
           test -e app/src/main/cpp/vulkan_gpu_probe.c
+          test -e app/src/main/cpp/vulkan_surface_frame.c
+          grep -q 'nativeRenderVulkanSurface' app/src/main/java/com/carx/nativefoundation/MainActivity.java
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -81,30 +83,35 @@ jobs:
           unzip -l "$apk" | tee /tmp/carx-apk-list.txt
           grep -q 'lib/arm64-v8a/libcarx_native.so' /tmp/carx-apk-list.txt
           ! grep -Eiq 'UnityPlayer.dll|GameAssembly.dll|wine|fexcore|qemu' /tmp/carx-apk-list.txt
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native.so > /tmp/carx-v5-libcarx-native.so
+          file /tmp/carx-v5-libcarx-native.so
+          readelf -h /tmp/carx-v5-libcarx-native.so | grep -q 'AArch64'
+          readelf -Ws /tmp/carx-v5-libcarx-native.so | grep -q 'vkQueuePresentKHR'
+          readelf -Ws /tmp/carx-v5-libcarx-native.so | grep -q 'vkCreateAndroidSurfaceKHR'
           sha256sum "$apk" > app-debug.apk.sha256
       - name: Upload TEST APK (not CarX game)
         uses: actions/upload-artifact@v4
         with:
-          name: CarX-NativeFoundation-v4-TEST-NOT-GAME
+          name: CarX-NativeFoundation-v5-SURFACE-TEST-NOT-GAME
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app-debug.apk.sha256
             REFERENCE_SHA256
           if-no-files-found: error
       - name: Publish APK as GitHub prerelease TEST NOT GAME
-        if: github.ref == 'refs/heads/carx-native-v4-proof'
+        if: github.ref == 'refs/heads/carx-native-v5-proof'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="carx-native-foundation-v4-test-20261113"
-          cp app/build/outputs/apk/debug/app-debug.apk CarX_NativeFoundation_v4_TEST_NOT_GAME.apk
-          sha256sum CarX_NativeFoundation_v4_TEST_NOT_GAME.apk > CarX_NativeFoundation_v4_TEST_NOT_GAME.apk.sha256
+          TAG="carx-native-foundation-v5-surface-test-20261113"
+          cp app/build/outputs/apk/debug/app-debug.apk CarX_NativeFoundation_v5_SURFACE_TEST_NOT_GAME.apk
+          sha256sum CarX_NativeFoundation_v5_SURFACE_TEST_NOT_GAME.apk > CarX_NativeFoundation_v5_SURFACE_TEST_NOT_GAME.apk.sha256
           cat > RELEASE_NOTES.md <<'NOTES'
-          # CarX Native Foundation v4 — Android ARM64 Technical Test
+          # CarX Native Foundation v5 — Android Vulkan Surface Technical Test
           This is a native Android APK **test harness**, NOT a working CarX Street game port.
-          It tests native translated AArch64 function prefixes, JNI integration, Vulkan GPU device initialization, and read-only Unity file inspection.
-          It does NOT include or run CarX gameplay, IL2CPP runtime, Android Unity Player or the full PC game's code.
+          It tests native translated AArch64 function prefixes, JNI integration, real Vulkan Android Surface + swapchain + single solid-color QueuePresent, and read-only Unity file inspection.
+          It does NOT include or run CarX gameplay, IL2CPP runtime, Android Unity Player or the full PC game's code. One teal test frame is NOT game rendering.
           Requires Android arm64-v8a; debug-signed for testing only.
           NOTES
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -112,10 +119,10 @@ jobs:
             exit 1
           fi
           gh release create "$TAG" \
-            CarX_NativeFoundation_v4_TEST_NOT_GAME.apk \
-            CarX_NativeFoundation_v4_TEST_NOT_GAME.apk.sha256 \
+            CarX_NativeFoundation_v5_SURFACE_TEST_NOT_GAME.apk \
+            CarX_NativeFoundation_v5_SURFACE_TEST_NOT_GAME.apk.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "CarX Native Foundation v4 — ARM64 APK TEST (NOT GAME)" \
+            --title "CarX Native Foundation v5 — Vulkan Surface APK TEST (NOT GAME)" \
             --notes-file RELEASE_NOTES.md \
             --prerelease
