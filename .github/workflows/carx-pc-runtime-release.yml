@@ -1,0 +1,132 @@
+name: CarX PC Runtime - signed APK Releases
+on:
+  push:
+    tags: ['carx-pc-v*-*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Example: carx-pc-v0003-r2b'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Identify release and versionCode
+        shell: bash
+        env:
+          MANUAL_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          TAG="${MANUAL_TAG:-$GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^carx-pc-v([0-9]{4,})-([A-Za-z0-9.-]+)$ ]]; then
+            echo "Tag must resemble carx-pc-v0003-r2b" >&2; exit 1
+          fi
+          NUMBER="${BASH_REMATCH[1]}"
+          CODE=$((10#$NUMBER))
+          if (( CODE <= 2 || CODE >= 2100000000 )); then
+            echo "Invalid versionCode: must be greater than 2" >&2; exit 1
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${BASH_REMATCH[2]}" >> "$GITHUB_ENV"
+      - name: Restore R1 and R2-A project and verify archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carxpc
+          cat carxpc/r1.part{1,2,3}.b64 | base64 -d > /tmp/r1.tar.xz
+          echo 'cf820c3abc3bc61c9ff2b0209f65e2a39d58b52ebddb25f49f1ea92883eb6190  /tmp/r1.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r1.tar.xz -C /tmp/carxpc
+          cat carxpc/r2a.part{1,2,3}.b64 | base64 -d > /tmp/r2a.tar.xz
+          echo 'db55e37f87a073f332576161922b2f49f8eb103ef41faaf1e27e32cdad5fb5e8  /tmp/r2a.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r2a.tar.xz -C /tmp/carxpc
+      - name: Recover protected release signing key
+        env:
+          KEY_B64: ${{ secrets.CARX_SIGNING_KEYSTORE_B64 }}
+          PASS: ${{ secrets.CARX_SIGNING_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEY_B64" || -z "$PASS" ]]; then
+            echo "Repository Actions secrets CARX_SIGNING_KEYSTORE_B64 and CARX_SIGNING_PASSWORD must be set once." >&2; exit 1
+          fi
+          umask 077
+          printf '%s' "$KEY_B64" | base64 -d > /tmp/carx-release.p12
+          test -s /tmp/carx-release.p12
+          echo "CARX_SIGNING_STORE=/tmp/carx-release.p12" >> "$GITHUB_ENV"
+      - name: Configure same package name, stable signing, increasing version
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          p = Path('/tmp/carxpc/app/build.gradle')
+          s = p.read_text()
+          assert "applicationId 'com.r4.carxpc'" in s, "Wrong package ID"
+          s,a = re.subn(r'\bversionCode\s+\d+', 'versionCode '+os.environ['VERSION_CODE'],s)
+          s,b = re.subn(r"\bversionName\s+'[^']+'", "versionName '"+os.environ['VERSION_NAME']+"'",s)
+          sign = """signingConfigs { release {
+              storeFile file(System.getenv('CARX_SIGNING_STORE'))
+              storePassword System.getenv('CARX_SIGNING_PASSWORD')
+              keyAlias 'carxpc'
+              keyPassword System.getenv('CARX_SIGNING_PASSWORD')
+          }}
+          buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }"""
+          s,c = re.subn(r'buildTypes\s*\{\s*release\s*\{\s*minifyEnabled\s+false\s*\}\s*\}',sign,s)
+          assert (a,b,c)==(1,1,1), "Unexpected Gradle layout"
+          p.write_text(s)
+          PY
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.13'}
+      - uses: android-actions/setup-android@v4
+        with: {packages: ''}
+      - name: Install SDK NDK CMake
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Build signed ARM64 APK
+        working-directory: /tmp/carxpc
+        env:
+          CARX_SIGNING_PASSWORD: ${{ secrets.CARX_SIGNING_PASSWORD }}
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify signature and optional pinned certificate
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.CARX_EXPECTED_CERT_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/carxpc/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libcarx_runtime_probe.so'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          CERT=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test -n "$CERT"
+          if [[ -n "$EXPECTED_CERT_SHA256" && "${CERT,,}" != "${EXPECTED_CERT_SHA256,,}" ]]; then
+            echo 'Signer certificate unexpectedly changed; blocking release' >&2; exit 1
+          fi
+          mkdir -p /tmp/carx-publish
+          OUT="/tmp/carx-publish/CarX_PC_Runtime_$TAG_ARM64.apk"
+          cp "$APK" "$OUT"
+          (cd /tmp/carx-publish && sha256sum "$(basename "$OUT")" > "$(basename "$OUT").sha256")
+          echo "RELEASE_APK=$OUT" >> "$GITHUB_ENV"
+      - name: Publish official GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo 'Release already exists, refusing to replace a published APK' >&2; exit 1
+          fi
+          gh release create "$TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --title "CarX PC Runtime $VERSION_NAME (diagnostic)" \
+            --notes "Signed ARM64 diagnostic APK (not yet a playable game). Package: com.r4.carxpc. versionCode: $VERSION_CODE." \
+            --target "$GITHUB_SHA" --prerelease
+      - name: Delete temporary signing key
+        if: always()
+        run: rm -f /tmp/carx-release.p12
