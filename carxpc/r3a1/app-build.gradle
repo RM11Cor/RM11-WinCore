@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.r4.carxpc'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.r4.carxpc'
+        minSdk 26
+        targetSdk 35
+        ndk { abiFilters 'arm64-v8a' }
+        versionCode 5
+        versionName '0.5-fex-hashguard'
+    }
+    ndkVersion '27.2.12479018'
+    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    // R3-A failed device hash verification because imported prebuilt .so
+    // may be stripped by Android Gradle Plugin before APK packaging.
+    // Preserve exact source-pinned upstream bytes, including ELF symbols,
+    // and verify both APK members against independent SHA-256 manifests in CI.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols += ['**/libFEXCore.so', '**/libkernix_g0_original_elf_fex_auxv_heap.so']
+        }
+    }
+    buildTypes { release { minifyEnabled false } }
+}
