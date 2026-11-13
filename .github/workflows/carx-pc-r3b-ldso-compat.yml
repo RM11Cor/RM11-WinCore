@@ -1,0 +1,86 @@
+name: CarX R3-B audit previous KERNIX original ld-linux runner ABI compatibility
+on:
+  push:
+    branches: [carx-pc-runtime-r3b]
+    paths: ['.github/workflows/carx-pc-r3b-ldso-compat.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned R3-A known-working FEX source components
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42091689429
+          github-token: ${{ github.token }}
+          path: /tmp/fex-r3a
+      - name: Download actual original ld-linux bounded-RW Android Bionic runner from KERNIX v2
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G0-Original-LDSO-RW-State-After-Heap-Android-Bionic-BUILDONLY
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42166430049
+          github-token: ${{ github.token }}
+          path: /tmp/ldso-r3b
+      - name: Compare pinned original FEX native ELF ABI and runner provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json,hashlib, pathlib
+          p=pathlib.Path('/tmp/fex-r3a')
+          q=pathlib.Path('/tmp/ldso-r3b')
+          f=json.loads((p/'compile-result.json').read_text())
+          a=json.loads((q/'accepted-source.json').read_text())
+          c=json.loads((q/'android-candidate/candidate.json').read_text())
+          assert f['source_sha']==a['original_upstream_fex_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert f['configure_rc']==f['build_rc']==0 and f['bionic_library_built']
+          assert a['real_linux_arm64_fex_execution_run']==42163385087
+          assert c['android_bionic_crosslinked'] and not c['android_device_executed']
+          old=(p/'libFEXCore-android-build-only.so').read_bytes()
+          new=(q/'android-candidate/libFEXCore.so').read_bytes()
+          runner=(q/'android-candidate/libkernix_g0_original_ldso_rw_state_after_heap.so').read_bytes()
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          assert sha(old)==f['elf']['sha256']
+          assert sha(new)==a['android_fexcore_sha256']
+          assert sha(runner)==c['native_candidate_sha256']
+          compatible=old==new
+          report={'schema':'r4.carx.runtime.r3b.fex-ldso-compat-audit.v1',
+           'r3a_fex_sha256':sha(old),'historical_v2_fex_sha256':sha(new),
+           'historical_v2_runner_sha256':sha(runner),
+           'pinned_fex_source_sha':f['source_sha'],
+           'original_bionic_runner_built':True,
+           'historical_source_linux_run':a['real_linux_arm64_fex_execution_run'],
+           'exact_fex_binary_byte_match':compatible,
+           'decision':('reuse_verified_binary' if compatible else 'requires_independent_runner_relink_and_abi_test'),
+           'original_ldso_bounded_executed_on_old_android':True,
+           'guest_glibc_fully_initialized':False,
+           'wine_game_proven':False}
+          pathlib.Path('dist/r3b-compat-report.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('CARX_R3B_ABI_COMPATIBILITY_AUDIT='+report['decision'])
+          print('CARX_R3B_R3A_FEX_SHA='+sha(old))
+          print('CARX_R3B_OLDER_V2_FEX_SHA='+sha(new))
+          print('CARX_R3B_ORIGINAL_LDSO_RUNNER_SHA='+sha(runner))
+          PY
+      - name: Verify Android ELF dependencies and target ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          READELF=$(command -v readelf)
+          for f in /tmp/fex-r3a/libFEXCore-android-build-only.so /tmp/ldso-r3b/android-candidate/libFEXCore.so /tmp/ldso-r3b/android-candidate/libkernix_g0_original_ldso_rw_state_after_heap.so; do
+             "$READELF" -h "$f" | grep -q 'Machine: *AArch64'
+             "$READELF" -d "$f" | grep -E 'Shared library|NEEDED' | head -25
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3B-Bounded-LDSO-Reuse-Compatibility-Report
+          path: dist/r3b-compat-report.json
+          retention-days: 21
