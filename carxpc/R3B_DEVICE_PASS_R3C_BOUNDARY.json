@@ -1,0 +1,40 @@
+{
+  "schema": "r4.carx.runtime.device-evidence-ledger.v1",
+  "source_type": "user-supplied CarX_PC_R3B_Diagnostics.json; verified locally; not independently hardware attested",
+  "accepted": {
+    "milestone": "R3B_BOUNDED_ORIGINAL_GNU_LDSO_CALLEE_RW",
+    "report_schema": "r4.carx-pc-runtime.r3b.report",
+    "original_native_libraries_sha_verified": true,
+    "source_original_guest_elfs_verified": true,
+    "child_finished_within_40s": true,
+    "exit_code": 0,
+    "success": true,
+    "guest_marker_sequence_verified": true,
+    "bounded_original_ldso_callee_rw_state_verified": true,
+    "ordered_markers": [
+      "KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START",
+      "KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED",
+      "KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE",
+      "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED",
+      "KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE",
+      "KERNIX_G0_SAME_FEX_LOADER_RW_STATE_ANDROID_CANDIDATE_NOT_FULL_LDSO"
+    ]
+  },
+  "not_proven": {
+    "full_dynamic_ldso_started": true,
+    "full_dynamic_interpreter_complete": true,
+    "guest_glibc_started": true,
+    "wine_executed": true,
+    "dxvk_executed": true,
+    "carx_game_executed": true
+  },
+  "note": "Do not mistake components.fexcore.runtime_test_passed=false (separate R3A test not run) for R3B ldso_progress failure. Report has null fex_integration and successful ldso_progress.",
+  "next_target": "R3C_REAL_GNU_DYNAMIC_INTERPRETER_PROCESS_START",
+  "no_repeat": [
+    "R1 file inventory",
+    "R2A Vulkan enumeration",
+    "R2B Android WSI clear/present",
+    "R3A genuine x86 guest ELF/AUXV/heap",
+    "R3B bounded original GNU ldso callee RW"
+  ]
+}
