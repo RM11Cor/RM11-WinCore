@@ -24,6 +24,14 @@ jobs:
           echo "4f7b9db4364a613e7108fd4ec823a97979e8ff15489e7f00e090bfb3b03194bf  /tmp/carx-v165.tar.xz" | sha256sum -c -
           tar -xJf /tmp/carx-v165.tar.xz -C /tmp/carx_android
           test -s /tmp/carx_android/app/src/main/cpp/unityfs_blocks.cpp
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/carx_android/settings.gradle')
+          s=p.read_text()
+          s=s.replace('mavenCentral()', "maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }; mavenCentral()")
+          p.write_text(s)
+          print('Configured Google Maven Central mirror')
+          PY
       - name: Run UnityFS 44 synthetic selftests plus corruption cases under sanitizers
         working-directory: /tmp/carx_android/app/src/main/cpp
         run: |
