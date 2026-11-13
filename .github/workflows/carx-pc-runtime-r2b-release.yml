@@ -45,6 +45,20 @@ jobs:
         with: {packages: ''}
       - name: Install pinned Android SDK NDK CMake
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Compile debug R2-B APK for JNI verification (not a stable update)
+        working-directory: /tmp/carxpc
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify debug APK contains ARM64 Vulkan library
+        run: |
+          APK=/tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t "$APK" | tail -1
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libcarx_runtime_probe.so'
+      - name: Upload experimental debug APK if stable signing unavailable
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-PC-R2B-WSI-UNSTABLE-DEBUG-APK
+          path: /tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
       - name: Restore repository existing secure stable signing key
         shell: bash
         env:
@@ -53,13 +67,36 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$KEY_B64" || -z "$KEY_PASS" ]]; then
-            echo "Existing secure signing secrets unavailable; no release can be published" >&2; exit 1
+            echo "CARX_STABLE_KEY_READY=false" >> "$GITHUB_ENV"
+            echo "::warning::Stable signing secret not configured. Debug verification only."
+            exit 0
           fi
           umask 077
-          printf %s "$KEY_B64" | base64 --decode > "$RUNNER_TEMP/carx-pc-stable.p12"
-          keytool -list -keystore "$RUNNER_TEMP/carx-pc-stable.p12" -storetype PKCS12 -storepass "$KEY_PASS" -alias rm11-autocore >/dev/null
-          echo "CARX_STABLE_KEYSTORE=$RUNNER_TEMP/carx-pc-stable.p12" >> "$GITHUB_ENV"
+          if python3 - <<'PY'
+          import os, re, base64, sys
+          s=os.environ['KEY_B64'].strip()
+          if s.startswith('data:') and ',' in s: s=s.split(',',1)[1]
+          s=s.strip(chr(34)).strip(chr(39))
+          s=re.sub(r'\\s+', '', s).replace('\\\\n','').replace('\\\\r','')
+          try: data=base64.b64decode(s,validate=True)
+          except Exception: sys.exit(1)
+          if len(data)<200: sys.exit(2)
+          open(os.environ['RUNNER_TEMP']+'/carx-pc-stable.p12','wb').write(data)
+          PY
+          then
+            if keytool -list -keystore "$RUNNER_TEMP/carx-pc-stable.p12" -storetype PKCS12 -storepass "$KEY_PASS" -alias rm11-autocore >/dev/null 2>&1; then
+              echo "CARX_STABLE_KEYSTORE=$RUNNER_TEMP/carx-pc-stable.p12" >> "$GITHUB_ENV"
+              echo "CARX_STABLE_KEY_READY=true" >> "$GITHUB_ENV"
+            else
+              echo "CARX_STABLE_KEY_READY=false" >> "$GITHUB_ENV"
+              echo "::warning::Signing secret is not a valid PKCS12 key with expected alias."
+            fi
+          else
+            echo "CARX_STABLE_KEY_READY=false" >> "$GITHUB_ENV"
+            echo "::warning::Signing secret Base64 cannot be decoded. No public Release will be published."
+          fi
       - name: Configure stable release signing without embedding secrets in source
+        if: env.CARX_STABLE_KEY_READY == 'true'
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -80,11 +117,13 @@ jobs:
           p.write_text(s.replace(old,replacement))
           PY
       - name: Compile stable signed ARM64 APK
+        if: env.CARX_STABLE_KEY_READY == 'true'
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
         working-directory: /tmp/carxpc
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify version ABI signature and certificate
+        if: env.CARX_STABLE_KEY_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -101,6 +140,7 @@ jobs:
           cp "$APK" /tmp/carx-published/CarX_PC_Runtime_R2B_ARM64.apk
           (cd /tmp/carx-published && sha256sum CarX_PC_Runtime_R2B_ARM64.apk > CarX_PC_Runtime_R2B_ARM64.apk.sha256)
       - name: Publish stable-signed test APK on GitHub Releases
+        if: env.CARX_STABLE_KEY_READY == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
