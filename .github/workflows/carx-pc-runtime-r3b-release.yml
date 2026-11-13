@@ -179,7 +179,7 @@ jobs:
           assert b'KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED' in runner
           lib=Path('/tmp/carxpc/app/src/main/jniLibs/arm64-v8a')/name
           lib.write_bytes(runner)
-          (Path('/tmp/carxpc/app/src/main/assets')/'rw-state-runner.sha256').write_text(digest+'\\n')
+          (Path('/tmp/carxpc/app/src/main/assets')/'rw-state-runner.sha256').write_text(digest+'\n')
           print('CARX_R3B_ORIGINAL_LDSO_RUNNER_EXACT_SHA256_AND_FEX_ABI_MATCH',digest)
           PY
           readelf -h /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_rw_state_after_heap.so | grep -E 'Machine:.*AArch64'
