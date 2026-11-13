@@ -1,27 +1,28 @@
-name: CarX v8 CAB Virtual Stream ARM64 TEST (NOT GAME)
+name: CarX v9 SerializedFile v22 Object Index ARM64 TEST (NOT GAME)
 on:
   push:
-    branches: [carx-native-v8-cab-prefix]
+    branches: [carx-native-v9-object-index]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-v8-test:
+  build-v9-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout isolated v8 branch
+      - name: Checkout isolated v9 branch
         uses: actions/checkout@v4
       - name: Extract source without original game binaries
         run: |
           set -euo pipefail
-          tar -tzf CarX_v8_CI_source_without_reference.tar.gz | head -40
-          tar -xzf CarX_v8_CI_source_without_reference.tar.gz
+          tar -tzf CarX_v9_CI_source_without_reference.tar.gz | head -40
+          tar -xzf CarX_v9_CI_source_without_reference.tar.gz
           test -f app/src/main/cpp/unityfs_directory.c
-          grep -q 'cab_virtual_prefix' app/src/main/cpp/unityfs_directory.c
+          grep -q 'PASS_V22_METADATA_OBJECT_INDEX' app/src/main/cpp/unityfs_directory.c
+          test -f tests/test_serialized_v22.py
           grep -q "applicationId 'com.carx.nativefoundation.test.updates'" app/build.gradle
-          grep -q "versionCode 800" app/build.gradle
+          grep -q "versionCode 900" app/build.gradle
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -83,12 +84,12 @@ jobs:
           "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='800'"
           unzip -p "$apk" lib/arm64-v8a/libcarx_native.so > /tmp/libcarx_native.so
           readelf -h /tmp/libcarx_native.so | grep -q 'AArch64'
-          sha256sum "$apk" > CarX_v8_debug.apk.sha256
-      - name: Upload build only (NOT distributable until v7 key re-signs)
+          sha256sum "$apk" > CarX_v9_debug.apk.sha256
+      - name: Upload build only (NOT distributable until v8 key re-signs)
         uses: actions/upload-artifact@v4
         with:
-          name: CarX-v8-CAB-DEBUG-REQUIRES-SAME-KEY-RESIGN
+          name: CarX-v9-OBJECT-INDEX-DEBUG-REQUIRES-SAME-KEY-RESIGN
           path: |
             app/build/outputs/apk/debug/app-debug.apk
-            CarX_v8_debug.apk.sha256
+            CarX_v9_debug.apk.sha256
           if-no-files-found: error
