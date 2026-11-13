@@ -1,0 +1,75 @@
+name: CarX Native v10 Verify Stable Update Signature and Publish TEST APK
+on:
+  push:
+    branches: [carx-native-v10-object-data]
+    paths:
+      - 'dist/CarX_NativeFoundation_v10_OBJECT_PAYLOAD_TEST_NOT_GAME.apk'
+      - '.github/workflows/carx-native-v91-signed-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout APK signed privately with v7 stable key
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official Android build-tools
+        run: |
+          set -euo pipefail
+          SDK_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p "$SDK_HOME/cmdline-tools"
+          SDKMANAGER="$(find "$SDK_HOME/cmdline-tools" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | head -1 || true)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            mkdir -p /tmp/carx-cmdtools
+            curl -fLsS --retry 3 'https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip' -o /tmp/carx-cmdtools.zip
+            unzip -q /tmp/carx-cmdtools.zip -d /tmp/carx-cmdtools
+            mv /tmp/carx-cmdtools/cmdline-tools "$SDK_HOME/cmdline-tools/carx-tools"
+            SDKMANAGER="$SDK_HOME/cmdline-tools/carx-tools/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --sdk_root="$SDK_HOME" 'build-tools;35.0.0'
+      - name: Verify app signature, version and native ABI before publishing
+        run: |
+          set -euo pipefail
+          apk=dist/CarX_NativeFoundation_v10_OBJECT_PAYLOAD_TEST_NOT_GAME.apk
+          test -s "$apk"
+          signer="${ANDROID_HOME}/build-tools/35.0.0/apksigner"
+          aapt="${ANDROID_HOME}/build-tools/35.0.0/aapt"
+          "$signer" verify --min-sdk-version 26 --verbose --print-certs "$apk" | tee /tmp/carx-v10-signature.txt
+          grep -Fqi '9a339d62994d35fb6762605b3134ea6d9493c82fe6ebb05b8cc6393347dfdf6f' /tmp/carx-v10-signature.txt
+          "$aapt" dump badging "$apk" | tee /tmp/carx-v10-package.txt
+          grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='1000'" /tmp/carx-v10-package.txt
+          unzip -t "$apk" | tail -2
+          unzip -l "$apk" | grep -Fq 'lib/arm64-v8a/libcarx_native.so'
+          ! unzip -l "$apk" | grep -Eiq 'GameAssembly.dll|UnityPlayer.dll|wine|fexcore|qemu'
+          sha256sum "$apk" > "$apk.sha256"
+      - name: Publish v10 APK on GitHub Releases only after verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='carx-native-foundation-v10-object-payload-test-20261113'
+          apk='dist/CarX_NativeFoundation_v10_OBJECT_PAYLOAD_TEST_NOT_GAME.apk'
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Tag already exists; refusing to replace release assets"
+            exit 1
+          fi
+          cat > RELEASE_NOTES.md <<'NOTES'
+          # CarX Native Foundation v10 — Bounded Real Serialized Object Data Test
+          This APK is a native Android ARM64 **test harness**, NOT a playable CarX Street game port.
+          Uses the SAME Android package ID and signing certificate as v7 and v7.1, with versionCode 1000 so it can update v9.1 in place.
+          Extends UnityFS CAB reads to bounded SerializedFile v22 metadata and actual object payload samples (up to 10 objects, 64 bytes each). Uses a strict bounded virtual LZ4 block reader. Reports ClassID histogram and possible Mesh or Material names only when structurally valid. May include small asset-byte prefixes from user-owned local files in exported reports. No full game files shipped.
+          Retains partial original x86-to-ARM64 AOT differential checks and native Vulkan test frame. Not a Unity Android Player; no original CarX gameplay is running.
+          NOTES
+          gh release create "$tag" "$apk" "$apk.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title 'CarX Native Foundation v10 — Real Object Payload ARM64 TEST (NOT GAME)' \
+            --notes-file RELEASE_NOTES.md --prerelease
