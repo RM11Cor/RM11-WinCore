@@ -1,14 +1,14 @@
-name: CarX v10 Native Unity v22 Object Payload ARM64 TEST (NOT GAME)
+name: CarX v11 TypeTree Mesh Fields ARM64 TEST (NOT GAME)
 on:
   push:
-    branches: [carx-native-v10-object-data]
+    branches: [carx-native-v11-mesh-typetree]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-v91-test:
+  build-v11-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout isolated v10 branch
@@ -16,15 +16,16 @@ jobs:
       - name: Extract source without original game binaries
         run: |
           set -euo pipefail
-          tar -tzf CarX_v10_CI_source_without_reference.tar.gz | head -40
-          tar -xzf CarX_v10_CI_source_without_reference.tar.gz
+          tar -tzf CarX_v11_CI_source_without_reference.tar.gz | head -40
+          tar -xzf CarX_v11_CI_source_without_reference.tar.gz
           test -f app/src/main/cpp/unityfs_directory.c
-          grep -q 'actual_object_data_samples' app/src/main/cpp/unityfs_directory.c
-          grep -q 'test_object_payload_crosses_lz4_blocks' tests/test_serialized_v22.py
+          grep -q 'type_tree_inspection' app/src/main/cpp/unityfs_directory.c
+          grep -q 'PASS_BOUNDED_TYPETREE_NODES' app/src/main/cpp/unityfs_directory.c
+          grep -q 'test_native_typetree_local_nodes' tests/test_serialized_v22.py
           test -f tests/test_serialized_v22.py
-          grep -q 'CarX_NativeFoundation_v10_Report.json' app/src/main/java/com/carx/nativefoundation/MainActivity.java
+          grep -q 'CarX_NativeFoundation_v11_Report.json' app/src/main/java/com/carx/nativefoundation/MainActivity.java
           grep -q "applicationId 'com.carx.nativefoundation.test.updates'" app/build.gradle
-          grep -q "versionCode 1000" app/build.gradle
+          grep -q "versionCode 1100" app/build.gradle
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -83,15 +84,15 @@ jobs:
           unzip -l "$apk" | tee /tmp/list-apk.txt
           grep -Fq 'lib/arm64-v8a/libcarx_native.so' /tmp/list-apk.txt
           ! grep -Eiq 'GameAssembly.dll|UnityPlayer.dll|wine|fexcore|qemu' /tmp/list-apk.txt
-          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='1000'"
+          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$apk" | grep -Fq "name='com.carx.nativefoundation.test.updates' versionCode='1100'"
           unzip -p "$apk" lib/arm64-v8a/libcarx_native.so > /tmp/libcarx_native.so
           readelf -h /tmp/libcarx_native.so | grep -q 'AArch64'
-          sha256sum "$apk" > CarX_v10_debug.apk.sha256
+          sha256sum "$apk" > CarX_v11_debug.apk.sha256
       - name: Upload build only (NOT distributable until v8 key re-signs)
         uses: actions/upload-artifact@v4
         with:
-          name: CarX-v10-OBJECT-PAYLOAD-DEBUG-REQUIRES-SAME-KEY-RESIGN
+          name: CarX-v11-TYPETREE-DEBUG-REQUIRES-SAME-KEY-RESIGN
           path: |
             app/build/outputs/apk/debug/app-debug.apk
-            CarX_v10_debug.apk.sha256
+            CarX_v11_debug.apk.sha256
           if-no-files-found: error
