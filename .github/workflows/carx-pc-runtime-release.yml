@@ -110,7 +110,7 @@ jobs:
             echo 'Signer certificate unexpectedly changed; blocking release' >&2; exit 1
           fi
           mkdir -p /tmp/carx-publish
-          OUT="/tmp/carx-publish/CarX_PC_Runtime_$TAG_ARM64.apk"
+          OUT="/tmp/carx-publish/CarX_PC_Runtime_${TAG}_ARM64.apk"
           cp "$APK" "$OUT"
           (cd /tmp/carx-publish && sha256sum "$(basename "$OUT")" > "$(basename "$OUT").sha256")
           echo "RELEASE_APK=$OUT" >> "$GITHUB_ENV"
