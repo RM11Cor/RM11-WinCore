@@ -1,0 +1,124 @@
+name: CarX R3C22 Android16 Perl Hardlink EACCES Source-Pinned Fallback Regression
+on:
+  push:
+    branches: [carx-pc-runtime-r3c22-android-hardlink-fallback]
+    paths:
+      - 'carxpc/r3c18/android/GuestRootfsInstaller.java'
+      - 'carxpc/r3c22/**'
+      - '.github/workflows/carx-pc-r3c22-hardlink-perl-repro.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  synthetic-eacces-and-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - name: Compile Android Java 26+ installer plus simulated EACCES and existing security regression
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carx-r3c22-fixtures /tmp/carx-r3c22-classes
+          python3 carxpc/r3c18/tests/make_tar_fixtures.py /tmp/carx-r3c22-fixtures
+          javac -encoding UTF-8 -d /tmp/carx-r3c22-classes \
+            carxpc/r3c18/android/GuestRootfsInstaller.java \
+            carxpc/r3c19/android/WineGuestElfPreflight.java \
+            carxpc/r3c18/tests/GuestRootfsInstallerTests.java \
+            carxpc/r3c22/tests/GuestRootfsAndroidHardlinkFallbackTest.java
+      - name: Execute previous 14 source-authentic TAR safety controls
+        run: |
+          set -euo pipefail
+          java -Xmx512m -cp /tmp/carx-r3c22-classes \
+            com.r4.carxpc.GuestRootfsInstallerTests /tmp/carx-r3c22-fixtures \
+            | tee r3c22-baseline-synthetic-evidence.log
+          grep -Fq 'ROOTFS_INSTALLER_STREAMING_SHA256_ROLLBACK_14_UNIT_CASES_PASS' \
+            r3c22-baseline-synthetic-evidence.log
+      - name: Simulate exact Android AccessDeniedException plus seven malicious archives
+        run: |
+          set -euo pipefail
+          java -Xmx512m -cp /tmp/carx-r3c22-classes \
+            com.r4.carxpc.GuestRootfsAndroidHardlinkFallbackTest \
+            synthetic /tmp/carx-r3c22-fixtures | tee r3c22-eacces-fixtures-evidence.log
+          grep -Fq 'CARX_R3C22_FORCED_ANDROID_ACCESS_DENIED_HARDLINK_FALLBACK_BYTES_PASS' r3c22-eacces-fixtures-evidence.log
+          grep -Fq 'CARX_R3C22_SEVEN_ATTACK_ARCHIVES_REJECTED_WITH_SAME_ROLLBACK' r3c22-eacces-fixtures-evidence.log
+      - name: Audit Android hardlink fallback cannot escape staging
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('carxpc/r3c18/android/GuestRootfsInstaller.java').read_text()
+          for x in ['catch(AccessDeniedException e)', 'materializeVerifiedHardlinkCopy(',
+                    'HARDLINK_FALLBACK_UNSAFE_PATH_OR_TYPE',
+                    'HARDLINK_FALLBACK_COPY_INVALID',
+                    'hardlinks_materialized_as_copies=',
+                    'Files.copy(src,dst,LinkOption.NOFOLLOW_LINKS)',
+                    'ARCHIVE_SHA256_MISMATCH','INVALID_EXISTING_ROOTFS']:
+            assert x in s,x
+          for x in ['Runtime.getRuntime().exec','ProcessBuilder','su -c','native void']:
+            assert x not in s,x
+          print('CARX_R3C22_ANDROID_FILE_SYSTEM_EACCES_PERL_HARDLINK_FALLBACK_FAILCLOSED_AUDIT_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C22-Android-EACCES-Perl-Hardlink-Synthetic-14Plus7-Safety-Proofs
+          path: |
+            r3c22-baseline-synthetic-evidence.log
+            r3c22-eacces-fixtures-evidence.log
+          retention-days: 14
+
+  original-wine-517mb-eacces:
+    needs: [synthetic-eacces-and-security]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - name: Download precisely the original Ubuntu Wine x86_64 517MB guest rootfs used on phone
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: /tmp/carx-r3c22-input
+      - name: Verify original compressed source SHA-256 and signed release asset hash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('/tmp/carx-r3c22-input')
+          archive=root/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          meta=json.loads((root/'guest-provenance.json').read_text())
+          with archive.open('rb') as f: sha=hashlib.file_digest(f,'sha256').hexdigest()
+          assert sha==meta['tar_sha256']=='86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0'
+          assert archive.stat().st_size==517361543
+          print('CARX_R3C22_AUTHENTIC_EXACT_DEVICE_WINE_ARCHIVE_517MB_SHA256_VERIFIED')
+          PY
+      - name: Compile authentic Wine ELF/PE SHA verifier and Android EACCES hardlink test
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carx-r3c22-classes /tmp/carx-r3c22-app-files
+          javac -encoding UTF-8 -d /tmp/carx-r3c22-classes \
+            carxpc/r3c18/android/GuestRootfsInstaller.java \
+            carxpc/r3c19/android/WineGuestElfPreflight.java \
+            carxpc/r3c22/tests/GuestRootfsAndroidHardlinkFallbackTest.java
+      - name: Extract full 517MB Wine archive simulating Android denied Perl hardlinks, preserve real guest ELF SHA
+        run: |
+          set -euo pipefail
+          timeout 540s java -Xmx1024m -cp /tmp/carx-r3c22-classes \
+            com.r4.carxpc.GuestRootfsAndroidHardlinkFallbackTest \
+            real /tmp/carx-r3c22-input/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz \
+            /tmp/carx-r3c22-app-files | tee r3c22-real-wine-eacces-evidence.log
+          grep -Fq 'CARX_R3C22_EXACT_REAL_WINE_SOURCE_SHA256_ANDROID_PERL_HARDLINK_EACCES_SIMULATION_PASS' r3c22-real-wine-eacces-evidence.log
+          grep -Fq 'CARX_R3C22_AUTHENTIC_WINE64_LDSO_KERNEL32_SOURCE_SHA256_STILL_VALID' r3c22-real-wine-eacces-evidence.log
+          grep -Fq 'NO_REAL_ANDROID_WINE_EXECUTION_PROOF' r3c22-real-wine-eacces-evidence.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C22-RealWine517MB-AndroidPerlEACCES-Simulated-SourceSHA-NOT-Phone
+          path: r3c22-real-wine-eacces-evidence.log
+          retention-days: 14
