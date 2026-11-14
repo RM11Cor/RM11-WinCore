@@ -79,7 +79,21 @@ public final class GuestRootfsInstaller {
      */
     public static Receipt install(InputStream archive, Path appFilesDir)
             throws IOException {
+        return installChecked(archive,appFilesDir,ARCHIVE_SHA256);
+    }
+
+    // Package-private fixture helper only: the Android app must use install()
+    // above with the immutable upstream digest, never a caller supplied hash.
+    static Receipt installFixtureForUnitTest(InputStream archive,Path appFilesDir,String fixtureHash)
+            throws IOException {
+        return installChecked(archive,appFilesDir,fixtureHash);
+    }
+
+    private static Receipt installChecked(InputStream archive, Path appFilesDir,String expectedHash)
+            throws IOException {
         if(archive==null || appFilesDir==null) throw new IOException("NULL_ARGUMENT");
+        if(expectedHash==null || !expectedHash.matches("[0-9a-f]{64}"))
+            throw new IOException("INVALID_PINNED_SHA256");
         Path parent=appFilesDir.toAbsolutePath().normalize();
         if(!Files.isDirectory(parent,LinkOption.NOFOLLOW_LINKS) ||
            Files.isSymbolicLink(parent)) throw new IOException("UNOWNED_OR_INVALID_APP_DIR");
@@ -99,7 +113,7 @@ public final class GuestRootfsInstaller {
                 unpack(gz,stage,counts);
             }
             String hash=hex(sha256.digest());
-            if(!ARCHIVE_SHA256.equals(hash)) throw new IOException("ARCHIVE_SHA256_MISMATCH");
+            if(!expectedHash.equals(hash)) throw new IOException("ARCHIVE_SHA256_MISMATCH");
             for(String path:REQUIRED) {
                 if(!counts.files.contains(path) || !Files.isRegularFile(
                         stage.resolve(path),LinkOption.NOFOLLOW_LINKS))
