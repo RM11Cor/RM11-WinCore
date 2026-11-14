@@ -129,6 +129,10 @@ newCallback='''        lastUnifiedBatch=data;
             if(evidence==null)continue;
             if("01_FEXCORE_ORIGINAL".equals(id))lastFex=evidence;
             if("02_GNU_LDSO_LIBC_12_OF_12".equals(id))lastContinuation=evidence;
+            if("03_WINE_GUEST_ROOTFS".equals(id) && lastRootfs==null)
+              lastRootfs=evidence;
+            if("04_WINE_ELF_AND_KERNEL32_AUTHENTIC".equals(id))
+              lastWineElf=evidence;
             if("05_ANDROID_VULKAN_ICD".equals(id))lastVulkan=evidence;
             if("06_ANDROID_VULKAN_SWAPCHAIN_CLEAR_PRESENT".equals(id))
               lastPresentation=evidence;
