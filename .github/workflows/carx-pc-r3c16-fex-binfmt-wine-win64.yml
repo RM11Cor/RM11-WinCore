@@ -1,0 +1,152 @@
+name: CarX R3C16 FEX binfmt x64 subprocess + Wine kernel32 boundary
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-fex-binfmt-wine-win64.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-fex-binfmt-wine-x64-runtime:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Install native ARM64 FEX dependencies and test tools
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 file binutils libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist
+      - name: Download pinned genuine FEX ARM64 ELF
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Download Ubuntu Wine guest and exact Win64 PE
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: inputs/rootfs
+      - name: Reproduce exact upstream x86_64 binfmt_misc rule on temporary ARM64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          fr=Path('inputs/fex/fex-linux-elf')
+          m=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert m['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          f=fr/'Bin/FEX'
+          meta=next(x for x in m['files'] if x['path']=='Bin/FEX')
+          assert hashlib.sha256(f.read_bytes()).hexdigest()==meta['sha256']
+          assert struct.unpack_from('<H',f.read_bytes(),18)[0]==183
+          g=Path('inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz')
+          r=json.loads(Path('inputs/rootfs/guest-provenance.json').read_text())
+          assert hashlib.file_digest(g.open('rb'),'sha256').hexdigest()==r['tar_sha256']
+          print("CARX_R3C16_BINFMT_FEX_ARM64_AND_DISTRO_ROOTFS_SOURCE_SHA256_PASS")
+          PY
+          sudo mkdir -p /tmp/carx-r3c16-binfmt-guest
+          sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c16-binfmt-guest
+          sudo install -Dm755 inputs/fex/fex-linux-elf/Bin/FEX /usr/local/bin/carx-r3c16-fex
+          for f in inputs/fex/fex-linux-elf/Bin/*; do test -f "$f" && chmod 755 "$f" || :; done
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-binfmt-guest"}}' >"$HOME/.fex-emu/Config.json"
+          sudo cp /tmp/carx-r3c16-binfmt-guest/usr/bin/true /tmp/carx-r3c16-x86-true
+          sudo chmod 755 /tmp/carx-r3c16-x86-true
+          test -f /tmp/carx-r3c16-binfmt-guest/tmp/kernix-real-win32-smoke.exe
+          test -f /tmp/carx-r3c16-binfmt-guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll
+          if ! test -e /proc/sys/fs/binfmt_misc/register; then
+            sudo modprobe binfmt_misc || :
+            sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc || :
+          fi
+          test -e /proc/sys/fs/binfmt_misc/register || { echo "CARX_R3C16_BINFMT_MOUNT_NOT_WRITABLE"; exit 1; }
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          # The exact 20-byte x86_64 matcher and flags are sourced from:
+          # FEX commit 02e24ca5..., Source/Tools/FEXInterpreter/CMakeLists.txt
+          magic=r'\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00'
+          mask=r'\xff\xff\xff\xff\xff\xfe\xfe\x00\x00\x00\x00\xff\xff\xff\xff\xff\xfe\xff\xff\xff'
+          rule=':CARX-FEX-x86_64:M:0:'+magic+':'+mask+':/usr/local/bin/carx-r3c16-fex:POCF'
+          assert len(rule)>100
+          with open('/proc/sys/fs/binfmt_misc/register','w') as out: out.write(rule)
+          print('CARX_R3C16_ORIGINAL_FEX_SOURCE_BINFMT_X86_64_POFC_REGISTERED')
+          PY
+          cat /proc/sys/fs/binfmt_misc/CARX-FEX-x86_64 | tee dist/original-fex-binfmt-registration.txt
+          grep -Fq /usr/local/bin/carx-r3c16-fex dist/original-fex-binfmt-registration.txt
+      - name: Execute native x86 Linux subprocess and genuine Windows PE through FEX binfmt
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-r3c16-binfmt-guest
+          export WINEPREFIX="$HOME/.carx-r3c16-original-binfmt-guest"
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine
+          export WINEARCH=win64
+          export WINEDEBUG=+module,+err
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          set +e
+          timeout 30s /tmp/carx-r3c16-x86-true >dist/binfmt-direct-x64-true.log 2>&1
+          A=$?
+          timeout 30s "$fex" /usr/bin/true >dist/fex-manual-x64-true.log 2>&1
+          B=$?
+          timeout 60s "$fex" /usr/lib/wine/wine64 --version >dist/fex-wine-version.log 2>&1
+          C=$?
+          timeout 120s "$fex" /usr/lib/wine/wine64 /tmp/kernix-real-win32-smoke.exe >dist/fex-binfmt-win64-pe.log 2>&1
+          D=$?
+          set -e
+          export A="$A" B="$B" C="$C" D="$D"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          w=Path('dist/fex-binfmt-win64-pe.log').read_text(errors='replace')
+          v=Path('dist/fex-wine-version.log').read_text(errors='replace')
+          marker="CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS"
+          e={
+            'schema':'r4.carx.r3c16.pinned-fex-binfmt-guest-win64-PE.v1',
+            'original_FEX_source_binfmt_rule_registered':True,
+            'native_guest_x86_64_binfmt_exec_exit_code':int(os.environ['A']),
+            'direct_FEX_linux_x86_true_exit_code':int(os.environ['B']),
+            'FEX_linux_wine_version_exit_code':int(os.environ['C']),
+            'FEX_wine_version_observed':int(os.environ['C'])==0 and 'wine' in v.lower(),
+            'real_win64_PE_exit_code':int(os.environ['D']),
+            'real_Win64_PE_WinAPI_VM_TLS_stdout_executed_on_Linux_ARM64':int(os.environ['D'])==0 and marker in w,
+            'kernel32_missing': 'could not load kernel32.dll' in w,
+            'fex_started_with_fresh_wine_prefix':True,
+            'android_bionic_or_carx_executed':False
+          }
+          Path('dist/binfmt-win64-pe-outcome.json').write_text(json.dumps(e,indent=2)+'\n')
+          print(json.dumps(e,indent=2))
+          PY
+          grep -E 'err:|kernel32|ntdll|could not|failed to' dist/fex-binfmt-win64-pe.log | tail -n 40 || :
+      - name: Keep every real FEX process Wine log, regardless of verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-PinnedOriginalFEX-Binfmt-RealWin64-PE-Evidence
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Verify FEX subprocess registration and report Win64 PE result separately
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/binfmt-win64-pe-outcome.json'))
+          assert d['original_FEX_source_binfmt_rule_registered'] is True
+          assert d['native_guest_x86_64_binfmt_exec_exit_code']==0, 'X86_BINFMTS_NOT_FUNCTIONING'
+          assert d['direct_FEX_linux_x86_true_exit_code']==0
+          print('CARX_R3C16_SOURCE_PINNED_BINFMT_TRUE_EXECUTION_PROVEN')
+          assert d['real_Win64_PE_WinAPI_VM_TLS_stdout_executed_on_Linux_ARM64'] is True, 'WINE_OR_FEX_BINFMT_WIN64_PE_NOT_EXECUTED'
+          print('CARX_R3C16_ORIGINAL_FEX_BINFMT_WINE_WIN64_PE_REAL_PASS')
+          PY
