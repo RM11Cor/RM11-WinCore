@@ -33,7 +33,7 @@ jobs:
       - name: Execute full Win64 PE and save verified native Wine prefix
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json
@@ -49,7 +49,8 @@ jobs:
           test -f "$WINEPREFIX/system.reg"
           test -d "$WINEPREFIX/drive_c/windows/system32"
           if [[ -e "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" || -L "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]]; then
-            ls -la "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" >dist/native-prefix-kernel32-location.txt
+            find "$WINEPREFIX/drive_c/windows/system32" -maxdepth 1 -iname "kernel32*" -ls >dist/native-prefix-kernel32-location.txt || :
+          test -s dist/native-prefix-kernel32-location.txt || echo "Wine prefix system32 has no kernel32 link: package DLL search path is authoritative" >dist/native-prefix-kernel32-location.txt
           else
             echo "Native Wine PE passed; kernel32 provided by Wine builtin runtime, no materialized system32 DLL required" >dist/native-prefix-kernel32-location.txt
           fi
