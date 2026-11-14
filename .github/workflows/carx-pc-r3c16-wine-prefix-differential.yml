@@ -44,9 +44,23 @@ jobs:
           export WINEARCH=win64
           export WINEDEBUG=-all
           export WINEPREFIX="$HOME/.carx-r3c16-known-working-native-prefix"
-          xvfb-run -a timeout 90s /usr/bin/wine "$PWD/inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe" >dist/native-known-working-win64-pe.log 2>&1
+          export CARX_RUNROOT="$PWD"
+          # One persistent Xvfb session for wineboot, real Win64 PE and the
+          # server flush. Wine64 PE stdout alone does not prove a durable
+          # prefix registry was written and fsynced.
+          xvfb-run -a bash -euo pipefail -c '
+            timeout 60s /usr/bin/wineboot -u >"$CARX_RUNROOT/dist/native-wineboot.log" 2>&1
+            timeout 90s /usr/bin/wine "$CARX_RUNROOT/inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe" >"$CARX_RUNROOT/dist/native-known-working-win64-pe.log" 2>&1
+            timeout 35s /usr/bin/wineserver -w >"$CARX_RUNROOT/dist/native-wineserver-flush.log" 2>&1 || :
+          '
           grep -Fq 'CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS' dist/native-known-working-win64-pe.log
-          test -f "$WINEPREFIX/system.reg"
+          if ! test -f "$WINEPREFIX/system.reg"; then
+            echo "::error::Win64 PE executed but Wine prefix registry absent after wineboot/server flush"
+            find "$HOME" -maxdepth 3 -name system.reg -print | tee dist/prefix-registry-paths.txt
+            cat dist/native-wineboot.log || :
+            ls -la "$WINEPREFIX" || :
+            exit 1
+          fi
           test -d "$WINEPREFIX/drive_c/windows/system32"
           if [[ -e "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" || -L "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]]; then
             find "$WINEPREFIX/drive_c/windows/system32" -maxdepth 1 -iname "kernel32*" -ls >dist/native-prefix-kernel32-location.txt || :
