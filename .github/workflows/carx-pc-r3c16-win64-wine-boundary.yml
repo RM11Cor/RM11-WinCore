@@ -1,0 +1,62 @@
+name: CarX R3C16 Win64 Wine Android Bridge Preflight
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-win64-wine-boundary.yml'
+      - 'carxpc/r3c16/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  win64-and-wine-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install real Win64 cross compiler
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64 python3
+      - name: Build Windows PE64 test and strictly audit imports
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -o dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe carxpc/r3c16/win64_vmem_tls_stdout_smoke.c -lkernel32
+          file dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe
+          python3 carxpc/r3c16/audit_real_win64_pe.py dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe dist/win64-pe-source-audit.json
+          x86_64-w64-mingw32-objdump -p dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe >dist/win64-pe-imports.txt
+          grep -Fq 'DLL Name: KERNEL32.dll' dist/win64-pe-imports.txt
+          grep -Fq 'VirtualAlloc' dist/win64-pe-imports.txt
+          grep -Fq 'TlsAlloc' dist/win64-pe-imports.txt
+          grep -Fq 'WriteFile' dist/win64-pe-imports.txt
+      - name: Download last source-pinned Android ARM64 FEX candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C15-GNU-ldso-SourcePinned-AutoBatch-Android-Bionic-BuildOnly
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43595030708
+          github-token: ${{ github.token }}
+          path: inputs/android-fex
+      - name: Download source-built Wine11 Linux x86-64 guest artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41568610374
+          github-token: ${{ github.token }}
+          path: inputs/linux-wine
+      - name: Verify Wine guest archive, native Android FEX and ABI boundaries
+        run: |
+          set -euo pipefail
+          python3 carxpc/r3c16/audit_wine_android_abi_bridge.py inputs/android-fex inputs/linux-wine dist/windows-android-bridge-preflight.json
+          sha256sum dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe >dist/win64-pe-fixture.sha256
+      - name: Upload Win64 PE and Wine source readiness evidence (NOT Android execution)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-RealWin64-PE-And-Wine-Source-Boundary-NOT-Android-Execution
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
