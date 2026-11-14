@@ -1392,10 +1392,14 @@ jobs:
                        b'R3C25_AUTHENTIC_WINE_GUEST_CONTEXT_PLAN_REJECTED']:
               assert any(mark in d for d in dex),('R3C25_APK_DEX_MISSING',mark)
           for mark in [b'REAL_ORIGINAL_FEXCORE_CONTEXT',b'FEX_CONTEXT_X86_THREAD_FRAME_NOT_CREATED',
-                       b'MAP_FIXED_NOREPLACE']:
+                       b'ORIGINAL_WINE64_GNU_LDSO_GUEST_VA']:
               assert mark in lib,('R3C25_APK_NATIVE_MISSING',mark)
           print('CARX_R3C25_SIGNED_APK_V30_FEX_CTX_PLUS_AUTHENTIC_WINE_GUEST_CPUSTATE_JNI_PASS')
           PY
+          # MAP_FIXED_NOREPLACE is a numeric flag compiled to instructions,
+          # so its macro name is absent from a stripped ELF by design.
+          grep -Fq 'MAP_FIXED_NOREPLACE' carxpc/r3c25/native/wine_x64_native_fex_context_probe.cpp
+          grep -Fq 'MAP_FIXED_NOREPLACE' carxpc/r3c24/native/wine_x64_native_ptload_probe.cpp
           unzip -p /tmp/carxpc/app/build/outputs/apk/release/app-release.apk lib/arm64-v8a/libcarx_wine_fex_context.so >/tmp/carx-r3c25-signed.so
           readelf -d /tmp/carx-r3c25-signed.so | grep -F 'Shared library: [libFEXCore.so]'
           readelf -Ws /tmp/carx-r3c25-signed.so | grep -F Java_com_r4_carxpc_WineX86FEXContextProbe_nativeProbe
