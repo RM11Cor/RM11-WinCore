@@ -26,8 +26,15 @@ assert all(x.is_file() for x in (native,act,service,main,gradle))
 
 def one(s,old,new):
     n=s.count(old)
-    assert n==1,("R3D11_UNEXPECTED_SOURCE_ANCHOR",old[:140],n)
-    return s.replace(old,new,1)
+    if n==1:return s.replace(old,new,1)
+    # Preserve semantic tokens while tolerating whitespace-only source layout.
+    parts=[re.escape(t) for t in re.split(r"\s+",old.strip()) if t]
+    rx=r"\s+".join(parts)
+    matches=list(re.finditer(rx,s))
+    assert len(matches)==1,("R3D11_SOURCE_ANCHOR_DIFFERENT_SEMANTICS",
+                            old[:140],n,len(matches))
+    found=matches[0]
+    return s[:found.start()]+new+s[found.end():]
 
 s=gradle.read_text()
 s,n=re.subn(r"\bversionCode\s+37\b","versionCode 38",s)
