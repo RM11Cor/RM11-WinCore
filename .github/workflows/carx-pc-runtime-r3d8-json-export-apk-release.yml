@@ -1343,7 +1343,7 @@ jobs:
           assert b'child_process_exit_detail' in dex
           assert b'R3D8JsonReportStore' in dex
           assert b'CarX_PC_R3D8_07D_Diagnostics_' in dex
-          assert b'فتح اختبار Wine 07D' in dex
+          assert 'فتح اختبار Wine 07D'.encode('utf-8') in dex
           assert b'Intent.ACTION_SEND' not in so
           assert b'getHistoricalProcessExitReasons' in dex
           assert b'E_WATCHDOG_FIRED_6000MS' in dex
