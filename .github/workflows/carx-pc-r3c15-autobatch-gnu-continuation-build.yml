@@ -227,6 +227,14 @@ jobs:
             +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
           print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
           PY
+      - name: Port Linux-only trusted local getrandom kernel call to Bionic API26
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEADER=/tmp/kernix-src/native-engine/android-host/kernix_g0_original_libc_getrandom8_owned_bss_source_guest_kernel.h
+          python3 carxpc/r3c15/android_local_getrandom_portability.py "$HEADER"
+          grep -Fq '::syscall(__NR_getrandom,trustedLocal.data()' "$HEADER"
+          grep -Fq '::getrandom(trustedLocal.data()' "$HEADER"
       - name: Compile genuine GNU ld-linux unpatched continuation for Android Bionic arm64
         working-directory: /tmp/kernix-src
         shell: bash
