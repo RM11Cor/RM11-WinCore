@@ -1207,7 +1207,7 @@ jobs:
           grep -Fq 'R3D8JsonReportStore.save' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'Intent.ACTION_CREATE_DOCUMENT' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'send.setType("application/json")' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D8_07D_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D9_07D_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           test -f /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'E_WATCHDOG_FIRED_6000MS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
