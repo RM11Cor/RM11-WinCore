@@ -158,15 +158,11 @@ s=one(s,
 s=one(s,
 '''    originalLdso,ldso,traceFd,nonce};''',
 '''    originalLdso,ldso,traceFd,nonce,brkHeap.base(),mode};''')
-s=one(s,
-'''         const std::vector<uint8_t> &stack,uint64_t expectedWineEntry,
-          uint64_t expectedLdsoEntry,uint64_t rsp,int traceFd,uint64_t nonce,
-          std::string &message){''',
-'''         const std::vector<uint8_t> &stack,uint64_t expectedWineEntry,
-          uint64_t expectedLdsoEntry,uint64_t rsp,int traceFd,uint64_t nonce,
-          int mode,std::string &message){''')
-s=one(s,'''                                  we,le,ldso,traceFd,nonce,message)){''',
-        '''                                  we,le,ldso,traceFd,nonce,mode,message)){''')
+s,n=re.subn(r"(uint64_t rsp,int traceFd,uint64_t nonce)(,\s*std::string &message\)\{)",
+            r"\1,int mode\2",s,count=1)
+assert n==1,"R3D11_RUN_SIGNATURE_MISSING"
+s=one(s,'we,le,ldso,traceFd,nonce,message)){',
+        'we,le,ldso,traceFd,nonce,mode,message)){')
 s=one(s,'''  jlong nonce,jint traceFd,jint progressFd){''',
         '''  jlong nonce,jint traceFd,jint progressFd,jint probeMode){''')
 s=one(s,'''  if(nonce<=0 || traceFd<0 || progressFd<0)''',
