@@ -1,0 +1,270 @@
+name: CarX R3C16 Control - Ubuntu Wine real Win64 PE on FEX Linux ARM64
+on:
+  workflow_dispatch:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-ubuntu-wine-win64-control.yml'
+      - 'carxpc/r3c16/**'
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-distro-wine-x64-control-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ubuntu rootfs builder and native Windows PE cross-compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            debootstrap python3 file binutils \
+            gcc-mingw-w64-x86-64
+          test -s /usr/share/keyrings/ubuntu-archive-keyring.gpg
+      - name: Build actual Ubuntu 24.04 amd64 glibc guest including wine64 and dependency packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          guest=/tmp/kernix-ubuntu-wine-x64-guest
+          # Wine's large optional library dependency graph does not configure
+          # reliably in debootstrap's initial base-package phase. First
+          # create a proper signed minimal distro; install Wine with apt in
+          # a separate fully initialized native amd64 chroot.
+          sudo DEBIAN_FRONTEND=noninteractive debootstrap \
+            --arch=amd64 --variant=minbase --components=main,universe \
+            noble "$guest" http://archive.ubuntu.com/ubuntu/
+          printf '%s\n' 'deb http://archive.ubuntu.com/ubuntu noble main universe' \
+            | sudo tee "$guest/etc/apt/sources.list" >/dev/null
+          sudo install -D -m 644 /etc/resolv.conf "$guest/etc/resolv.conf"
+          # Do not try to start real host services from inside this guest.
+          printf '#!/bin/sh\nexit 101\n' \
+            | sudo tee "$guest/usr/sbin/policy-rc.d" >/dev/null
+          sudo chmod 755 "$guest/usr/sbin/policy-rc.d"
+          sudo chroot "$guest" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+            apt-get update -qq
+          if ! sudo chroot "$guest" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+            apt-get install -y --no-install-recommends wine wine64 ca-certificates libstdc++6; then
+            sudo chroot "$guest" dpkg --audit || :
+            sudo chroot "$guest" apt-get -f install --assume-no || :
+            echo 'Guest Wine install failed; refusing to publish a broken rootfs'
+            exit 1
+          fi
+          test -x "$guest/usr/lib/wine/wine64"
+          test -e "$guest/lib64/ld-linux-x86-64.so.2"
+          # Ubuntu's /usr/bin/wine wrapper normally establishes distro
+          # library search paths; the raw Wine64 loader may not initialize
+          # in a root-only isolated chroot. Verify installed ABI/files and
+          # run the real CLI + PE gate later as a non-root FEX guest.
+          sudo chroot "$guest" dpkg-query -W wine wine64 libwine \
+            | tee /tmp/kernix-guest-wine-package-versions.txt
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          file "$guest/usr/lib/wine/wine64" \
+            "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          sudo chroot "$guest" /usr/bin/env \
+            WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine \
+            /usr/lib/wine/wine64 --version \
+            > /tmp/kernix-guest-native-version-probe.log 2>&1 || {
+              echo 'Direct root-in-chroot Wine64 CLI not required for rootfs packaging:'
+              cat /tmp/kernix-guest-native-version-probe.log
+            }
+          test -f "$guest/usr/share/doc/wine/copyright"
+          for d in dev proc sys; do
+            if mountpoint -q "$guest/$d"; then
+              echo "ERROR: guest path $d remains mounted, refusing to archive host mount"
+              exit 1
+            fi
+          done
+          sudo mkdir -p "$guest/home/kernix"
+          sudo chmod 777 "$guest/home/kernix"
+          mkdir -p dist
+          x86_64-w64-mingw32-gcc -std=c11 -Os -Wall -Wextra -Werror \
+            -o dist/real-windows-pe-smoke.exe \
+            carxpc/r3c16/win64_vmem_tls_stdout_smoke.c
+          python3 carxpc/r3c16/audit_real_win64_pe.py \
+            dist/real-windows-pe-smoke.exe dist/win64-pe-control-audit.json
+          file dist/real-windows-pe-smoke.exe
+          sudo cp dist/real-windows-pe-smoke.exe "$guest/tmp/kernix-real-win32-smoke.exe"
+          sudo chmod 644 "$guest/tmp/kernix-real-win32-smoke.exe"
+          sudo tar -C "$guest" -czf dist/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz .
+          sudo chown "$(id -u):$(id -g)" dist/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz
+          sha256sum dist/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz \
+            > dist/kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256
+          sudo chroot "$guest" dpkg-query -W > dist/wine-guest-distro-package-manifest.txt
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('dist')
+          f=root/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with f.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
+          meta={'schema':'kernix.ubuntu-wine-linux-x64-guest.v1',
+                'distro':'Ubuntu 24.04 Noble signed APT repo',
+                'arch':'x86_64','package_list':'wine-guest-distro-package-manifest.txt',
+                'wine_source':'Ubuntu apt binary packages, version recorded in manifest',
+                'tar_sha256':digest,'archive_size':f.stat().st_size,
+                'android_bionic_compatible':False,'fex_arm64_pe_execution_verified':False}
+          (root/'guest-provenance.json').write_text(json.dumps(meta,indent=2)+'\n')
+          print('KERNIX_UBUNTU_WINE_REAL_GUEST_ROOTFS_READY',f.stat().st_size,digest)
+          PY
+      - name: Upload real signed-distro Wine Linux x64 guest, manifest and PE fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+  arm64-fex-win32-pe:
+    needs: [build-distro-wine-x64-control-guest]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 18
+    steps:
+      - name: Install real FEX native ARM64 Linux shared-library requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file binutils libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+      - name: Download pinned original source-built Linux ARM64 FEX ELF
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41505334933
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Download exact Ubuntu Wine distro guest from prior successful job
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          path: inputs/rootfs
+      - name: Verify cross-machine hashes and restore FEX execution modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json,hashlib,struct
+          from pathlib import Path
+          fr=Path('inputs/fex/fex-linux-elf')
+          info=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert info['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert info['android_bionic_compatible'] is False
+          files=info['files']; assert len(files)>=2
+          for p in files:
+              f=(fr/p['path']).resolve()
+              assert f.is_relative_to(fr.resolve())
+              assert f.is_file()
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==p['sha256']
+              h=f.open('rb').read(64)
+              assert h[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',h,18)[0]==183
+          base=Path('inputs/rootfs')
+          meta=json.loads((base/'guest-provenance.json').read_text())
+          f=base/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with f.open('rb') as stream: sha=hashlib.file_digest(stream,'sha256').hexdigest()
+          assert sha==meta['tar_sha256']==(base/'kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256').read_text().split()[0]
+          assert meta['arch']=='x86_64' and meta['android_bionic_compatible'] is False
+          Path('dist/source-provenance.json').write_text(json.dumps({
+             'schema':'kernix.fex-arm64-distro-wine-pe-input.v1',
+             'fex_source_commit':info['source_commit'],
+             'fex_elf_files_sha256_verified':len(files),
+             'signed_ubuntu_noble_amd64_guest_sha256':sha,
+             'source_wine11_affected':False,
+             'android_bionic_compatible':False},indent=2)+'\n')
+          print('KERNIX_FEX_ARM64_UBUNTU_WINE_X64_REAL_INPUTS_VERIFIED',sha)
+          PY
+          fexbin="$PWD/inputs/fex/fex-linux-elf/Bin"
+          for f in "$fexbin/"*; do
+            test -f "$f" || continue
+            chmod 755 "$f"
+          done
+          test -x "$fexbin/FEX"
+          test -x "$fexbin/FEXServer"
+          sudo mkdir -p /tmp/kernix-fex-wine64-ubuntu-guest
+          sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz \
+            -C /tmp/kernix-fex-wine64-ubuntu-guest
+          test -f /tmp/kernix-fex-wine64-ubuntu-guest/tmp/kernix-real-win32-smoke.exe
+          test -x /tmp/kernix-fex-wine64-ubuntu-guest/usr/lib/wine/wine64
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-fex-wine64-ubuntu-guest"}}' > "$HOME/.fex-emu/Config.json"
+          file "$fexbin/FEX" \
+            /tmp/kernix-fex-wine64-ubuntu-guest/usr/lib/wine/wine64 \
+            /tmp/kernix-fex-wine64-ubuntu-guest/tmp/kernix-real-win32-smoke.exe \
+            | tee dist/real-elf-and-pe-file-types.txt
+      - name: Run Ubuntu Wine64 real Windows PE inside genuine FEX ARM64 Linux
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-fex-wine64-ubuntu-guest
+          export WINEPREFIX="$HOME/.kernix-fex-ubuntu-distro-wine-prefix"
+          # Debian/Ubuntu split builtins from the Wine64 executable.
+          # Match the distro Wine wrapper's builtin DLL search directory.
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine
+          export WINEDEBUG=+err,+module
+          set +e
+          timeout 35s "$fex" /usr/bin/true > dist/fex-x86-true.log 2>&1
+          true_rc=$?
+          timeout 45s "$fex" /usr/lib/wine/wine64 --version > dist/fex-guest-wine-version.log 2>&1
+          version_rc=$?
+          timeout 90s "$fex" /usr/lib/wine/wine64 \
+            /tmp/kernix-real-win32-smoke.exe > dist/fex-real-windows-pe.log 2>&1
+          pe_rc=$?
+          set -e
+          cat dist/fex-x86-true.log || :
+          cat dist/fex-guest-wine-version.log || :
+          tail -n 75 dist/fex-real-windows-pe.log || :
+          export KERNIX_TRUE_RC="$true_rc" KERNIX_VERSION_RC="$version_rc" KERNIX_PE_RC="$pe_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          v=Path('dist/fex-guest-wine-version.log').read_text(errors='replace')
+          p=Path('dist/fex-real-windows-pe.log').read_text(errors='replace')
+          t=int(os.environ['KERNIX_TRUE_RC'])
+          ve=int(os.environ['KERNIX_VERSION_RC'])
+          pe=int(os.environ['KERNIX_PE_RC'])
+          evidence={'schema':'kernix.fex-arm64-ubuntu-wine-real-pe.v1',
+            'real_x64_elf_true_exit':t,
+            'fex_true_executed':t==0,
+            'fex_guest_wine_version_exit':ve,
+            'fex_distro_wine_cli_executed':ve==0 and 'wine' in v.lower(),
+            'fex_guest_windows_pe_exit':pe,
+            'real_windows_pe_under_fex_wine_executed':pe==0 and
+               'CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS' in p,
+            'used_original_source_built_fex':True,
+            'wine_source':'signed Ubuntu 24.04 amd64 apt packages, versions recorded',
+            'wine11_source_runtime_replaced':False,
+            'android_bionic_compatible':False,'android_game_tested':False}
+          Path('dist/real-arm64-fex-wine-pe-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          PY
+      - name: Upload true ARM64 FEX to Windows PE logs, even if failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-FEX-UbuntuDistro-Wine-Win64-Positive-Control-Evidence
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require actual FEX-to-real-Win32-PE execution
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/real-arm64-fex-wine-pe-evidence.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open('dist/real-arm64-fex-wine-pe-evidence.json'))
+          assert e['fex_true_executed'] is True
+          assert e['fex_distro_wine_cli_executed'] is True
+          assert e['real_windows_pe_under_fex_wine_executed'] is True
+          assert e['android_bionic_compatible'] is False
+          print('CARX_R3C16_REAL_WIN64_PE_VMEM_TLS_ON_DISTRO_WINE_FEX_LINUX_ARM64_PASS')
+          PY
