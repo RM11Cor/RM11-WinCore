@@ -1,0 +1,127 @@
+name: CarX R3C16 Control - Wine11 kernel32 native Linux x86_64 versus FEX
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-wine11-native-x64-control.yml'
+      - 'carxpc/r3c16/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  wine11-native-x64-source-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native x64 Wine dependencies, diagnostics and Xvfb
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 file binutils xvfb xauth strace wine wine64 libfreetype6 libfontconfig1 libx11-6 libxext6 libxrender1 libxrandr2 libxi6 libxcursor1 libxinerama1 libvulkan1
+          mkdir -p dist
+      - name: Retrieve exact source-built Wine 11 Linux x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41568610374
+          github-token: ${{ github.token }}
+          path: inputs/wine
+      - name: Retrieve same exact compiled Win64 PE
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-RealWin64-PE-And-Wine-Source-Boundary-NOT-Android-Execution
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43596982241
+          github-token: ${{ github.token }}
+          path: inputs/pe
+      - name: Verify source hashes and stage Wine into identical /opt prefix
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          w=Path('inputs/wine')
+          m=json.loads((w/'wine-stage-files-sha256.json').read_text())
+          assert m['upstream_commit']=='db11d0fe6a169c457e23d007e20404643d067aa8'
+          assert m['android_bionic_compatible'] is False
+          a=w/'wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz'
+          assert hashlib.file_digest(a.open('rb'),'sha256').hexdigest()==(w/'wine-linux-x64-stage.tar.gz.sha256').read_text().split()[0]
+          pe=Path('inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe')
+          pm=json.loads(Path('inputs/pe/win64-pe-source-audit.json').read_text())
+          assert hashlib.sha256(pe.read_bytes()).hexdigest()==pm['sha256']
+          print('CARX_R3C16_WINE11_NATIVE_X64_SOURCE_SHA_PINNED_PASS')
+          PY
+          sudo tar -xzf inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz -C /
+          test -x /opt/kernix-wine-linux-x64/bin/wine
+          file /opt/kernix-wine-linux-x64/bin/wine | tee dist/wine11-host-architecture.txt
+          ldd /opt/kernix-wine-linux-x64/bin/wine | tee dist/wine11-host-ldd.txt
+          find /opt/kernix-wine-linux-x64/lib/wine -iname 'kernel32*' -o -iname 'kernelbase*' -o -iname 'ntdll*' | sort >dist/wine11-dll-inventory.txt
+          cat dist/wine11-dll-inventory.txt
+          test -s dist/wine11-dll-inventory.txt
+          cp inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe
+      - name: Compare distro Wine and the exact Wine11 x64 source installation
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export WINEARCH=win64
+          export WINEDEBUG=+module,+loaddll,+err
+          export WINEDLLPATH=/opt/kernix-wine-linux-x64/lib/wine
+          set +e
+          export WINEPREFIX="$HOME/.carx-r3c16-wine11-native-control"
+          timeout 30s /opt/kernix-wine-linux-x64/bin/wine --version >dist/source-wine-version.log 2>&1
+          a=$?
+          xvfb-run -a timeout 90s /opt/kernix-wine-linux-x64/bin/wine "$PWD/dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe" >dist/source-wine11-pe.log 2>&1
+          b=$?
+          export WINEPREFIX="$HOME/.carx-r3c16-ubuntu-native-control"
+          unset WINEDLLPATH
+          timeout 30s /usr/bin/wine --version >dist/distro-wine-version.log 2>&1
+          c=$?
+          xvfb-run -a timeout 90s /usr/bin/wine "$PWD/dist/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe" >dist/distro-wine-pe.log 2>&1
+          d=$?
+          set -e
+          export CARX_A="$a" CARX_B="$b" CARX_C="$c" CARX_D="$d"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          marker="CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS"
+          s=Path('dist/source-wine11-pe.log').read_text(errors='replace')
+          d=Path('dist/distro-wine-pe.log').read_text(errors='replace')
+          result={
+            "schema":"r4.carx.r3c16.wine11-native-linux-x64-versus-distro.v1",
+            "wine11_native_x64_version_exit":int(os.environ['CARX_A']),
+            "wine11_native_x64_PE_exit":int(os.environ['CARX_B']),
+            "wine11_native_x64_PE_real_WinAPI_success":int(os.environ['CARX_B'])==0 and marker in s,
+            "distro_wine_native_x64_version_exit":int(os.environ['CARX_C']),
+            "distro_wine_native_x64_PE_exit":int(os.environ['CARX_D']),
+            "distro_wine_native_x64_PE_real_WinAPI_success":int(os.environ['CARX_D'])==0 and marker in d,
+            "wine11_kernel32_error":'could not load kernel32.dll' in s,
+            "distro_kernel32_error":'could not load kernel32.dll' in d,
+            "fex_executed":False,"android_bionic_executed":False,"carx_executed":False
+          }
+          Path('dist/native-wine11-vs-distro-evidence.json').write_text(json.dumps(result,indent=2)+"\n")
+          print(json.dumps(result,indent=2))
+          PY
+          tail -n 45 dist/source-wine11-pe.log || :
+          tail -n 25 dist/distro-wine-pe.log || :
+      - name: Upload full Wine11 and distro exact PE results even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-Wine11-NativeX64-Versus-Distro-Control-Evidence
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require one real Windows PE result from source Wine11 or distro Wine x64
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/native-wine11-vs-distro-evidence.json'))
+          assert (d["wine11_native_x64_PE_real_WinAPI_success"] or
+                  d["distro_wine_native_x64_PE_real_WinAPI_success"]),"BOTH_NATIVE_WINE_PE_CONTROLS_FAILED"
+          print("CARX_R3C16_ONE_NATIVE_X64_REAL_WIN64_PE_POSITIVE_CONTROL_PASS")
+          PY
