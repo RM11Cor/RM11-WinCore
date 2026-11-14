@@ -1,0 +1,34 @@
+name: CarX R3D3 source witness guards (NO Wine execution)
+on:
+  push:
+    branches:
+      - carx-r3d3-wine-first-syscall-guard
+    paths:
+      - 'carxpc/r3d3/**'
+      - '.github/workflows/carx-r3d3-witness-ci.yml'
+  workflow_dispatch:
+jobs:
+  validate-first-syscall-witness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify no real execution is falsely claimed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path('carxpc/r3c25/native/wine_x64_native_fex_context_probe.cpp').read_text()
+          witness = Path('carxpc/r3d3/native/r3d3_first_syscall_witness.hpp').read_text()
+          assert 'NO ExecuteThread() and NO direct x86 code execution' in base
+          assert 'context->ExecuteThread(thread)' not in base
+          assert 'Does NOT execute Wine by itself' in witness
+          assert 'inline bool make_record(' in witness
+          assert 'if (at.found == prior.found) return false' in witness
+          print('R3D3_NO_FAKE_WINE_EXECUTION_GUARD_PASS')
+          PY
+      - name: Build and execute C++17 negative controls with sanitizer
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -O1 -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            carxpc/r3d3/tests/witness_test.cpp -o /tmp/r3d3-test
+          /tmp/r3d3-test
