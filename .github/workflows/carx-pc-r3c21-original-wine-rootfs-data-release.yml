@@ -1,0 +1,97 @@
+name: CarX R3C21 Publish SHA Pinned Ubuntu Wine Guest RootFS External Data Asset
+on:
+  push:
+    branches: [carx-pc-runtime-r3c21-rootfs-autoprovision]
+    paths:
+      - '.github/workflows/carx-pc-r3c21-original-wine-rootfs-data-release.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  source-pinned-rootfs-data:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Download existing Ubuntu Noble x86_64 Wine rootfs exact source control
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: /tmp/carx-r3c21-original
+      - name: SHA-pin exact compressed artifact and inspect license metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=/tmp/carx-r3c21-original/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz
+          test -s "$SRC"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,tarfile
+          root=Path('/tmp/carx-r3c21-original')
+          f=root/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          meta=json.loads((root/'guest-provenance.json').read_text())
+          with f.open('rb') as source: sha=hashlib.file_digest(source,'sha256').hexdigest()
+          assert sha==meta['tar_sha256']=='86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0'
+          assert f.stat().st_size==517361543,('SOURCE_ARCHIVE_LENGTH_CHANGED',f.stat().st_size)
+          with tarfile.open(f,'r:gz') as tar:
+              names=set(tar.getnames())
+          def present(path):
+              return path in names or './'+path in names
+          for path in [
+            'usr/share/wine/wine.inf',
+            'usr/lib/wine/wine64',
+            'usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll',
+            'tmp/kernix-real-win32-smoke.exe']:
+              assert present(path),('SOURCE_ARCHIVE_MISSING_REQUIRED',path)
+          copyright=[n for n in names if n.startswith('usr/share/doc/') and n.endswith('/copyright')]
+          print('CARX_R3C21_EXACT_ORIGINAL_UBUNTU_WINE_GUEST_DATA_SOURCE_VERIFIED',len(names),len(copyright))
+          PY
+          mkdir -p dist
+          cp "$SRC" dist/CarX_Wine_Ubuntu_Noble_x86_64_GuestRootfs_SHA256.tar.gz
+          (cd dist && sha256sum CarX_Wine_Ubuntu_Noble_x86_64_GuestRootfs_SHA256.tar.gz >CarX_Wine_Ubuntu_Noble_x86_64_GuestRootfs_SHA256.tar.gz.sha256)
+          cat >dist/README_Source_Licenses.txt <<'TXT'
+          CarX R3C21 source-pinned Ubuntu Noble Linux x86_64 Wine GUEST DATA
+          Archive SHA256 86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0
+          This is NOT an APK and does not run Windows by itself.
+          This archive is the exact unmodified input used in Linux FEX/Wine tests.
+          Includes Wine packages, glibc runtime and dependencies with package
+          copyright/license texts under usr/share/doc, and a small MinGW
+          experimental Win64 test fixture. Installed only in the app-private
+          guest DATA directory, with no native Linux ELF execve on Android.
+          Wine source/documentation: https://www.winehq.org/
+          Ubuntu Wine packages and source: https://packages.ubuntu.com/noble/wine64
+          Ubuntu libwine and source: https://packages.ubuntu.com/noble/libwine
+          Ubuntu GNU libc and source: https://packages.ubuntu.com/noble/libc6
+          FEX ARM64 engine (not bundled here): https://github.com/FEX-Emu/FEX
+          Binary legal attributions and licenses: archive usr/share/doc/
+          This experimental third-party guest data is not endorsed by Wine,
+          Canonical or FEX. Use only when the Android app asks to install data.
+          TXT
+          gh --version
+      - name: Publish separate immutable original rootfs DATA release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=carx-pc-wine-guest-ubuntu-noble-r3c21
+          if gh release view "$TAG" >/dev/null 2>&1;then
+            echo "::error::Refusing to replace existing immutable third-party data source";exit 1
+          fi
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "CarX verified Ubuntu Wine Linux x64 guest DATA — 517 MB" \
+            --notes "Exact source-verified Ubuntu Noble Linux x86-64 Wine rootfs tar.gz from GitHub Actions 43598239873. Original compressed SHA-256 86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0, exact bytes 517361543. Intended for Android app-owned guest data installation on explicit opt-in. This is not an executable Android APK and does NOT demonstrate Wine/Windows/CarX game boot on Android. Source and redistributed package license notices remain in the archive under /usr/share/doc, with attribution README in assets."
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets | tee /tmp/carx-r3c21-source-release-assets.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/carx-r3c21-source-release-assets.json'))
+          names={a['name'] for a in x['assets']}
+          assert {'CarX_Wine_Ubuntu_Noble_x86_64_GuestRootfs_SHA256.tar.gz',
+                  'CarX_Wine_Ubuntu_Noble_x86_64_GuestRootfs_SHA256.tar.gz.sha256',
+                  'README_Source_Licenses.txt'}<=names,names
+          print('CARX_R3C21_GITHUB_RELEASE_VERIFIED_ASSET_UPLOADED')
+          PY
