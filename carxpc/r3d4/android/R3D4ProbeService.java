@@ -40,7 +40,7 @@ public final class R3D4ProbeService extends Service {
     private void phase(String stage) {
         try (FileOutputStream stream = new FileOutputStream(
                 new File(getFilesDir(), PHASE_FILE), true)) {
-            stream.write((stage + "\\n").getBytes(StandardCharsets.UTF_8));
+            stream.write((stage + "\n").getBytes(StandardCharsets.UTF_8));
             stream.getFD().sync();
         } catch (Throwable ignored) { }
     }
@@ -61,7 +61,7 @@ public final class R3D4ProbeService extends Service {
         // A fresh phase log is required to tie events to this one launch.
         try (FileOutputStream stream = new FileOutputStream(
                 new File(getFilesDir(), PHASE_FILE), false)) {
-            stream.write(("session=" + Long.toUnsignedString(nonce) + "\\n")
+            stream.write(("session=" + Long.toUnsignedString(nonce) + "\n")
                 .getBytes(StandardCharsets.UTF_8));
             stream.getFD().sync();
         } catch (Throwable ignored) { }
