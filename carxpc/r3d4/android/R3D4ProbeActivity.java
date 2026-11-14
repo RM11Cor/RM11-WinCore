@@ -9,6 +9,9 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -31,7 +34,7 @@ public final class R3D4ProbeActivity extends Activity {
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        setTitle("CarX R3D4 | FEX / Wine 07D");
+        setTitle("CarX R3D6 | FEX / Wine 07D");
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(36, 44, 36, 24);
@@ -68,6 +71,12 @@ public final class R3D4ProbeActivity extends Activity {
             output.setText("REJECTED: لم يمكن مسح أثر جلسة قديمة");
             return;
         }
+        File progress = new File(getFilesDir(), R3D4ProbeService.PHASE_FILE);
+        if (progress.exists() && !progress.delete()) {
+            running = false; run.setEnabled(true);
+            output.setText("REJECTED: فشل تنظيف سجل مراحل التشغيل القديم");
+            return;
+        }
         output.setText("07D: RUNNING\nالتنفيذ داخل عملية منفصلة مع مهلة قتل 6 ثوانٍ...");
         try {
             Intent intent = new Intent(this, R3D4ProbeService.class);
@@ -87,7 +96,7 @@ public final class R3D4ProbeActivity extends Activity {
         String state = "NOT_OBSERVED";
         JSONObject report = new JSONObject();
         try {
-            report.put("schema","r4.carx.r3d4.first-syscall-device-report.v1");
+            report.put("schema","r4.carx.r3d6.first-syscall-phase-trace.v1");
             report.put("stage","07D_WINE_LDSO_FIRST_FEX_SYSCALL");
             report.put("device_process_isolated",true);
             report.put("parent_did_not_execute_fex",true);
@@ -122,6 +131,40 @@ public final class R3D4ProbeActivity extends Activity {
                         report.put("rip_interpretation",interpretation);
                     } else state="REJECTED_INVALID_WITNESS";
                 } else if (data.length!=0) state="REJECTED_TRUNCATED_WITNESS";
+            }
+            // R3D6: diagnostics only; phases MUST NOT promote status to PASS.
+            File phases = new File(getFilesDir(), R3D4ProbeService.PHASE_FILE);
+            String last = "NO_CHILD_PHASE_LOG";
+            JSONArray phaseArray = new JSONArray();
+            boolean phaseSessionValid = false;
+            if (phases.isFile()) {
+                List<String> lines = Files.readAllLines(phases.toPath(),
+                    StandardCharsets.UTF_8);
+                if (!lines.isEmpty() && lines.size() <= 48 &&
+                    lines.get(0).equals("session=" +
+                        Long.toUnsignedString(expectedNonce))) {
+                    phaseSessionValid = true;
+                    for (int i = 1; i < lines.size(); ++i) {
+                        String item=lines.get(i);
+                        if (item.matches("[A-Z0-9_]{3,150}")) {
+                            phaseArray.put(item);
+                            last=item;
+                        } else {
+                            last="INVALID_CHILD_PHASE_LINE";
+                            phaseSessionValid=false;
+                            break;
+                        }
+                    }
+                } else {
+                    last="REJECTED_PHASE_SESSION_MISMATCH";
+                }
+            }
+            report.put("phase_log_session_valid", phaseSessionValid);
+            report.put("phase_events", phaseArray);
+            report.put("last_probe_phase", last);
+            report.put("phase_result_is_independent_of_syscall_proof",true);
+            if (!phaseSessionValid && state.startsWith("OBSERVED")) {
+                state="REJECTED_MISSING_MATCHING_PHASE_SESSION";
             }
             report.put("status",state);
             report.put("evidence_limit",
