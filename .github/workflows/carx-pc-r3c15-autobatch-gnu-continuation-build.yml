@@ -239,7 +239,7 @@ jobs:
         working-directory: /tmp/kernix-src
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           mkdir -p dist/android-candidate
           cp /tmp/carx-fex/libFEXCore-android-build-only.so dist/android-candidate/libFEXCore.so
           test "$(sha256sum dist/android-candidate/libFEXCore.so | cut -d' ' -f1)" = 'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
