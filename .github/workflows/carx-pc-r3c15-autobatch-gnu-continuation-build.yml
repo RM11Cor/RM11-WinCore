@@ -246,7 +246,7 @@ jobs:
           NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
           BIN=dist/android-candidate/libkernix_g0_original_ldso_continuation.so
           "$NDK_BIN/aarch64-linux-android26-clang++" \
-            -std=c++20 -O2 -Wall -Wextra -fPIE -pie \
+            -std=c++20 -O2 -Wall -Wextra -fPIE -pie -static-libstdc++ \
             -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
             -DKERNIX_G0_ENABLE_GUEST_BRK12 \
             -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
