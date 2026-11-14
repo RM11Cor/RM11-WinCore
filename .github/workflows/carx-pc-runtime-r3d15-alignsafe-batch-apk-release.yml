@@ -3,7 +3,7 @@ on:
   push:
     branches: [carx-r3d15-unaligned-tso-fexcore]
     paths:
-      - '.github/workflows/carx-pc-runtime-r3d15-unaligned-tso-batch-apk-release.yml'
+      - '.github/workflows/carx-pc-runtime-r3d15-alignsafe-batch-apk-release.yml'
       - 'carxpc/r3d4/**'
       - 'carxpc/r3d6/**'
       - 'carxpc/r3d7/**'
