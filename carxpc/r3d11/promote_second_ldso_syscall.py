@@ -144,11 +144,10 @@ struct R3D11GuestBrkReservation {
   }
 };
 bool createFEXContextBoundToWine(uint64_t wineEntry,uint64_t loaderEntry,''')
-s=one(s,
-'''                                 int traceFd,uint64_t nonce,
-                                 std::string& reason) {''',
-'''                                 int traceFd,uint64_t nonce,int mode,
-                                 std::string& reason) {''')
+s,n=re.subn(
+    r"(bool createFEXContextBoundToWine\([\s\S]{0,700}?int traceFd,uint64_t nonce)(,\s*std::string& reason\) \{)",
+    r"\1,int mode\2",s,count=1)
+assert n==1,"R3D11_FEX_CONTEXT_SIGNATURE_NOT_FOUND"
 s=one(s,
 '''  GuardedFEXCallRetStack callretGuard{};
   auto context=FEXCore::Context::Context::CreateNewContext(host);''',
