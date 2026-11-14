@@ -128,6 +128,7 @@ s=one(s,
 
 s=one(s,
 '''        lastReport = null;
+        probeStartedAtMs=System.currentTimeMillis();
         File f = new File''',
 '''        lastReport = null;
         savedUri = null;
