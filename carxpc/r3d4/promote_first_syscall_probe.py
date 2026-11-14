@@ -42,10 +42,33 @@ component = """
 """
 manifest.write_text(m.replace("</application>", component + "    </application>"))
 
+# R3D5: Always expose the new test in the EXISTING launcher activity.
+# REDMAGIC launchers may coalesce extra MAIN/LAUNCHER aliases. No second icon
+# is required to access 07D. Never reroute legacy button 09 / 07C.
+activity = root / "MainActivity.java"
+ui = activity.read_text()
+ui_anchor = '    addText("09 | R3-C25 ربط ذاكرة Wine وسياق FEX الحقيقي",17,ACCENT,true);'
+assert ui.count(ui_anchor) == 1, "R3C25_MAIN_ACTIVITY_UI_ANCHOR_NOT_FOUND"
+ui_new = ui_anchor + """
+    addText("10 | R3D5 — اختبار Wine 07D الجديد",17,ACCENT,true);
+    addText("هذا الاختبار يشتغل داخل عملية معزولة، ويمكنك مشاركة تقريره هنا. لا يحاول تشغيل CarX أو Wine كاملاً.",13,MUTED,false);
+    Button r3d5OpenProbeBtn = button("فتح اختبار Wine 07D");
+    r3d5OpenProbeBtn.setOnClickListener(v -> {
+        android.content.Intent next = new android.content.Intent(
+            MainActivity.this,R3D4ProbeActivity.class);
+        startActivity(next);
+    });
+"""
+ui = ui.replace(ui_anchor,ui_new,1)
+assert "فتح اختبار Wine 07D" in ui
+assert "R3D4ProbeActivity.class" in ui
+activity.write_text(ui)
+
+
 s = gradle.read_text()
-s,n = re.subn(r"\bversionCode\s+30\b", "versionCode 31", s)
+s,n = re.subn(r"\bversionCode\s+30\b", "versionCode 32", s)
 assert n == 1, "MUST_PATCH_R3C25_ONLY"
-s,n = re.subn(r"versionName\s+'[^']+'", "versionName '0.31-r3d4-isolated-wine-first-syscall-probe'", s)
+s,n = re.subn(r"versionName\s+'[^']+'", "versionName '0.32-r3d5-visible-07d-button'", s)
 assert n == 1
 gradle.write_text(s)
 
