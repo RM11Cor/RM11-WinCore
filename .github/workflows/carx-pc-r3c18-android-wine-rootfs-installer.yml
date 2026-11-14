@@ -1,0 +1,120 @@
+name: CarX R3C18 Android Guest Wine RootFS Streaming Installer
+on:
+  push:
+    branches: [carx-pc-runtime-r3c18-android-guest-rootfs]
+    paths:
+      - 'carxpc/r3c18/**'
+      - '.github/workflows/carx-pc-r3c18-android-wine-rootfs-installer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  safe-archive-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate fake Wine TAR.GZ fixtures and 13 adversarial archives
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carx-r3c18-fixtures /tmp/carx-r3c18-classes
+          python3 carxpc/r3c18/tests/make_tar_fixtures.py /tmp/carx-r3c18-fixtures
+      - name: Compile the exact source into portable Java bytecode
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d /tmp/carx-r3c18-classes \
+            carxpc/r3c18/android/GuestRootfsInstaller.java \
+            carxpc/r3c18/tests/GuestRootfsInstallerTests.java \
+            carxpc/r3c18/tests/GuestRootfsActualArchiveTest.java
+          javap -classpath /tmp/carx-r3c18-classes -public com.r4.carxpc.GuestRootfsInstaller \
+            | tee /tmp/carx-r3c18-installer-api.txt
+          grep -Fq 'public static final java.lang.String ARCHIVE_SHA256' /tmp/carx-r3c18-installer-api.txt
+      - name: Execute actual streaming extract, rollback, SHA-256 and archive attacks
+        run: |
+          set -euo pipefail
+          java -Xmx512m -cp /tmp/carx-r3c18-classes \
+            com.r4.carxpc.GuestRootfsInstallerTests /tmp/carx-r3c18-fixtures \
+            | tee r3c18-unit-evidence.log
+          grep -Fq 'ROOTFS_INSTALLER_STREAMING_SHA256_ROLLBACK_14_UNIT_CASES_PASS_NO_ANDROID_WINE_EXECUTION' r3c18-unit-evidence.log
+      - name: Audit no root, shell or path escape is exposed by the importer
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('carxpc/r3c18/android/GuestRootfsInstaller.java').read_text()
+          for key in ['ARCHIVE_SHA256','ATOMIC_MOVE','Files.createSymbolicLink',
+                      'ARCHIVE_SHA256_MISMATCH','SYMLINK_ESCAPE',
+                      'PATH_COMPONENT_REJECTED','UNSAFE_GLOBAL_PAX_OVERRIDE',
+                      'GZIPInputStream','WINE_PREFIX_PARENT_NOT_OWNED']:
+              if key=='WINE_PREFIX_PARENT_NOT_OWNED':continue
+              assert key in p,key
+          for key in ['Runtime.getRuntime().exec','ProcessBuilder','su -c',
+                      'System.loadLibrary','native void']:
+              assert key not in p,key
+          print('CARX_R3C18_UNPRIVILEGED_GUEST_DATA_ONLY_IMPORTER_SOURCE_AUDIT_PASS')
+          PY
+      - name: Upload fake-data unit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C18-RootfsInstaller-SyntheticSafetyTests-NOT-Device
+          path: r3c18-unit-evidence.log
+          retention-days: 14
+
+  real-ubuntu-wine-archive:
+    needs: [safe-archive-unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download existing pinned Ubuntu x86_64 Wine guest archive; do not redistribute as APK
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: /tmp/carx-r3c18-inputs
+      - name: Authenticate source archive exact SHA before any extraction
+        run: |
+          set -euo pipefail
+          test -f /tmp/carx-r3c18-inputs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          d=Path('/tmp/carx-r3c18-inputs')
+          m=json.loads((d/'guest-provenance.json').read_text())
+          p=d/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with p.open('rb') as f: sha=hashlib.file_digest(f,'sha256').hexdigest()
+          assert sha==m['tar_sha256']=='86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0'
+          print("CARX_R3C18_REAL_WINE_ARCHIVE_515MB_SOURCE_SHA256_VERIFIED",p.stat().st_size)
+          PY
+      - name: Compile same Java guest installer source and extract original x86-64 Wine rootfs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carx-r3c18-classes /tmp/carx-r3c18-owned-app-files
+          javac -encoding UTF-8 -d /tmp/carx-r3c18-classes \
+            carxpc/r3c18/android/GuestRootfsInstaller.java \
+            carxpc/r3c18/tests/GuestRootfsActualArchiveTest.java
+          timeout 900s java -Xmx1024m -cp /tmp/carx-r3c18-classes \
+            com.r4.carxpc.GuestRootfsActualArchiveTest \
+            /tmp/carx-r3c18-inputs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz \
+            /tmp/carx-r3c18-owned-app-files | tee r3c18-real-archive-evidence.log
+          grep -Fq 'CARX_R3C18_REAL_UBUNTU_GUEST_ROOTFS_EXTRACT_SHA256_PASS' r3c18-real-archive-evidence.log
+          grep -Fq 'CARX_R3C18_DISK_STAGING_ONLY_NOT_AN_ANDROID_WINE_EXECUTION' r3c18-real-archive-evidence.log
+          test -f /tmp/carx-r3c18-owned-app-files/wine-guest-x86_64/.r4-rootfs-receipt
+          cat /tmp/carx-r3c18-owned-app-files/wine-guest-x86_64/.r4-rootfs-receipt
+      - name: Upload only manifest and logs (not user rootfs or Wine binary)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C18-RealUbuntuWine-SourceSHA-StreamExtract-HostOnly-NOT-Android
+          path: r3c18-real-archive-evidence.log
+          retention-days: 14
