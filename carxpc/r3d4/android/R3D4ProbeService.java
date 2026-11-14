@@ -84,8 +84,7 @@ public final class R3D4ProbeService extends Service {
                 // Parent will report NOT_OBSERVED; never fabricate success.
             } finally {
                 if (rawFd >= 0) {
-                    try { android.system.Os.close(
-                        android.os.ParcelFileDescriptor.adoptFd(rawFd).getFileDescriptor()); }
+                    try { android.os.ParcelFileDescriptor.adoptFd(rawFd).close(); }
                     catch (Throwable ignored) {}
                 }
             }
