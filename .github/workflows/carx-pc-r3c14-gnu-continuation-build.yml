@@ -1,0 +1,319 @@
+name: CarX R3C14 - original GNU ldso post-close set_tid_address guest TLS
+on:
+  push:
+    branches: [carx-pc-runtime-r3c14]
+    paths: ['.github/workflows/carx-pc-r3c14-gnu-continuation-build.yml', 'carxpc/r3c2/apply_signal_fix.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compile-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse unchanged KERNIX authenticated GNU guest engine sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin kernix-native-engine-v1
+          git worktree add --detach /tmp/kernix-src FETCH_HEAD
+          test -s /tmp/kernix-src/native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp
+          test -s /tmp/kernix-src/native-engine/android-host/kernix_g0_original_fex_sigbus_backpatch_android_bionic_diagnostic.h
+          mkdir -p /tmp/kernix-src/dist
+      - name: Patch only Android Bionic SIGBUS handler to honor signed upstream FEX retry and rewind
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=/tmp/kernix-src/native-engine/android-host/kernix_g0_original_fex_sigbus_backpatch_android_bionic_diagnostic.h
+          python3 carxpc/r3c2/apply_signal_fix.py "$SOURCE"
+          grep -Fq 'KERNIX_G0_ANDROID_BIONIC_UPSTREAM_FEX_SIGBUS_SIGNED_DELTA_0_RETRY_SAME_JIT_PC' "$SOURCE"
+          grep -Fq 'KERNIX_G0_ANDROID_BIONIC_UPSTREAM_FEX_SIGBUS_SIGNED_DELTA_NEG4_REWIND_DMB' "$SOURCE"
+          grep -Fq 'kMaxHandledBusFaults=4096' "$SOURCE"
+          grep -Fq 'IsAddressInCodeBuffer(self->guestThread_,pc)' "$SOURCE"
+          test "$(grep -F 'uc->uc_mcontext.pc=resumedPC;' "$SOURCE" | wc -l)" -eq 1
+          echo 'R3C2_ORIGINAL_FEXCORE_TSO_ENABLED_SIGNED_PC_DELTA_FIX_STAGED'
+      - name: Download original source-pinned x86 GNU executable interpreter and libc triad
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: /tmp/kernix-src/inputs/original
+      - name: Download exact Android Bionic FEXCore already proven in CarX R3B
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42091689429
+          github-token: ${{ github.token }}
+          path: /tmp/carx-fex
+      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create private input root
+        working-directory: /tmp/kernix-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          accepted={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(accepted)
+          private=Path('dist/original-source-pinned-root')
+          for name,(size,sha) in accepted.items():
+              file=origin/name
+              assert file.is_file() and not file.is_symlink()
+              b=file.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert proof['files'][name]['sha256']==sha
+              target=private/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+              target.chmod(0o400)
+          for p in private.rglob('*'):
+              if p.is_dir():p.chmod(0o700)
+          private.chmod(0o700)
+          print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
+          PY
+      - name: Set up exact Android NDK and source headers (configure only)
+        working-directory: /tmp/kernix-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake ninja-build git python3 pkg-config binutils
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          test -x "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;29.0.14206865'
+          echo "NDK_ROOT=$SDK/ndk/29.0.14206865" >>"$GITHUB_ENV"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --quiet --detach 02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = 02e24ca5c01ed0c864466ed573db347336f70170
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/kernix-fex-upstream/CMakeLists.txt')
+          s=p.read_text()
+          a='elseif (NOT (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))'
+          assert s.count(a)==1
+          s=s.replace(a,a.replace('))',' OR ANDROID))'),1)
+          a='add_subdirectory(Source/)'
+          assert s.count(a)==1
+          p.write_text(s.replace(a,'# Android source-only header configure',1))
+          p=Path('/tmp/kernix-fex-upstream/FEXCore/Source/CMakeLists.txt')
+          s=p.read_text()
+          assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in s
+          p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          p=Path('/tmp/kernix-fex-upstream/FEXCore/Source/Utils/FileUtils.cpp')
+          s=p.read_text()
+          a='#include <unistd.h>'
+          assert s.count(a)==1 and s.count('ssize_t read = getdents64(')==2
+          shim='''#include <sys/syscall.h>
+          #ifdef __ANDROID__
+          static inline ssize_t kernix_android_getdents64(int fd, void* buffer, size_t bytes) {
+            return ::syscall(__NR_getdents64, fd, buffer, bytes);
+          }
+          #endif'''
+          p.write_text(s.replace(a,a+'\n'+shim,1).replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64('))
+          PY
+          cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$SDK/ndk/29.0.14206865/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF \
+            -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_FEX_LINUX_TESTS=OFF \
+            -DBUILD_TESTING=OFF -DENABLE_FEX_ALLOCATOR=ON \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF -DENABLE_OFFLINE_TELEMETRY=OFF \
+            -DENABLE_GDB_SYMBOLS=OFF -DENABLE_WERROR=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE -DTUNE_CPU=generic \
+            >dist/android-headers-cmake-configure.log 2>&1 || {
+              tail -n 100 dist/android-headers-cmake-configure.log;exit 1;
+            }
+          test -d /tmp/kernix-fex-android/generated
+          # FEXCore CMake emits ConfigValues.inl/ConfigOptions.inl and
+          # IRDefines.inc via custom build targets, not configure_file.
+          # Running CMake configure alone is insufficient (observed
+          # first Bionic attempt #42163937029).
+          cmake --build /tmp/kernix-fex-android --target CONFIG_INC IR_INC --parallel 2 \
+            >dist/android-generated-headers-build.log 2>&1 || {
+              tail -n 100 dist/android-generated-headers-build.log;exit 1;
+            }
+          for required in \
+            /tmp/kernix-fex-android/include/FEXCore/Config/ConfigValues.inl \
+            /tmp/kernix-fex-android/include/FEXCore/Config/ConfigOptions.inl \
+            /tmp/kernix-fex-android/include/FEXCore/IR/IRDefines.inc; do
+            test -s "$required" || { echo "::error::Missing authentic FEX generated header: $required";exit 1; }
+          done
+          echo KERNIX_BIONIC_ORIGINAL_FEX_SOURCE_GENERATED_HEADERS_PASS
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+        working-directory: /tmp/kernix-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          b=p.read_bytes()
+          assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
+          assert struct.unpack_from('<H',b,18)[0]==62
+          pOff=struct.unpack_from('<Q',b,32)[0]
+          pEnt,pNum=struct.unpack_from('<HH',b,54)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          offsets=[]
+          for i in range(pNum):
+              t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
+              if t!=1 or flags&7!=5 or fsize>msize or offset>len(b) or fsize>len(b)-offset or vaddr%4096!=offset%4096:continue
+              at=(offset+4095)&~4095
+              if fsize>=4096 and at>=offset and at-offset<=fsize-4096:
+                  offsets.append(at)
+          assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
+          selected=min(offsets)
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
+          PY
+          x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
+            native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S \
+            -o dist/original-elf-fex-process.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/original-elf-fex-process.o dist/original-elf-fex-process.bin
+          x86_64-linux-gnu-objdump -d dist/original-elf-fex-process.o \
+            >dist/original-elf-fex-process-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/original-elf-fex-process.bin').read_bytes()
+          offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
+          assert len(offset)==15 and 340<=len(b)<1200, (len(b),offset)
+          assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(14))
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
+          assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
+          assert bytes.fromhex('64') in b      # FS prefix guest instructions
+          assert b[-1]==0xf4
+          assert 'jmp' in Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          dis=Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          for required in ('syscall','r13','r12','r14','r15','rbp','jmp','hlt'):
+              assert required in dis,required
+          fmt=',\n'.join(','.join(f'0x{v:02x}' for v in b[i:i+8])
+                        for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '// Machine code assembled from source-authentic GNU x86_64 Linux fixture.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'
+            +fmt+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_ARCH_SET_FS_OFFSET={offset[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={offset[1]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_1_OFFSET={offset[2]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_2_OFFSET={offset[3]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_OPENAT_OFFSET={offset[4]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_PREAD64_OFFSET={offset[5]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_READ_OFFSET={offset[6]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MMAP_OFFSET={offset[7]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MUNMAP_OFFSET={offset[8]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MMAP_OFFSET={offset[9]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MUNMAP_OFFSET={offset[10]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_CLOSE_OFFSET={offset[11]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FOREIGN_RELRO_MPROTECT_OFFSET={offset[12]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MPROTECT_OFFSET={offset[13]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={offset[14]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
+          print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
+          PY
+      - name: Compile genuine GNU ld-linux unpatched continuation for Android Bionic arm64
+        working-directory: /tmp/kernix-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/android-candidate
+          cp /tmp/carx-fex/libFEXCore-android-build-only.so dist/android-candidate/libFEXCore.so
+          test "$(sha256sum dist/android-candidate/libFEXCore.so | cut -d' ' -f1)" = 'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          BIN=dist/android-candidate/libkernix_g0_original_ldso_continuation.so
+          "$NDK_BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -fPIE -pie \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -Ldist/android-candidate -lFEXCore \
+            -Wl,-rpath,'$ORIGIN' -Wl,-z,max-page-size=16384 \
+            -o "$BIN" >dist/r3c-android-compile.log 2>&1 || {
+              echo 'R3C_ANDROID_BIONIC_CROSS_LINK_FAILED'
+              tail -n 110 dist/r3c-android-compile.log
+              exit 1
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$BIN" >dist/r3c-android-elf.txt
+          grep -E 'Machine: *AArch64' dist/r3c-android-elf.txt
+          grep -Fq '/system/bin/linker64' dist/r3c-android-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/r3c-android-elf.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libc\+\+_shared.so)\]' dist/r3c-android-elf.txt
+          grep -aFq 'KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_READ_832_SOURCE_ELF64_TO_OWNED_GUEST_STACK_PASS_NO_HOST_READ' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_PREAD64_784_SOURCE_OFFSET_' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_FSTAT5_VIRTUAL_X86_64_STAT144_SOURCE_SIZE_' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_MMAP9_LARGE_PRIVATE_RO_SOURCE_2118168_REQUEST_0x211d90_FD100_OFFSET0_WX_SAFE_EOF_GUARD_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_SECOND_FIXED_TEXT_MMAP_PTLOAD_VERIFIED_RX_NO_NATIVE_FIXED_NO_WX_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_THIRD_FIXED_RO_MMAP_PTLOAD_VERIFIED_SOURCE_NO_NATIVE_FIXED_NO_WX_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_FOURTH_FIXED_RW_MMAP_PTLOAD_OFFSET_SHIFT_SOURCE_0x1fe000_TO_VADDR_0x1ff000_LENGTH_0x6000_NO_NATIVE_FIXED_NO_WX_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_FIFTH_ANONYMOUS_BSS_MMAP_ORIGINAL_RW_PTLOAD_SOURCE_MEM_END_0x211d90_ZERO_0xcd90_OWNED_NO_NATIVE_FIXED_NO_WX_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_CLOSE3_AFTER_FIFTH_BSS_SYNTHETIC_FD100_ONLY_MAPPED_RO_RX_RW_PTLOADS_REMAIN_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_POST_LIBC_CLOSE_ANONYMOUS_RW_8K_OWNED_ZERO_SOURCE_VM_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_POST_CLOSE_ARCH_PRCTL158_ARCH_SET_FS1002_OWNED_8K_TCB_PLUS_0x10c0_FEX_FS_CACHED_GUEST_ONLY_PASS' "$BIN"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_SET_TID_ADDRESS218_AFTER_ARCH_SET_FS_CLEAR_CHILD_TID_POINTER_IN_OWNED_GUEST_8K_TLS_NO_HOST_TID_SYSCALL_PASS' "$BIN"
+          ! grep -aFq 'KERNIX_G0_DIAGNOSTIC_ONLY_FEX_TSO_DISABLED' "$BIN"
+          sha256sum "$BIN" >dist/android-candidate/original-ldso-continuation.sha256
+          cp /tmp/carx-fex/FEX-UPSTREAM-LICENSE.txt dist/android-candidate/FEX-UPSTREAM-LICENSE.txt
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          d=Path('dist/android-candidate')
+          b=(d/'libkernix_g0_original_ldso_continuation.so').read_bytes()
+          report={'schema':'r4.carx.r3c.original-gnu-ldso-android-bionic-candidate',
+              'fex_source_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+              'fex_sha256':'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d',
+              'runner_sha256':hashlib.sha256(b).hexdigest(),
+              'runner_bytes':len(b),
+              'unmodified_ldso_continuation_compiled':True,
+              'android_sigbus_signed_delta_fix':True,
+              'source_pinned_libc_guest_read_832_enabled':True,
+              'source_pinned_libc_pread64_784_offset_64_enabled':True,
+              'source_pinned_libc_fstat5_linux_x86_64_stat144_enabled':True,
+              'source_pinned_libc_large_ro_mmap9_enabled':True,
+              'source_pinned_libc_second_text_rx_mmap9_enabled':True,
+              'source_pinned_libc_third_data_ro_ptload_mmap9_enabled':True,
+              'source_pinned_libc_fourth_writable_ptload_mmap9_enabled':True,
+              'source_pinned_libc_fifth_anonymous_bss_zero_mmap9_enabled':True,
+              'source_pinned_libc_after_bss_close3_enabled':True,
+              'source_pinned_ldso_post_close_anonymous_rw_8k_enabled':True,
+              'source_pinned_ldso_post_close_guest_arch_prctl_set_fs_enabled':True,
+              'source_pinned_ldso_post_close_guest_set_tid_address_enabled':True,
+              'android_device_executed':False,
+              'guest_glibc_initialized':False,
+              'wine_executed':False,
+              'carx_booted':False}
+          (d/'candidate.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('CARX_R3C14_GNU_LDSO_SET_TID_ADDRESS_GUEST_TLS_ANDROID_CANDIDATE_BUILD_PASS',report['runner_sha256'])
+          PY
+      - name: Upload compiled Android source-verified original loader runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C14-GNU-ldso-PostClose-Guest-SetTidAddress-Android-Bionic-BuildOnly
+          path: /tmp/kernix-src/dist/android-candidate/
+          retention-days: 30
