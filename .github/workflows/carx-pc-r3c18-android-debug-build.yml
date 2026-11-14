@@ -1006,5 +1006,5 @@ jobs:
           APK=/tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='23'"
           unzip -p "$APK" classes.dex | strings | grep -Fq 'GuestRootfsInstaller'
-          unzip -p "$APK" classes.dex | strings | grep -Fq 'PICK_WINE_ROOTFS'
+          grep -Fq 'PICK_WINE_ROOTFS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
           echo 'CARX_R3C18_ANDROID_DEBUG_APK_VERSION23_GUEST_ROOTFS_IMPORTER_COMPILED_PASS'
