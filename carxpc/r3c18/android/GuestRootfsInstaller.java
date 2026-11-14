@@ -1,7 +1,7 @@
 package com.r4.carxpc;
 
 import java.io.BufferedInputStream;
-import java.io.DigestInputStream;
+import java.security.DigestInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
