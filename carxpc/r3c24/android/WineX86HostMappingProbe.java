@@ -35,13 +35,16 @@ public final class WineX86HostMappingProbe {
     }
     private static byte[] pinned(Path root,String path,String expected)throws Exception{
         Path source=root.resolve(path).normalize();
-        if(!source.startsWith(root) ||
-           !Files.isRegularFile(source,LinkOption.NOFOLLOW_LINKS) ||
-           Files.isSymbolicLink(source))
-            throw new IOException("R3C24_SOURCE_NOT_REGULAR_APP_OWNED_FILE");
-        Path real=source.toRealPath();
-        if(!real.startsWith(root))
+        if(!source.startsWith(root))
             throw new IOException("R3C24_APP_PRIVATE_ROOT_ESCAPE");
+        // The authentic /lib64/ld-linux-x86-64.so.2 is a normal Linux
+        // symlink inside this guest rootfs. Allow only canonical destinations
+        // strictly inside the app-private root, with a final regular file.
+        Path real=source.toRealPath();
+        if(!real.startsWith(root) ||
+           !Files.isRegularFile(real,LinkOption.NOFOLLOW_LINKS) ||
+           Files.isSymbolicLink(real))
+            throw new IOException("R3C24_SOURCE_SYMLINK_ESCAPED_OR_NOT_REGULAR");
         if(Files.size(real)>2*1024*1024L)
             throw new IOException("R3C24_GUEST_FILE_TOO_LARGE");
         byte[] bytes=Files.readAllBytes(real);
