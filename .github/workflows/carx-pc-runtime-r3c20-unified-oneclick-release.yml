@@ -1195,7 +1195,7 @@ jobs:
               assert any(token in d for d in images),('MISSING_ONECLICK_CLASS_OR_MARKER',token,[len(x) for x in images])
           print('CARX_R3C20_MULTIDEX_ONECLICK_EXECUTION_AND_BLOCKED_GATES_VERIFIED',len(images))
           PY
-          grep -Fq 'one-click' /tmp/carxpc/app/build.gradle
+          grep -Fq 'r3c20-oneclick-device-batch' /tmp/carxpc/app/build.gradle
           echo CARX_R3C20_SIGNED_V25_ONECLICK_GENUINE_FEX_GNU_WINE_ELF_VULKAN_FAILCLOSED_APP_INCLUDED
       - name: Verify signed v24 APK includes original Wine x86_64 ELF preflight and explicitly no execution claims
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
