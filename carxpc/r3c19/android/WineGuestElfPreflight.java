@@ -33,6 +33,14 @@ public final class WineGuestElfPreflight {
     private static final String ROOTFS="wine-guest-x86_64";
     public static final String ROOTFS_SHA256=
         "86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0";
+    // Exact hashes of original source-verified binaries from GitHub Actions
+    // run 43605206286, NOT inferred from filenames or the Android host.
+    public static final String WINE64_SHA256=
+        "f86e46a5fe46e92783ac42fcf03a84f0287c2fbc7d620a5521b3341b1a032e03";
+    public static final String LDSO_SHA256=
+        "1d7133d7b9f94465978b2ae8d21ca3751c8dfaaec50e5c3a90";
+    public static final String KERNEL32_SHA256=
+        "b4d6464d6c56d08a939564adcafa59822a3957df5ab13de24edf29de4795f5e5";
     private static final String RECEIPT=".r4-rootfs-receipt";
     private static final String WINE="usr/lib/wine/wine64";
     private static final String PE="usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll";
@@ -109,6 +117,7 @@ public final class WineGuestElfPreflight {
 
         Path wine=source(realRoot,WINE);
         Elf x64=readElf(wine,WINE,true);
+        if(!WINE64_SHA256.equals(x64.sha256))throw fail("WINE64_SOURCE_SHA256_MISMATCH");
         if(x64.interpreter==null||!x64.interpreter.startsWith("/") ||
            x64.interpreter.contains("..") ||
            x64.interpreter.indexOf('\\')>=0)
@@ -116,12 +125,14 @@ public final class WineGuestElfPreflight {
         String interp=x64.interpreter.substring(1);
         Path interpreter=source(realRoot,interp);
         Elf loader=readElf(interpreter,interp,false);
+        if(!LDSO_SHA256.equals(loader.sha256))throw fail("GUEST_LDSO_SOURCE_SHA256_MISMATCH");
         if(loader.interpreter!=null)
             throw fail("GUEST_DYNAMIC_INTERPRETER_HAS_ANOTHER_INTERPRETER");
         if(loader.loadSegments<1)
             throw fail("GUEST_LDSO_NO_PTLOAD");
         Path kernel32=source(realRoot,PE);
         String kh=checkKernel32PE64(kernel32);
+        if(!KERNEL32_SHA256.equals(kh))throw fail("KERNEL32_SOURCE_SHA256_MISMATCH");
         Path inf=source(realRoot,"usr/share/wine/wine.inf");
         if(Files.size(inf)<64)throw fail("GUEST_WINE_INF_MISSING_OR_TOO_SMALL");
 
