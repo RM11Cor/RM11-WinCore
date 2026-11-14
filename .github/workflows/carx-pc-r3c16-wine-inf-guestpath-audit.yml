@@ -1,0 +1,113 @@
+name: CarX R3C16 Wine inf RootFS guest-path audit
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-wine-inf-guestpath-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  wine-inf-guestpath:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - name: Install source FEX ARM64 Linux runtime libraries
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 file libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist inputs
+      - name: Source-pinned FEX ARM64 Linux runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Source-verified Ubuntu Wine64 amd64 guest rootfs
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: inputs/rootfs
+      - name: Inspect Wine INF file and Win64 test file from host and inside genuine FEX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          m=json.loads(Path('inputs/rootfs/guest-provenance.json').read_text())
+          a=Path('inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz')
+          assert hashlib.file_digest(a.open('rb'),'sha256').hexdigest()==m['tar_sha256']
+          d=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert d['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          print('CARX_R3C16_INF_CHECK_SOURCE_PINNED_PASS',m['tar_sha256'])
+          PY
+          ROOT=/tmp/carx-inf-guest-rootfs
+          sudo mkdir -p "$ROOT"
+          sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C "$ROOT"
+          for p in usr/share/wine/wine.inf usr/share/wine usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll usr/lib/wine/wine64 tmp/kernix-real-win32-smoke.exe; do
+            if test -e "$ROOT/$p"; then
+              echo "HOST_ROOTFS_PRESENT $p" | tee -a dist/host-rootfs-inventory.txt
+              ls -ld "$ROOT/$p" >>dist/host-rootfs-inventory.txt
+            else
+              echo "HOST_ROOTFS_ABSENT $p" | tee -a dist/host-rootfs-inventory.txt
+            fi
+          done
+          find "$ROOT/usr" \( -name 'wine.inf' -o -name 'wine.inf.in' \) -ls >dist/rootfs-wine-inf-all-places.txt || :
+          cat dist/rootfs-wine-inf-all-places.txt
+          test -x inputs/fex/fex-linux-elf/Bin/FEX
+          for bin in inputs/fex/fex-linux-elf/Bin/*; do test -f "$bin" && chmod 755 "$bin" || :; done
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-inf-guest-rootfs"}}' >"$HOME/.fex-emu/Config.json"
+      - name: Confirm guest Wine INF and PE access from Linux x64 FEX process
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-inf-guest-rootfs
+          FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          set +e
+          timeout 25s "$FEX" /usr/bin/stat /usr/share/wine/wine.inf >dist/guest-wine-inf-stat.log 2>&1
+          RC_INF=$?
+          timeout 25s "$FEX" /usr/bin/stat /tmp/kernix-real-win32-smoke.exe >dist/guest-pe-stat.log 2>&1
+          RC_PE=$?
+          timeout 25s "$FEX" /usr/bin/stat /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll >dist/guest-kernel32-stat.log 2>&1
+          RC_DLL=$?
+          set -e
+          export RC_INF RC_PE RC_DLL
+          python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          root=Path('/tmp/carx-inf-guest-rootfs')
+          keys=['usr/share/wine/wine.inf','tmp/kernix-real-win32-smoke.exe',
+                'usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll']
+          d={'schema':'r4.carx.r3c16.wine-inf-guest-rootfs-path-audit.v1',
+             'original_guest_rootfs_verified':True,'fex_arm64_source_sha_pinned':True,
+             'wine_inf_exists_in_rootfs':(root/keys[0]).is_file(),
+             'exe_exists_in_rootfs':(root/keys[1]).is_file(),
+             'kernel32_exists_in_rootfs':(root/keys[2]).is_file(),
+             'fex_guest_wine_inf_stat_exit':int(os.environ['RC_INF']),
+             'fex_guest_exe_stat_exit':int(os.environ['RC_PE']),
+             'fex_guest_kernel32_stat_exit':int(os.environ['RC_DLL']),
+             'wine_inf_host_fs_at_usr_share_exists':Path('/usr/share/wine/wine.inf').exists(),
+             'android_bionic_executed':False,'windows_pe_executed_in_this_check':False}
+          Path('dist/wine-inf-rootfs-fex-stat-audit.json').write_text(json.dumps(d,indent=2)+'\n')
+          print(json.dumps(d,indent=2))
+          PY
+          cat dist/guest-wine-inf-stat.log dist/guest-pe-stat.log dist/guest-kernel32-stat.log || :
+      - name: Upload path evidence independent of whether guest INF is missing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-Original-FEX-Guest-WineInf-And-PE-Path-Provenance
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
