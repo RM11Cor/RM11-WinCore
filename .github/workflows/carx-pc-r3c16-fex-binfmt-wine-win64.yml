@@ -58,6 +58,10 @@ jobs:
           sudo mkdir -p /tmp/carx-r3c16-binfmt-guest
           sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c16-binfmt-guest
           sudo install -Dm755 inputs/fex/fex-linux-elf/Bin/FEX /usr/local/bin/FEX
+          sudo install -Dm755 inputs/fex/fex-linux-elf/Bin/FEXServer /usr/local/bin/FEXServer
+          test -x /usr/local/bin/FEX && test -x /usr/local/bin/FEXServer
+          export PATH="/usr/local/bin:$PATH"
+          echo "CARX_R3C16_BINFMT_FEX_AND_FEXSERVER_COLOCATED"
           for f in inputs/fex/fex-linux-elf/Bin/*; do test -f "$f" && chmod 755 "$f" || :; done
           mkdir -p "$HOME/.fex-emu"
           printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-binfmt-guest"}}' >"$HOME/.fex-emu/Config.json"
@@ -88,6 +92,7 @@ jobs:
         continue-on-error: true
         run: |
           set -uo pipefail
+          export PATH="/usr/local/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
           export FEX_ROOTFS=/tmp/carx-r3c16-binfmt-guest
           export WINEPREFIX="$HOME/.carx-r3c16-original-binfmt-guest"
