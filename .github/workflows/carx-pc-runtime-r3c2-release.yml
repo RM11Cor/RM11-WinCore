@@ -1,0 +1,543 @@
+name: CarX PC Runtime R3-C2 - fix FEX signed SIGBUS JIT PC delta
+on:
+  push:
+    branches: [carx-pc-runtime-r3c2]
+    paths:
+      - '.github/workflows/carx-pc-runtime-r3c2-release.yml'
+      - 'carxpc/r3c/app_delta.part*.b64'
+      - 'carxpc/r3c2/**'
+      - 'carxpc/R3C2_SIGBUS_183_FIX_AR.md'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified CarX source stages R1 R2A R2B and R3A
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carxpc
+          cat carxpc/r1.part{1,2,3}.b64 | base64 -d > /tmp/r1.tar.xz
+          echo 'cf820c3abc3bc61c9ff2b0209f65e2a39d58b52ebddb25f49f1ea92883eb6190  /tmp/r1.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r1.tar.xz -C /tmp/carxpc
+          cat carxpc/r2a.part{1,2,3}.b64 | base64 -d > /tmp/r2a.tar.xz
+          echo 'db55e37f87a073f332576161922b2f49f8eb103ef41faaf1e27e32cdad5fb5e8  /tmp/r2a.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r2a.tar.xz -C /tmp/carxpc
+          cat carxpc/r2b.part{1,2,3}.b64 | base64 -d > /tmp/r2b.tar.xz
+          echo 'af5acf423120fa5766f4ac8c50c4c5046553b2ceb925ef1fdef34c00d713bf33  /tmp/r2b.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r2b.tar.xz -C /tmp/carxpc
+          cat carxpc/r3a.part{1,2,3}.b64 | base64 -d > /tmp/r3a.tar.xz
+          echo 'd759d43be422b3f57d7c91ead73c65d028fc0886ba1835b11a6680b9a65903f1  /tmp/r3a.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r3a.tar.xz -C /tmp/carxpc
+          test -s /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          test -s /tmp/carxpc/app/src/main/cpp/native_present.cpp
+          cat carxpc/r3b_patch.part{1,2}.b64 | base64 -d > /tmp/carx-r3b.patch.xz
+          echo 'b2491b4157d13112e3e2487c01065fa4ea8d330757c9c3b4133f96873f664b6c  /tmp/carx-r3b.patch.xz' | sha256sum -c -
+          xz -cd /tmp/carx-r3b.patch.xz >/tmp/carx-r3b.patch
+          patch --batch -p1 -d /tmp/carxpc < /tmp/carx-r3b.patch
+          grep -Fq 'keepDebugSymbols' /tmp/carxpc/app/build.gradle
+          grep -Fq 'versionCode 6' /tmp/carxpc/app/build.gradle
+          grep -Fq 'runLdsoRW' /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          grep -Fq 'beginLdsoProgress' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+          cat carxpc/r3c/app_delta.part{1,2}.b64 | base64 -d > /tmp/carx-r3c-app.patch.xz
+          echo 'e683dc78e02bc004d88da6eb1940706ea07eb7f357917cafef4a70d81e468d5c  /tmp/carx-r3c-app.patch.xz' | sha256sum -c -
+          xz -cd /tmp/carx-r3c-app.patch.xz >/tmp/carx-r3c-app.patch
+          patch --batch -p1 -d /tmp/carxpc < /tmp/carx-r3c-app.patch
+          grep -Fq 'versionCode 7' /tmp/carxpc/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/carxpc/app/build.gradle')
+          s=p.read_text()
+          s,n=re.subn(r'\bversionCode\s+7\b','versionCode 8',s)
+          assert n==1,('versionCode_patch_not_unique',n)
+          s,n=re.subn(r"\bversionName\s+'[^']+'","versionName '0.8-r3c1-cxx-loader-fix'",s)
+          assert n==1,('versionName_patch_not_unique',n)
+          p.write_text(s)
+          PY
+          grep -Fq 'versionCode 8' /tmp/carxpc/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/carxpc/app/build.gradle')
+          s=p.read_text()
+          s,n=re.subn(r'\bversionCode\s+8\b','versionCode 9',s)
+          assert n==1,('versionCode_R3C2_expected_one',n)
+          s,n=re.subn(r"\bversionName\s+'[^']+'","versionName '0.9-r3c2-sigbus-signed-delta'",s)
+          assert n==1
+          p.write_text(s)
+          PY
+          grep -Fq 'versionCode 9' /tmp/carxpc/app/build.gradle
+          grep -Fq 'runOriginalLdsoContinuation' /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          grep -Fq 'beginOriginalLdsoContinuation' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+      - name: Download source-pinned original FEXCore Android ARM64 and guest components
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42091689429
+          github-token: ${{ github.token }}
+          path: /tmp/original-fex
+      - name: Download existing attested real GNU guest ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: /tmp/original-guest
+      - name: Download glibc license/source notices from earlier KERNIX distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-B-Private-Root-Fix-Signed-v0.27-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41851255385
+          github-token: ${{ github.token }}
+          path: /tmp/notices
+      - name: Download proven original GNU ld-linux bounded RW runtime for Android Bionic
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G0-Original-LDSO-RW-State-After-Heap-Android-Bionic-BUILDONLY
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42166430049
+          github-token: ${{ github.token }}
+          path: /tmp/original-ldso-v2
+      - name: Download source-locked GNU ld-linux original unpatched Android ARM64 Bionic candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C-Original-GNU-ldso-Continuation-Bionic-BuildOnly
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43576462916
+          github-token: ${{ github.token }}
+          path: /tmp/gnu-ldso-r3c
+      - name: Download upstream FEX signed SIGBUS-delta corrected GNU loader for Android Bionic
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C2-GNU-ldso-Continuation-Signed-SIGBUS-Fix-Bionic-BuildOnly
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43579716984
+          github-token: ${{ github.token }}
+          path: /tmp/r3c2-native
+      - name: Historical R3A native bytes check (reference only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/old-release
+          gh release download carx-pc-v0004-r3a --pattern 'CarX_PC_Runtime_R3A_FEX_ARM64.apk' --dir /tmp/old-release
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zipfile
+          p=Path('/tmp/old-release/CarX_PC_Runtime_R3A_FEX_ARM64.apk')
+          with zipfile.ZipFile(p) as z:
+              for name in ('libFEXCore.so','libkernix_g0_original_elf_fex_auxv_heap.so'):
+                  b=z.read('lib/arm64-v8a/'+name)
+                  print('OLD_R3A_APK_LIBRARY',name,'sha256',hashlib.sha256(b).hexdigest(),'bytes',len(b))
+          PY
+      - name: Verify and stage exact original FEX upstream binaries ELF triad and licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,zipfile
+          source=Path('/tmp/original-fex')
+          metadata=json.loads((source/'compile-result.json').read_text())
+          assert metadata['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert metadata['configure_rc']==0 and metadata['build_rc']==0 and metadata['bionic_library_built'] is True
+          candidate=source/'g0-integrated-source-original-elf-auxv-fex-android-candidate'
+          witness=json.loads((candidate/'candidate.json').read_text())
+          assert witness['upstream_FEX_sha']==metadata['source_sha']
+          assert witness['actual_linux_ARM64_combined_FEX_guest_run_id']==42090766519
+          assert witness['Android_Bionic_crosslinked'] is True
+          assert witness['physical_Android_device_executed'] is False
+          so='libkernix_g0_original_elf_fex_auxv_heap.so'
+          pairs=[
+            (source/'libFEXCore-android-build-only.so','libFEXCore.so',metadata['elf']['sha256'],'original-fexcore.sha256'),
+            (candidate/so,so,witness['native_binary_sha256'],'original-fex-elf-auxv-heap-runner.sha256')
+          ]
+          dest=Path('/tmp/carxpc/app/src/main')
+          libs=dest/'jniLibs/arm64-v8a'
+          assets=dest/'assets'
+          libs.mkdir(parents=True,exist_ok=True);assets.mkdir(parents=True,exist_ok=True)
+          for src,name,sha,stamp in pairs:
+              raw=src.read_bytes()
+              assert len(raw)>4096 and hashlib.sha256(raw).hexdigest()==sha
+              (libs/name).write_bytes(raw)
+              (assets/stamp).write_text(sha+'\n')
+          orig=Path('/tmp/original-guest/original-guest')
+          manifest=json.loads(Path('/tmp/original-guest/proven-guest-triad.json').read_text())
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')
+          }
+          assert {str(f.relative_to(orig)) for f in orig.rglob('*') if f.is_file()}==set(expected)
+          for rel,(size,sha) in expected.items():
+              b=(orig/rel).read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert manifest['files'][rel]['sha256']==sha
+              target=assets/'original'/rel
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+          raw=(source/'FEX-UPSTREAM-LICENSE.txt').read_bytes()
+          assert len(raw)>100
+          notices=assets/'third-party-notices'
+          notices.mkdir(parents=True,exist_ok=True)
+          (notices/'FEX-UPSTREAM-LICENSE.txt').write_bytes(raw)
+          apks=list(Path('/tmp/notices').rglob('KERNIX-G2E-B-Private-Root-Fix-v0.27.apk'))
+          assert len(apks)==1
+          with zipfile.ZipFile(apks[0]) as z:
+              for name in ('GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt'):
+                  doc=z.read('assets/third-party-notices/'+name)
+                  assert len(doc)>500
+                  (notices/name).write_bytes(doc)
+          print('CARX_R3A_VERIFIED_FEX_UPSTREAM_GUEST_AND_LGPL_NOTICES_STAGED')
+          PY
+      - name: Stage genuine ld-linux bounded callee runner, proven ABI identical to CarX FEXCore
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, hashlib
+          base=Path('/tmp/original-ldso-v2')
+          accepted=json.loads((base/'accepted-source.json').read_text())
+          candidate=base/'android-candidate'
+          w=json.loads((candidate/'candidate.json').read_text())
+          assert accepted['real_linux_arm64_fex_execution_run']==42163385087
+          assert accepted['original_upstream_fex_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert w['original_FEXCore_sha256']==accepted['android_fexcore_sha256']
+          assert w['android_bionic_crosslinked'] is True
+          assert not w['full_ldso_or_glibc_started'] and not w['wine_proton_windows_pe_or_games_executed']
+          raw=(candidate/'libFEXCore.so').read_bytes()
+          original=Path('/tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libFEXCore.so').read_bytes()
+          stamp=Path('/tmp/carxpc/app/src/main/assets/original-fexcore.sha256').read_text().strip()
+          assert raw==original
+          assert hashlib.sha256(raw).hexdigest()==stamp==accepted['android_fexcore_sha256']
+          name='libkernix_g0_original_ldso_rw_state_after_heap.so'
+          runner=(candidate/name).read_bytes()
+          digest=hashlib.sha256(runner).hexdigest()
+          assert digest==w['native_candidate_sha256']=='eb521dd35ca1afafbc31126f8670ac792a73fd06db9e34e87c98aed68f28454c'
+          assert b'KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED' in runner
+          lib=Path('/tmp/carxpc/app/src/main/jniLibs/arm64-v8a')/name
+          lib.write_bytes(runner)
+          (Path('/tmp/carxpc/app/src/main/assets')/'rw-state-runner.sha256').write_text(digest+'\n')
+          print('CARX_R3B_ORIGINAL_LDSO_RUNNER_EXACT_SHA256_AND_FEX_ABI_MATCH',digest)
+          PY
+          readelf -h /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_rw_state_after_heap.so | grep -E 'Machine:.*AArch64'
+          readelf -d /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_rw_state_after_heap.so | grep -F 'Shared library: [libFEXCore.so]'
+      - name: Stage genuine unpatched original GNU loader and verify exact FEXCore ABI and SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          p=Path('/tmp/gnu-ldso-r3c')
+          meta=json.loads((p/'candidate.json').read_text())
+          assert meta['fex_source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['fex_sha256']=='f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          assert meta['runner_sha256']=='fe1eec641a5b3aca7606bf779c9c2581cba5304c5f2b6e99044343c60f6ab06b'
+          assert meta['unmodified_ldso_continuation_compiled'] and not meta['android_device_executed']
+          root=Path('/tmp/carxpc/app/src/main')
+          fex=(root/'jniLibs/arm64-v8a/libFEXCore.so').read_bytes()
+          assert hashlib.sha256(fex).hexdigest()==meta['fex_sha256']
+          runner=(p/'libkernix_g0_original_ldso_continuation.so').read_bytes()
+          assert len(runner)>4096 and hashlib.sha256(runner).hexdigest()==meta['runner_sha256']
+          (root/'jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so').write_bytes(runner)
+          (root/'assets/original-gnu-ldso-continuation.sha256').write_text(meta['runner_sha256']+'\n')
+          print('CARX_R3C_ORIGINAL_GNU_LDSO_CONTINUATION_SOURCE_AND_FEX_CORE_SHA_PASS')
+          PY
+          readelf -h /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so | grep -E 'Machine: *AArch64'
+          readelf -d /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so | grep -F 'Shared library: [libFEXCore.so]'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android SDK and NDK for R2B retained Vulkan
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Bundle pinned Android NDK C++ runtime required by original GNU ldso executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          test -d "$NDK"
+          SOURCE=""
+          for p in \
+            "$NDK/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_shared.so" \
+            "$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" \
+            "$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/libc++_shared.so"; do
+            if test -s "$p"; then SOURCE="$p"; break; fi
+          done
+          if [[ -z "$SOURCE" ]]; then
+            SOURCE="$(find "$NDK" -type f -name libc++_shared.so | grep -E 'arm64-v8a|aarch64-linux-android' | head -1)"
+          fi
+          if [[ -z "$SOURCE" || ! -s "$SOURCE" ]]; then
+            echo "::error::Android NDK libc++_shared.so ARM64 not found"; exit 1
+          fi
+          echo "CXX_SOURCE=$SOURCE"
+          FILE=/tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+          cp "$SOURCE" "$FILE"
+          sha256sum "$SOURCE" "$FILE"
+          cmp "$SOURCE" "$FILE"
+          readelf -h "$FILE" | grep -E 'Machine:.*AArch64'
+          readelf -d "$FILE" | grep -F 'Library soname: [libc++_shared.so]'
+          RUNNER=/tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so
+          readelf -d "$RUNNER" | grep -F 'Shared library: [libc++_shared.so]'
+          readelf -d "$RUNNER" | grep -F 'Shared library: [libFEXCore.so]'
+          readelf -d "$RUNNER" | grep -F '$ORIGIN'
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root=Path('/tmp/carxpc/app/src/main')
+          src=root/'jniLibs/arm64-v8a/libc++_shared.so'
+          sha=hashlib.sha256(src.read_bytes()).hexdigest()
+          (root/'assets/android-ndk-cxx-shared.sha256').write_text(sha+'\n')
+          print('CARX_R3C1_CXX_DEPENDENCY_BUNDLED',sha)
+          PY
+      - name: Replace only ld-linux runner with source-pinned R3C2 signed PC-delta fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          base=Path('/tmp/r3c2-native')
+          meta=json.loads((base/'candidate.json').read_text())
+          assert meta['fex_source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['fex_sha256']=='f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          assert meta['runner_sha256']=='6f7359506f7118f960f2bfe14d1c6f868c3362b50066de65559124949145e2dc'
+          assert meta['android_sigbus_signed_delta_fix'] is True
+          assert meta['unmodified_ldso_continuation_compiled'] is True
+          assert not meta['android_device_executed']
+          root=Path('/tmp/carxpc/app/src/main')
+          lib=root/'jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
+          old=hashlib.sha256(lib.read_bytes()).hexdigest()
+          assert old=='fe1eec641a5b3aca7606bf779c9c2581cba5304c5f2b6e99044343c60f6ab06b'
+          source=(base/'libkernix_g0_original_ldso_continuation.so').read_bytes()
+          assert len(source)>4096
+          assert hashlib.sha256(source).hexdigest()==meta['runner_sha256']
+          lib.write_bytes(source)
+          (root/'assets/original-gnu-ldso-continuation.sha256').write_text(meta['runner_sha256']+'\n')
+          assert hashlib.sha256((root/'jniLibs/arm64-v8a/libFEXCore.so').read_bytes()).hexdigest()==meta['fex_sha256']
+          print('CARX_R3C2_SIGBUS_SOURCE_PINNED_NEW_RUNNER_STAGED',meta['runner_sha256'])
+          PY
+          readelf -h /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so | grep -E 'Machine:.*AArch64'
+          readelf -d /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so | grep -F 'Shared library: [libFEXCore.so]'
+          readelf -d /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so | grep -F 'Shared library: [libc++_shared.so]'
+      - name: Regression — previously accepted CarX PE inspector
+        working-directory: /tmp/carxpc
+        run: |
+          mkdir -p /tmp/carx-host-tests
+          javac -d /tmp/carx-host-tests app/src/main/java/com/r4/carxpc/PEParser.java tests/PEParserHostTest.java
+          java -cp /tmp/carx-host-tests PEParserHostTest
+      - name: Build CarX R3C APK with genuine GNU unpatched loader continuation probe
+        working-directory: /tmp/carxpc
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Audit native library provenance and completed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libFEXCore.so'
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libkernix_g0_original_elf_fex_auxv_heap.so'
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libkernix_g0_original_ldso_rw_state_after_heap.so'
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
+          unzip -l "$APK" | grep -F 'assets/original/lib64/ld-linux-x86-64.so.2'
+          unzip -l "$APK" | grep -F 'assets/third-party-notices/GLIBC-LGPL-2.1.txt'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          sha256sum "$APK"
+      - name: Verify debug APK preserves exact cryptographic hashes of original FEX binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zipfile
+          root=Path('/tmp/carxpc/app/src/main')
+          apk=Path('/tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk')
+          assert apk.is_file()
+          with zipfile.ZipFile(apk) as z:
+              for name,stamp in [('libFEXCore.so','original-fexcore.sha256'),('libkernix_g0_original_elf_fex_auxv_heap.so','original-fex-elf-auxv-heap-runner.sha256'),('libkernix_g0_original_ldso_rw_state_after_heap.so','rw-state-runner.sha256'),('libkernix_g0_original_ldso_continuation.so','original-gnu-ldso-continuation.sha256')]:
+                  expected=(root/'assets'/stamp).read_text().strip()
+                  source=(root/'jniLibs/arm64-v8a'/name).read_bytes()
+                  packaged=z.read('lib/arm64-v8a/'+name)
+                  assert hashlib.sha256(source).hexdigest()==expected,('source_stamp_mismatch',name)
+                  assert hashlib.sha256(packaged).hexdigest()==expected,('APK_STRIPPED_LIBRARY_HASH_FAILURE',name,hashlib.sha256(packaged).hexdigest(),expected)
+                  assert packaged==source,('APK_MODIFIED_PREBUILT_ELF',name)
+                  print('CARX_R3A1_DEBUG_ELF_EXACT_BYTES_SHA256_PASS',name,expected)
+          PY
+      - name: Verify debug APK contains shared C++ dynamic linker dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,re,subprocess
+          apk=Path('/tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk')
+          assert apk.is_file()
+          with zipfile.ZipFile(apk) as z:
+              member='lib/arm64-v8a/libc++_shared.so'
+              assert member in z.namelist(), ('CXX_LIBRARY_MISSING_FROM_APK',member)
+              cxx=z.read(member)
+              assert cxx.startswith(b'\x7fELF') and len(cxx)>10000
+              required='lib/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
+              assert required in z.namelist()
+              runner=z.read(required)
+              assert runner.startswith(b'\x7fELF')
+              assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
+              print('CARX_R3C1_DEBUG_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
+          PY
+      - name: Upload debug-only artifact until stable release signer passes
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-PC-Runtime-R3C2-FEX-SIGBUS-Signed-Delta-Debug
+          path: /tmp/carxpc/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+      - name: Attempt to load original stable KERNIX release keystore
+        shell: bash
+        env:
+          SIGN_B64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          SIGN_PASS: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo 'CARX_R3A_STABLE_SIGNING_READY=false' >> "$GITHUB_ENV"
+          if [[ -z "$SIGN_B64" || -z "$SIGN_PASS" ]]; then
+            echo '::warning::Stable KERNIX signing secrets unavailable; no release will be published.'
+            exit 0
+          fi
+          PASS="$(printf '%s' "$SIGN_PASS" | tr -d '[:space:]')"
+          if [[ "$(printf '%s' "$PASS" | wc -c)" -ne 48 ]]; then
+            echo '::warning::Stable key password format invalid.'
+            exit 0
+          fi
+          umask 077
+          if ! printf '%s' "$SIGN_B64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/carx-r3a-stable.p12"; then
+            echo '::warning::Cannot decode KERNIX signing keystore; no release published.'
+            exit 0
+          fi
+          SHA="$(sha256sum "$RUNNER_TEMP/carx-r3a-stable.p12" | cut -d' ' -f1)"
+          if [[ "$SHA" != fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6 ]]; then
+            echo '::warning::Keystore fingerprint mismatch; refusing release.'
+            exit 0
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/carx-r3a-stable.p12" -storetype PKCS12 -alias kernix-update -storepass "$PASS" > /dev/null 2>&1; then
+            echo '::warning::Keystore alias/password mismatch.'
+            exit 0
+          fi
+          echo "CARX_R3A_STABLE_KEYSTORE=$RUNNER_TEMP/carx-r3a-stable.p12" >> "$GITHUB_ENV"
+          echo "CARX_R3A_STABLE_SIGNING_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo 'CARX_R3A_STABLE_SIGNING_READY=true' >> "$GITHUB_ENV"
+      - name: Configure stable certificate into CarX build
+        if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/carxpc/app/build.gradle')
+          s=p.read_text()
+          assert "applicationId 'com.r4.carxpc'" in s and 'versionCode 9' in s
+          old='buildTypes { release { minifyEnabled false } }'
+          assert s.count(old)==1
+          new="""signingConfigs { stable {
+              storeFile file(System.getenv('CARX_R3A_STABLE_KEYSTORE'))
+              storePassword System.getenv('CARX_R3A_STABLE_SIGNING_PASSWORD')
+              keyAlias 'kernix-update'
+              keyPassword System.getenv('CARX_R3A_STABLE_SIGNING_PASSWORD')
+              storeType 'PKCS12'
+          }}
+          buildTypes { release { minifyEnabled false; signingConfig signingConfigs.stable } }"""
+          p.write_text(s.replace(old,new))
+          PY
+      - name: Build signed ARM64 CarX R3A Release APK
+        if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
+        working-directory: /tmp/carxpc
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Verify release APK preserves exact cryptographic hashes of original FEX binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zipfile
+          root=Path('/tmp/carxpc/app/src/main')
+          apk=Path('/tmp/carxpc/app/build/outputs/apk/release/app-release.apk')
+          assert apk.is_file()
+          with zipfile.ZipFile(apk) as z:
+              for name,stamp in [('libFEXCore.so','original-fexcore.sha256'),('libkernix_g0_original_elf_fex_auxv_heap.so','original-fex-elf-auxv-heap-runner.sha256'),('libkernix_g0_original_ldso_rw_state_after_heap.so','rw-state-runner.sha256'),('libkernix_g0_original_ldso_continuation.so','original-gnu-ldso-continuation.sha256')]:
+                  expected=(root/'assets'/stamp).read_text().strip()
+                  source=(root/'jniLibs/arm64-v8a'/name).read_bytes()
+                  packaged=z.read('lib/arm64-v8a/'+name)
+                  assert hashlib.sha256(source).hexdigest()==expected,('source_stamp_mismatch',name)
+                  assert hashlib.sha256(packaged).hexdigest()==expected,('APK_STRIPPED_LIBRARY_HASH_FAILURE',name,hashlib.sha256(packaged).hexdigest(),expected)
+                  assert packaged==source,('APK_MODIFIED_PREBUILT_ELF',name)
+                  print('CARX_R3A1_RELEASE_ELF_EXACT_BYTES_SHA256_PASS',name,expected)
+          PY
+      - name: Verify release APK contains shared C++ dynamic linker dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,re,subprocess
+          apk=Path('/tmp/carxpc/app/build/outputs/apk/release/app-release.apk')
+          assert apk.is_file()
+          with zipfile.ZipFile(apk) as z:
+              member='lib/arm64-v8a/libc++_shared.so'
+              assert member in z.namelist(), ('CXX_LIBRARY_MISSING_FROM_APK',member)
+              cxx=z.read(member)
+              assert cxx.startswith(b'\x7fELF') and len(cxx)>10000
+              required='lib/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
+              assert required in z.namelist()
+              runner=z.read(required)
+              assert runner.startswith(b'\x7fELF')
+              assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
+              print('CARX_R3C1_RELEASE_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
+          PY
+      - name: Verify CarX release identity and original KERNIX certificate
+        if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/carxpc/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          SHA="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          test "${SHA,,}" = 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='9'"
+          mkdir -p /tmp/carx-release
+          cp "$APK" /tmp/carx-release/CarX_PC_Runtime_R3C2_FEX_SIGBUS_Fix_ARM64.apk
+          (cd /tmp/carx-release && sha256sum CarX_PC_Runtime_R3C2_FEX_SIGBUS_Fix_ARM64.apk > CarX_PC_Runtime_R3C2_FEX_SIGBUS_Fix_ARM64.apk.sha256)
+      - name: Publish prerelease APK on GitHub Releases
+        if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=carx-pc-v0009-r3c2
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo 'Release already exists — refuse to overwrite APK'; exit 1
+          fi
+          gh release create "$TAG" /tmp/carx-release/* \
+            --title "CarX PC Runtime R3-C2 — fix Android FEX SIGBUS signed PC delta" \
+            --target "$GITHUB_SHA" --prerelease \
+            --notes "R3-C2 corrects Android SIGBUS JIT handler to accept genuine signed HandleUnalignedAccess returns: 0 means retry patched LDAR/LDAPR at the same PC, -4 means reexecute previous DMB after store patch, 4 means advance. Source FEXCore unchanged, TSO enabled. Same com.r4.carxpc stable certificate versionCode 9 updates R3-C1 in place. Run only test 06 and export JSON to prove device continuation. GNU glibc/Wine/DXVK/CarX launch not yet established."
+      - name: Remove original signing material from temporary runner
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/carx-r3a-stable.p12"
