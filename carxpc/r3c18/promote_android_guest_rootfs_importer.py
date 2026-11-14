@@ -59,11 +59,11 @@ repl("    if(req==CREATE_REPORT){",
       guestRootfsBtn.setEnabled(false);
       status.setText("R3-C18: جاري استيراد Wine RootFS والتحقق من SHA-256 وكل المسارات دون صلاحيات root...");
       worker.execute(()->{
-        JSONObject result=new JSONObject();
+        JSONObject importResult=new JSONObject();
         try(InputStream in=getContentResolver().openInputStream(chosen)){
           if(in==null)throw new java.io.IOException("NULL_DOCUMENT_STREAM");
           GuestRootfsInstaller.Receipt receipt=GuestRootfsInstaller.install(in,getFilesDir().toPath());
-          result.put("schema","r4.carx.r3c18.owned-guest-rootfs-install.v1")
+          importResult.put("schema","r4.carx.r3c18.owned-guest-rootfs-install.v1")
             .put("status","SOURCE_SHA256_VERIFIED_STAGED_DATA_ONLY")
             .put("success",true)
             .put("sha256",receipt.sha256)
@@ -78,7 +78,7 @@ repl("    if(req==CREATE_REPORT){",
             .put("carx_game_boot_proven",false);
         }catch(Throwable e){
           try{
-            result.put("schema","r4.carx.r3c18.owned-guest-rootfs-install.v1")
+            importResult.put("schema","r4.carx.r3c18.owned-guest-rootfs-install.v1")
               .put("success",false)
               .put("status","IMPORT_REJECTED_OR_FAILED")
               .put("error_type",e.getClass().getSimpleName())
@@ -88,7 +88,7 @@ repl("    if(req==CREATE_REPORT){",
               .put("carx_game_boot_proven",false);
           }catch(Exception ignored){}
         }
-        final JSONObject finalResult=result;
+        final JSONObject finalResult=importResult;
         handler.post(()->{
           busy=false;guestRootfsBtn.setEnabled(true);lastRootfs=finalResult;
           refreshReport();
