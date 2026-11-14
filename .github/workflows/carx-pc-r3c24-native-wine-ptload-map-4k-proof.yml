@@ -1,0 +1,91 @@
+name: CarX R3C24 Actual Native Wine64 ld-linux PTLOAD 4KiB Memory Source Proof
+on:
+  push:
+    branches: [carx-pc-runtime-r3c24-wine-native-ptload-memory]
+    paths:
+      - 'carxpc/r3c24/**'
+      - '.github/workflows/carx-pc-r3c24-native-wine-ptload-map-4k-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-elf-memory-source-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact R3C16 Ubuntu Wine Linux x86_64 original source archive
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: /tmp/carx-r3c24-source
+      - name: Verify original source sha and extract exactly source original Wine64 and ldlinux bytes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,tarfile
+          from pathlib import Path
+          archive=Path('/tmp/carx-r3c24-source/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz')
+          with archive.open('rb') as f:h=hashlib.file_digest(f,'sha256').hexdigest()
+          assert h=='86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0'
+          expected={
+            'wine':'f86e46a5fe46e92783ac42fcf03a84f0287c2fbc7d620a5521b3341b1a032e03',
+            'ldso':'1d7133d7b9f94465978b2ae8d21ca3751c8dfaaecaa2d462aeaf1ec50e5c3a90'}
+          saved={}
+          with tarfile.open(archive,'r:gz') as tar:
+            for info in tar:
+              if not info.isfile() or info.size not in [14640,236616]:
+                continue
+              f=tar.extractfile(info)
+              if not f:continue
+              data=f.read()
+              sha=hashlib.sha256(data).hexdigest()
+              for key,val in expected.items():
+                if sha==val and key not in saved:
+                  saved[key]=(info.name,data)
+          assert set(saved)==set(expected),('SOURCE_WINE_LDSO_REAL_BYTES_NOT_IN_TAR',list(saved))
+          root=Path('/tmp/carx-r3c24-bytes');root.mkdir(exist_ok=True)
+          for name,(src,raw) in saved.items():
+            (root/name).write_bytes(raw)
+            print('CARX_R3C24_REAL_SOURCE_ARCHIVE',name,src,len(raw),expected[name])
+          PY
+      - name: Compile Linux host equivalent original ELF64 memory proof with strict Werror
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic -D_CARX_4K_HOST_TEST=1 -DCARX_WINE_HOST_MAPPING_HOST_TEST=1 \
+            carxpc/r3c24/native/wine_x64_native_ptload_probe.cpp \
+            -o /tmp/carx-r3c24-actual-host-map
+      - name: Exercise source-identical real Wine x86_64 PTLOAD RX/RO/RW pages and guest ABI host stack
+        run: |
+          set -euo pipefail
+          /tmp/carx-r3c24-actual-host-map /tmp/carx-r3c24-bytes/wine /tmp/carx-r3c24-bytes/ldso \
+            | tee r3c24-real-native-host-ptload-evidence.log
+          grep -Fq 'CARX_R3C24_ACTUAL_NATIVE_HOST_MMAP4K_ORIGINAL_WINE64_LDSO_4PTLOAD_STACK_WX_PASS' \
+            r3c24-real-native-host-ptload-evidence.log
+          grep -Fq 'CARX_R3C24_WINE_ORIGINAL_ELF_HEADER_CORRUPTION_FAILCLOSED_PASS' \
+            r3c24-real-native-host-ptload-evidence.log
+          grep -Fq 'NO_GUEST_FEX_WINE_EXECUTION_OR_WINDOWS_PE_PROOF' \
+            r3c24-real-native-host-ptload-evidence.log
+      - name: Compile same JNI native source for real Android Bionic ARM64 NDK ABI
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('carxpc/r3c24/native/wine_x64_native_ptload_probe.cpp').read_text()
+          for must in ['MAP_FIXED_NOREPLACE','PROT_NONE','PROT_READ|PROT_WRITE',
+                       'PF_X','PF_W','original','GetByteArrayRegion',
+                       'SEALED_ORIGINAL_WINE_ELF_PTLOAD_BYTES_MISMATCH',
+                       'NO_GUEST_FEX_WINE_EXECUTION_OR_WINDOWS_PE_PROOF']:
+            assert must in s,must
+          assert 'MAP_FIXED,' not in s
+          print('CARX_R3C24_GUEST_LINUX_CODE_NO_BIONIC_EXECVE_NO_WX_STATIC_AUDIT_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C24-RealWine64-GNUldso-HOST4K-PTLOAD-SourceSHA-WX-NOT-Android
+          path: r3c24-real-native-host-ptload-evidence.log
+          retention-days: 14
