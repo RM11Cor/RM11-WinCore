@@ -33,7 +33,7 @@ public final class WineX86HostMappingProbe {
             b.append(String.format(Locale.ROOT,"%02x",value&255));
         return b.toString();
     }
-    private static byte[] pinned(Path root,String path,String expected)throws Exception{
+    static byte[] pinned(Path root,String path,String expected)throws Exception{
         Path source=root.resolve(path).normalize();
         if(!source.startsWith(root))
             throw new IOException("R3C24_APP_PRIVATE_ROOT_ESCAPE");
