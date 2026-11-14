@@ -79,7 +79,7 @@ once(
       j.put("auto_batch_stop_reason",batchStopReason);
       j.put("auto_batch_terminal_original_guest_exit_group0_proven",batchTerminal);
       if(g>=0) {
-        int boundaryEnd=log.indexOf('\\\\n',g);
+        int boundaryEnd=log.indexOf('\\n',g);
         j.put("auto_batch_last_unsupported_x86_syscall",log.substring(g,boundaryEnd>g?boundaryEnd:log.length()));
       }''')
 once(
