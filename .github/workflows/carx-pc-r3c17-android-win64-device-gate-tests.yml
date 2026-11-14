@@ -31,7 +31,7 @@ jobs:
           p=Path('carxpc/r3c17/accept_android_win64_wine_device.py').read_text()
           for token in ['NOT_ANDROID_BIONIC_HOST','FEX_LINUX_HOST_NOT_ANDROID',
                         'WINE_GUEST_ABI_INVALID','DEVICE_GATE_UNPROVEN_',
-                        'GUEST_PREFIX_PARENT_NOT_OWNED','WIN64_GUEST_PROCESS_NONZERO_EXIT',
+                        'WINE_PREFIX_PARENT_NOT_OWNED','WIN64_GUEST_PROCESS_NONZERO_EXIT',
                         'CARX_R3C17_WIN64_PE_GUEST_EXIT0_ANDROID_BIONIC','GAME_BOOT_FALSE_POSITIVE']:
               assert token in p,token
           print('CARX_R3C17_LINUX_CONTROL_NOT_ACCEPTED_AS_ANDROID_DEVICE_PROOF')
