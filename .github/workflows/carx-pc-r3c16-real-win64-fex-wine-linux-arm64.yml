@@ -1,0 +1,147 @@
+name: CarX R3C16 Real Win64 PE under FEX and Wine on Linux ARM64
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-real-win64-fex-wine-linux-arm64.yml'
+      - 'carxpc/r3c16/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  linux-arm64-real-wine-pe-api-smoke:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux ARM64 host and trusted rootfs tools
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends debootstrap python3 file binutils ca-certificates libstdc++6 libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+      - name: Download real source-built ARM64 Linux FEX binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Download source-built Wine11 Linux x86-64 guest
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41568610374
+          github-token: ${{ github.token }}
+          path: inputs/wine
+      - name: Download newly compiled Win64 PE Windows API fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-RealWin64-PE-And-Wine-Source-Boundary-NOT-Android-Execution
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43596982241
+          github-token: ${{ github.token }}
+          path: inputs/pe
+      - name: Verify source chain and build isolated Linux x86-64 guest rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          fex=Path('inputs/fex/fex-linux-elf')
+          m=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert m['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert m['android_bionic_compatible'] is False
+          for i in m['files']:
+              path=(fex/i['path']).resolve()
+              assert path.is_relative_to(fex.resolve())
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==i['sha256']
+              h=path.open('rb').read(64)
+              assert h[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',h,18)[0]==183
+          wine=Path('inputs/wine')
+          w=json.loads((wine/'wine-stage-files-sha256.json').read_text())
+          assert w['upstream_commit']=='db11d0fe6a169c457e23d007e20404643d067aa8'
+          assert w['android_bionic_compatible'] is False
+          arch=wine/'wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz'
+          assert hashlib.file_digest(arch.open('rb'),'sha256').hexdigest()==(wine/'wine-linux-x64-stage.tar.gz.sha256').read_text().split()[0]
+          pe=Path('inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe')
+          manifest=json.loads(Path('inputs/pe/win64-pe-source-audit.json').read_text())
+          assert hashlib.sha256(pe.read_bytes()).hexdigest()==manifest['sha256']
+          assert manifest['pe_machine']=='AMD64' and manifest['win64_kernel32_imports_structurally_verified'] is True
+          Path('dist/provenance.json').write_text(json.dumps({'schema':'r4.carx.r3c16.linux-arm64-fex-wine-provenance','win64_pe_sha256':manifest['sha256'],'fex_commit':m['source_commit'],'wine_commit':w['upstream_commit'],'android_bionic_executed':False},indent=2)+'\n')
+          print('CARX_R3C16_FEX_WINE_WIN64_PE_PINNED_INPUTS_PASS')
+          PY
+          sudo debootstrap --foreign --arch=amd64 --variant=minbase --include=libgcc-s1,libstdc++6 noble /tmp/carx-r3c16-amd64-guest http://archive.ubuntu.com/ubuntu/
+          test -e /tmp/carx-r3c16-amd64-guest/lib64/ld-linux-x86-64.so.2
+          sudo tar -xzf inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz -C /tmp/carx-r3c16-amd64-guest
+          sudo cp inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe /tmp/carx-r3c16-amd64-guest/tmp/
+          test -f /tmp/carx-r3c16-amd64-guest/opt/kernix-wine-linux-x64/bin/wine
+          test -f /tmp/carx-r3c16-amd64-guest/tmp/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-amd64-guest"}}' > "$HOME/.fex-emu/Config.json"
+          FEX_BIN="$PWD/inputs/fex/fex-linux-elf/Bin"
+          for f in "$FEX_BIN/"*; do test -f "$f" && chmod 755 "$f" || :; done
+          test -x "$FEX_BIN/FEX" && test -x "$FEX_BIN/FEXServer"
+      - name: Run Wine version then actual Win64 PE VirtualAlloc TLS WriteFile under FEX
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-r3c16-amd64-guest
+          export WINEPREFIX="$HOME/.carx-r3c16-real-win64-wine-prefix"
+          export WINEDEBUG=-all
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          set +e
+          timeout 40s "$fex" /usr/bin/true >dist/fex-x64-true.log 2>&1
+          t=$?
+          timeout 60s "$fex" /opt/kernix-wine-linux-x64/bin/wine --version >dist/wine-version.log 2>&1
+          w=$?
+          timeout 120s "$fex" /opt/kernix-wine-linux-x64/bin/wine /tmp/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe >dist/win64-real-pe.log 2>&1
+          p=$?
+          set -e
+          export CARX_T="$t" CARX_W="$w" CARX_P="$p"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          t=int(os.environ['CARX_T']);w=int(os.environ['CARX_W']);p=int(os.environ['CARX_P'])
+          v=Path('dist/wine-version.log').read_text(errors='replace')
+          s=Path('dist/win64-real-pe.log').read_text(errors='replace')
+          outcome={'schema':'r4.carx.r3c16.real-linux-fex-win64-pe.v1',
+             'fex_linux_arm64_x64_elf_true_exit_code':t,
+             'wine_11_linux_x64_cli_exit_code':w,
+             'wine_version_seen':'wine-11.0' in v,
+             'win64_vmem_tls_stdout_pe_exit_code':p,
+             'real_win64_pe_winapi_vmem_tls_stdout_executed_on_linux_arm64':p==0 and 'CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS' in s,
+             'executed_on_android_bionic':False,'dxvk_loaded':False,'carx_game_started':False}
+          Path('dist/real-linux-wine-win64-pe-evidence.json').write_text(json.dumps(outcome,indent=2)+'\n')
+          print(json.dumps(outcome,indent=2))
+          PY
+          cat dist/wine-version.log || :
+          tail -n 50 dist/win64-real-pe.log || :
+      - name: Preserve real execution logs even when dependencies fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-Win64-RealFEX-Wine-LinuxARM64-Evidence-NOT-Android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require actual Win64 PE execution under FEX and Wine on Linux ARM64
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/real-linux-wine-win64-pe-evidence.json'))
+          assert d['fex_linux_arm64_x64_elf_true_exit_code']==0
+          assert d['wine_11_linux_x64_cli_exit_code']==0
+          assert d['wine_version_seen'] is True
+          assert d['real_win64_pe_winapi_vmem_tls_stdout_executed_on_linux_arm64'] is True
+          assert d['executed_on_android_bionic'] is False
+          print('CARX_R3C16_REAL_FEX_WINE_WIN64_PE_VMEM_TLS_STDOUT_LINUX_ARM64_PASS')
+          PY
