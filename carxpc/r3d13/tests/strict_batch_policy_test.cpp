@@ -19,7 +19,7 @@ int main(){
   static_assert(!is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x80001,0));
   static_assert(!is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x80002,0));
   static_assert(!is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x80200,0));
-  static_assert(!is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x80000,0x1A4));
+  static_assert(is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x80000,0x1A4)); // mode ignored without O_CREAT
   static_assert(!is_safe_missing_guest_cache_openat(kAtFdcwdZeroExtended,0x40080000,0));
   return 0;
 }
