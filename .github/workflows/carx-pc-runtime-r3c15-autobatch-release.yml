@@ -966,8 +966,14 @@ jobs:
               assert required in z.namelist()
               runner=z.read(required)
               assert runner.startswith(b'\x7fELF')
-              assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
-              print('CARX_R3C1_DEBUG_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
+              assert b'libFEXCore.so' in runner
+              # Auto-batch AArch64 runner is SHA-pinned, built with NDK
+              # static libc++; other packaged existing libs still use
+              # exact source-pinned libc++_shared.so.
+              import hashlib
+              assert hashlib.sha256(runner).hexdigest()=='b145d4da32a38305d19634fb4777766eec917c72ab172421f52f23849a0074b1'
+              assert b'libc++_shared.so' not in runner
+              print('CARX_R3C15_DEBUG_APK_NATIVE_CXX_DEPENDENCY_AND_PINNED_STATIC_BATCH_INCLUDED',len(cxx),'bytes')
           PY
       - name: Upload debug-only artifact until stable release signer passes
         uses: actions/upload-artifact@v4
@@ -1072,8 +1078,14 @@ jobs:
               assert required in z.namelist()
               runner=z.read(required)
               assert runner.startswith(b'\x7fELF')
-              assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
-              print('CARX_R3C1_RELEASE_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
+              assert b'libFEXCore.so' in runner
+              # Auto-batch AArch64 runner is SHA-pinned, built with NDK
+              # static libc++; other packaged existing libs still use
+              # exact source-pinned libc++_shared.so.
+              import hashlib
+              assert hashlib.sha256(runner).hexdigest()=='b145d4da32a38305d19634fb4777766eec917c72ab172421f52f23849a0074b1'
+              assert b'libc++_shared.so' not in runner
+              print('CARX_R3C15_RELEASE_APK_NATIVE_CXX_DEPENDENCY_AND_PINNED_STATIC_BATCH_INCLUDED',len(cxx),'bytes')
           PY
       - name: Verify CarX release identity and original KERNIX certificate
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
