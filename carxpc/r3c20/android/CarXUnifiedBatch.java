@@ -228,6 +228,7 @@ public final class CarXUnifiedBatch {
             JSONArray array=new JSONArray();
             int passes=0,failures=0,blocks=0;
             JSONObject firstStop=null,firstFailure=null;
+            JSONObject firstDataDependency=null,firstStructuralEngineBlocker=null;
             for(Stage stage:stages) {
                 array.put(stage.json());
                 if("PASS".equals(stage.status))passes++;
@@ -238,6 +239,11 @@ public final class CarXUnifiedBatch {
                     firstStop=stage.json();
                 if(firstFailure==null && "FAIL".equals(stage.status))
                     firstFailure=stage.json();
+                if("03_WINE_GUEST_ROOTFS".equals(stage.id) && "BLOCKED".equals(stage.status))
+                    firstDataDependency=stage.json();
+                if("07_ANDROID_BIONIC_WINE_PROCESS_ADAPTER".equals(stage.id) &&
+                   "BLOCKED".equals(stage.status))
+                    firstStructuralEngineBlocker=stage.json();
             }
             report.put("schema",SCHEMA);
             report.put("mode","ONE_CLICK_REAL_DEVICE_COMPONENT_BATCH");
@@ -251,6 +257,10 @@ public final class CarXUnifiedBatch {
             report.put("block_count",blocks);
             report.put("first_failure",firstFailure==null?JSONObject.NULL:firstFailure);
             report.put("first_stop",firstStop==null?JSONObject.NULL:firstStop);
+            report.put("first_missing_guest_data",
+                firstDataDependency==null?JSONObject.NULL:firstDataDependency);
+            report.put("first_unimplemented_runtime_component",
+                firstStructuralEngineBlocker==null?JSONObject.NULL:firstStructuralEngineBlocker);
             report.put("stages",array);
             report.put("rootfs_metadata_verified",elfReady);
             report.put("original_gnu_12_steps_device_pass",gnuPassed);
