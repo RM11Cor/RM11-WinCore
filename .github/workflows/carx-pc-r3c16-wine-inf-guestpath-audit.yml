@@ -63,8 +63,9 @@ jobs:
           done
           find "$ROOT/usr" \( -name 'wine.inf' -o -name 'wine.inf.in' \) -ls >dist/rootfs-wine-inf-all-places.txt || :
           cat dist/rootfs-wine-inf-all-places.txt
-          test -x inputs/fex/fex-linux-elf/Bin/FEX
           for bin in inputs/fex/fex-linux-elf/Bin/*; do test -f "$bin" && chmod 755 "$bin" || :; done
+          test -x inputs/fex/fex-linux-elf/Bin/FEX
+          test -x inputs/fex/fex-linux-elf/Bin/FEXServer
           mkdir -p "$HOME/.fex-emu"
           printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-inf-guest-rootfs"}}' >"$HOME/.fex-emu/Config.json"
       - name: Confirm guest Wine INF and PE access from Linux x64 FEX process
