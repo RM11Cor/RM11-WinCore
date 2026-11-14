@@ -168,8 +168,8 @@ s=one(s,'''  jlong nonce,jint traceFd,jint progressFd){''',
 s=one(s,'''  if(nonce<=0 || traceFd<0 || progressFd<0)''',
         '''  if(nonce<=0 || traceFd<0 || progressFd<0 ||
      (probeMode!=0 && probeMode!=1))''')
-s=one(s,'''                              int(traceFd),uint64_t(nonce),msg);''',
-        '''                              int(traceFd),uint64_t(nonce),int(probeMode),msg);''')
+s=one(s,'int(traceFd),uint64_t(nonce),msg);',
+        'int(traceFd),uint64_t(nonce),int(probeMode),msg);')
 assert all(t in s for t in (
  "N13_BRK_ZERO_QUERY_EMULATED","N14_SECOND_X86_SYSCALL_CALLBACK",
  "N15_SECOND_SOURCE_LOCKED_LDSO_SYSCALL","N9B_FEX_CALLRET_PREEXEC_VALIDATED",
