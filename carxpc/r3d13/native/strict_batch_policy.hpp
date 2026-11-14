@@ -16,9 +16,9 @@ constexpr uint64_t kAtFdcwdSignExtended = 0xFFFFFFFFFFFFFF9CULL;
 inline constexpr bool is_safe_missing_guest_cache_openat(
     uint64_t dirfd,uint64_t flags,uint64_t mode) noexcept {
   // Do not accept O_CREAT, O_WRONLY, O_TRUNC, O_DIRECTORY, or unknown flags.
-  return (dirfd==kAtFdcwdZeroExtended ||
+  (void)mode; // openat ignores mode unless O_CREAT or O_TMPFILE.\n  return (dirfd==kAtFdcwdZeroExtended ||
           dirfd==kAtFdcwdSignExtended) &&
-         flags==kOpenAtCloexecOnly && mode==0;
+         flags==kOpenAtCloexecOnly; // 4th 'mode' arg is unused without O_CREAT
 }
 
 inline constexpr bool is_safe_brk_zero_query(
