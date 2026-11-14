@@ -41,7 +41,7 @@ jobs:
           print('CARX_R3C19_REAL_GUEST_ROOTFS_SHA256_VALID',digest)
           PY
           mkdir -p /tmp/carx-r3c19-x64-guest
-          tar -xzf inputs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c19-x64-guest
+          sudo tar -xzf inputs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c19-x64-guest
           ROOT=/tmp/carx-r3c19-x64-guest
           for p in /usr/lib/wine/wine64 /usr/lib/wine/wineserver /lib64/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll /usr/share/wine/wine.inf /tmp/kernix-real-win32-smoke.exe; do
             if test -e "$ROOT$p"; then
