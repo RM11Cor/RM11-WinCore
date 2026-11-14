@@ -1,0 +1,146 @@
+name: CarX R3C16 FEX Wine Kernel32 RootFS Paths Strace Isolation
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-fex-kernel32-path-isolation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  kernel32-path-experiments:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 27
+    steps:
+      - name: Install ARM64 Linux FEX host dependencies and strace
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 file binutils strace libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist
+      - name: Retrieve pinned native FEX ARM64 Linux host
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Retrieve distro Wine guest from successful source package validation
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: inputs/distro
+      - name: Verify rootfs provenance, guest builtin paths, interpreter and ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          m=json.loads(Path('inputs/distro/guest-provenance.json').read_text())
+          f=Path('inputs/distro/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz')
+          assert m['arch']=='x86_64' and m['android_bionic_compatible'] is False
+          assert hashlib.file_digest(f.open('rb'),'sha256').hexdigest()==m['tar_sha256']
+          print('CARX_R3C16_FEX_ROOTFS_SHA256_VALID',m['tar_sha256'])
+          PY
+          sudo mkdir -p /tmp/carx-r3c16-wine-rootfs
+          sudo tar -xzf inputs/distro/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c16-wine-rootfs
+          ROOT=/tmp/carx-r3c16-wine-rootfs
+          test -f "$ROOT/tmp/kernix-real-win32-smoke.exe"
+          test -f "$ROOT/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          test -f "$ROOT/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/ntdll.dll"
+          test -x "$ROOT/usr/lib/wine/wine64"
+          find "$ROOT/usr/lib/wine" -maxdepth 2 -type f -print | head -n 25 >dist/wine-host-exec-paths.txt
+          find "$ROOT/usr/lib/x86_64-linux-gnu/wine" -maxdepth 2 -type f \( -name 'kernel32.dll' -o -name 'ntdll.dll' -o -name 'kernelbase.dll' -o -name 'wineserver' -o -name 'ntdll.so' \) -print >dist/wine-guest-module-paths.txt
+          ls -la /proc/sys/fs/binfmt_misc >dist/binfmt-before.txt || :
+          find inputs/fex/fex-linux-elf/Bin -maxdepth 1 -type f -printf '%f\n' | sort >dist/fex-binaries.txt
+          cat dist/fex-binaries.txt
+          FEX_BIN="$PWD/inputs/fex/fex-linux-elf/Bin"
+          for f in "$FEX_BIN/"*; do test -f "$f" && chmod 755 "$f" || :; done
+          test -x "$FEX_BIN/FEX"
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-wine-rootfs"}}' >"$HOME/.fex-emu/Config.json"
+      - name: Execute identical Win64 PE with controlled Wine DLL layouts
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-r3c16-wine-rootfs
+          export WINEARCH=win64
+          export WINEDEBUG=+module,+loaddll,+err
+          EXE=/tmp/kernix-real-win32-smoke.exe
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export WINEPREFIX="$HOME/.carx-path-baseline"
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine
+          set +e
+          timeout 40s strace -f -qq -e trace=openat,access,newfstatat,readlink,execve -o dist/strace-baseline.log "$fex" /usr/lib/wine/wine64 "$EXE" >dist/wine-baseline.log 2>&1
+          A=$?
+          export WINEPREFIX="$HOME/.carx-path-explicit-windows-dir"
+          export WINESYSTEMDLLPATH=/usr/lib/x86_64-linux-gnu/wine/x86_64-windows
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine/x86_64-windows
+          timeout 40s strace -f -qq -e trace=openat,access,newfstatat,readlink,execve -o dist/strace-explicit-dll.log "$fex" /usr/lib/wine/wine64 "$EXE" >dist/wine-explicit-dll.log 2>&1
+          B=$?
+          unset WINESYSTEMDLLPATH
+          sudo mkdir -p /opt/carx-wine-distro/usr/lib
+          sudo cp -a /tmp/carx-r3c16-wine-rootfs/usr/lib/wine /opt/carx-wine-distro/usr/lib/
+          sudo mkdir -p /opt/carx-wine-distro/usr/lib/x86_64-linux-gnu
+          sudo cp -a /tmp/carx-r3c16-wine-rootfs/usr/lib/x86_64-linux-gnu/wine /opt/carx-wine-distro/usr/lib/x86_64-linux-gnu/
+          export WINEPREFIX="$HOME/.carx-path-host-side"
+          export WINEDLLPATH=/opt/carx-wine-distro/usr/lib/x86_64-linux-gnu/wine
+          export WINESYSTEMDLLPATH=/opt/carx-wine-distro/usr/lib/x86_64-linux-gnu/wine/x86_64-windows
+          timeout 40s strace -f -qq -e trace=openat,access,newfstatat,readlink,execve -o dist/strace-hostside.log "$fex" /opt/carx-wine-distro/usr/lib/wine/wine64 "$EXE" >dist/wine-hostside.log 2>&1
+          C=$?
+          set -e
+          export RESULT_A="$A" RESULT_B="$B" RESULT_C="$C"
+          python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          marker='CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS'
+          cases={}
+          for label,variable in [('baseline','RESULT_A'),('explicit_dllpath','RESULT_B'),('hostside_wine','RESULT_C')]:
+              log=Path('dist/wine-'+{'baseline':'baseline','explicit_dllpath':'explicit-dll','hostside_wine':'hostside'}[label]+'.log').read_text(errors='replace')
+              trace=Path('dist/strace-'+{'baseline':'baseline','explicit_dllpath':'explicit-dll','hostside_wine':'hostside'}[label]+'.log').read_text(errors='replace')
+              code=int(os.environ[variable])
+              cases[label]={
+                'exit_code':code,
+                'real_win64_pe_executed':code==0 and marker in log,
+                'kernel32_missing':"could not load kernel32.dll" in log,
+                'wine_module_err_lines':[x[:500] for x in log.splitlines() if re.search('kernel32|kernelbase|ntdll|err:',x,re.I)][-18:],
+                'host_kernel32_accesses':[x[:400] for x in trace.splitlines() if 'kernel32' in x.lower()][-16:],
+                'host_execve_count':trace.count('execve(')
+              }
+          d={'schema':'r4.carx.r3c16.fex-wine-rootfs-path-experiments.v1',
+             'original_fex_guest_rootfs_preserved':True,
+             'android_bionic_execution':False,
+             'cases':cases}
+          Path('dist/kernel32-path-experiments.json').write_text(json.dumps(d,indent=2)+'\n')
+          print(json.dumps({k:{t:v for t,v in c.items() if t not in ('wine_module_err_lines','host_kernel32_accesses')} for k,c in cases.items()},indent=2))
+          PY
+      - name: Upload all Wine paths and FEX trace evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-FEX-Wine-Kernel32-Path-Isolation-Results
+          path: dist/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Require diagnostic JSON and capture first failure
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/kernel32-path-experiments.json'))
+          assert len(d['cases'])==3
+          print("CARX_R3C16_FEX_WINE_KERNEL32_THREE_LAYOUTS_DIAGNOSIS_RECORDED")
+          if any(c['real_win64_pe_executed'] for c in d['cases'].values()):
+              print("CARX_R3C16_FEX_WINE_WIN64_WINDOWS_API_RUNTIME_LAYOUT_SUCCESS")
+          else:
+              print("CARX_R3C16_FEX_WINE_ALL_THREE_LAYOUTS_STILL_FAIL_WINE_NTDLL_OR_BINFMT_NEXT")
+          PY
