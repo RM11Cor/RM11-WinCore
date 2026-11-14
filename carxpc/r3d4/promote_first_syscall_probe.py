@@ -43,9 +43,9 @@ component = """
 manifest.write_text(m.replace("</application>", component + "    </application>"))
 
 s = gradle.read_text()
-s,n = re.subn(r"\\bversionCode\\s+30\\b", "versionCode 31", s)
+s,n = re.subn(r"\bversionCode\s+30\b", "versionCode 31", s)
 assert n == 1, "MUST_PATCH_R3C25_ONLY"
-s,n = re.subn(r"versionName\\s+'[^']+'", "versionName '0.31-r3d4-isolated-wine-first-syscall-probe'", s)
+s,n = re.subn(r"versionName\s+'[^']+'", "versionName '0.31-r3d4-isolated-wine-first-syscall-probe'", s)
 assert n == 1
 gradle.write_text(s)
 
@@ -56,10 +56,10 @@ assert native.count("context->InitCore()") == 1
 assert native.count("NO ExecuteThread()") == 1
 assert native.count("Java_com_r4_carxpc_WineX86FEXContextProbe_nativeProbe") == 1
 assert native.count("bool run(const std::vector<uint8_t> &wine,") == 1
-native = native.replace("#include <cstdio>", "#include <cstdio>\\n#include <fcntl.h>\\n#include \\"carxpc/r3d3/native/r3d3_first_syscall_witness.hpp\\"")
+native = native.replace("#include <cstdio>", "#include <cstdio>\n#include <fcntl.h>\n#include \"carxpc/r3d3/native/r3d3_first_syscall_witness.hpp\"")
 
 start = native.index("class ExplicitNoWineExecutionSyscalls final :")
-end = native.index("\\nbool createFEXContextBoundToWine(", start)
+end = native.index("\nbool createFEXContextBoundToWine(", start)
 replacement = """class FirstSyscallCapture final : public FEXCore::HLE::SyscallHandler {
 public:
   FirstSyscallCapture(uint64_t w,uint64_t l,uint64_t wineLen,uint64_t ldsoLen,
@@ -171,7 +171,7 @@ new = """  std::string msg;
   // Fail closed if ever accidentally loaded in the main app process.
   char cmdline[128]{};
   int proc=::open("/proc/self/cmdline",O_RDONLY|O_CLOEXEC);
-  ssize_t nread=proc<0?-1:::read(proc,cmdline,sizeof(cmdline));
+  ssize_t nread=proc < 0 ? -1 : ::read(proc,cmdline,sizeof(cmdline));
   if(proc>=0)::close(proc);
   size_t processLen = nread<=0 ? 0 : strnlen(cmdline,size_t(nread));
   if(!carx_r3d3::exact_service_process(cmdline,processLen))
