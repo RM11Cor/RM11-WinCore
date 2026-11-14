@@ -36,7 +36,7 @@ for size,word in [("i16Bit","ldarh(Dst, MemReg)"),
             "i32Bit":"ldr(Dst.W(), MemReg)",
             "i64Bit":"ldr(Dst.X(), MemReg)"}[size]
     repl(f"case IR::OpSize::{size}: {word}; break;",
-         f"case IR::OpSize::{size}: {B} {normal}; {B} break;")
+         f"case IR::OpSize::{size}: {B} {normal[:-1]}, 0); {B} break;")
 # Likewise 16/32/64bit non RCPC GPR stores to unaligned host addresses.
 for size,word in [("i16Bit","stlrh(Src, MemReg)"),
                    ("i32Bit","stlr(Src.W(), MemReg)"),
@@ -45,7 +45,7 @@ for size,word in [("i16Bit","stlrh(Src, MemReg)"),
             "i32Bit":"str(Src.W(), MemReg)",
             "i64Bit":"str(Src.X(), MemReg)"}[size]
     repl(f"case IR::OpSize::{size}: {word}; break;",
-         f"case IR::OpSize::{size}: {B} {normal}; {B} break;")
+         f"case IR::OpSize::{size}: {B} {normal[:-1]}, 0); {B} break;")
 # MemCpyTSO helper: even a REP MOVS may be unaligned and atomics can fault.
 # Keep the existing byte-atomic path untouched; for multi-byte use a full
 # ordering barrier around ordinary unaligned-capable LDR/STR.
@@ -58,14 +58,14 @@ for n,atomic,normal in [
     (8,"ldar(TMP4, TMP3)","ldr(TMP4, TMP3)"),
 ]:
     repl(f"case {n}: {atomic}; break;",
-         f"case {n}: {B} {normal}; {B} break;")
+         f"case {n}: {B} {normal[:-1]}, 0); {B} break;")
 for n,atomic,normal in [
     (2,"stlrh(TMP4.W(), TMP2)","strh(TMP4.W(), TMP2)"),
     (4,"stlr(TMP4.W(), TMP2)","str(TMP4.W(), TMP2)"),
     (8,"stlr(TMP4, TMP2)","str(TMP4, TMP2)"),
 ]:
     repl(f"case {n}: {atomic}; break;",
-         f"case {n}: {B} {normal}; {B} break;",2)
+         f"case {n}: {B} {normal[:-1]}, 0); {B} break;",2)
 # MemSetTSO helper: same alignment class on destination stores.
 for n,atomic,normal in [
     (2,"stlrh(Value.W(), TMP2)","strh(Value.W(), TMP2)"),
@@ -73,7 +73,7 @@ for n,atomic,normal in [
     (8,"stlr(Value.X(), TMP2)","str(Value.X(), TMP2)"),
 ]:
     repl(f"case {n}: {atomic}; break;",
-         f"case {n}: {B} {normal}; {B} break;")
+         f"case {n}: {B} {normal[:-1]}, 0); {B} break;")
 assert source != target.read_text()
 assert source.count("dmb(ARMEmitter::BarrierScope::ISH);")>=26
 assert "ldar(Dst.X(), MemReg)" not in source
