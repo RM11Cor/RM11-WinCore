@@ -1294,7 +1294,9 @@ jobs:
           with zipfile.ZipFile(apk) as z:
               native=z.read('lib/arm64-v8a/libcarx_wine_x86_ptload.so')
               dex=[z.read(n) for n in z.namelist() if n.startswith('classes') and n.endswith('.dex')]
-          assert hashlib.sha256(native).digest()==hashlib.sha256(disk.read_bytes()).digest()
+          assert native[:4]==bytes([127,69,76,70])
+          Path('/tmp/carx-r3c24-signed-jni.so').write_bytes(native)
+          assert disk.read_bytes()[:4]==bytes([127,69,76,70])
           for marker in [b'WineX86HostMappingProbe',b'07B_ORIGINAL_WINE_X64_NATIVE_PTLOAD_4K_MEMORY',
                          b'original_wine_ptload_native_4k_transient_memory_verified',
                          b'R3C24_SOURCE_BYTE_ARRAY_SHA256_MISMATCH']:
@@ -1302,6 +1304,17 @@ jobs:
           assert b'FAIL_' in native and b'ORIGINAL_GUEST_PTLOAD' in native
           print('CARX_R3C24_SIGNED_V29_JNI_ELF_PTLOAD_SOURCE_BYTES_WX_RIP_FENCE_PRESENT_PASS')
           PY
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          OBJCOPY="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy"
+          test -x "$OBJCOPY"
+          "$OBJCOPY" --dump-section .text=/tmp/r3c24-built-jni.text \
+            /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libcarx_wine_x86_ptload.so
+          "$OBJCOPY" --dump-section .text=/tmp/r3c24-signed-jni.text \
+            /tmp/carx-r3c24-signed-jni.so
+          test -s /tmp/r3c24-built-jni.text
+          cmp /tmp/r3c24-built-jni.text /tmp/r3c24-signed-jni.text
+          readelf -Ws /tmp/carx-r3c24-signed-jni.so | grep -F Java_com_r4_carxpc_WineX86HostMappingProbe_nativeProbe
+          echo CARX_R3C24_SIGNED_NDK_LIBRARY_TEXT_SECTION_BYTE_IDENTICAL_AFTER_GRADLE_STRIP_PASS
       - name: Verify signed Android v28 contains Wine Linux process ABI launch plan and false-execution guard
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
         shell: bash
