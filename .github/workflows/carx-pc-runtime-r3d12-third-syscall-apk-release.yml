@@ -1234,12 +1234,12 @@ jobs:
           grep -Fq 'getTraceInputStream()' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'MAX_TRACE_BYTES = 1024 * 1024' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'native_crash_tombstone' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D9_07D_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D12_07F_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           test -f /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'R3D8JsonReportStore.save' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'Intent.ACTION_CREATE_DOCUMENT' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'send.setType("application/json")' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D9_07D_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D12_07F_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           test -f /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'E_WATCHDOG_FIRED_6000MS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
@@ -1419,7 +1419,7 @@ jobs:
           assert b'native_crash_tombstone' in dex
           assert b'getTraceInputStream' in dex
           assert b'RECOVERED_NATIVE_CRASH_RECORD_ONLY' in dex
-          assert b'CarX_PC_R3D9_07D_Diagnostics_' in dex
+          assert b'CarX_PC_R3D12_07F_Diagnostics_' in dex
           assert 'فتح اختبار Wine 07D'.encode('utf-8') in dex
           assert b'Intent.ACTION_SEND' not in so
           assert b'getHistoricalProcessExitReasons' in dex
