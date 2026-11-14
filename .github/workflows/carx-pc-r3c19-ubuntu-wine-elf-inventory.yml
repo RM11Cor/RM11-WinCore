@@ -1,0 +1,70 @@
+name: CarX R3C19 Analyze Real Ubuntu x64 Wine ELF Dependencies For Android Bionic
+on:
+  push:
+    branches: [carx-pc-runtime-r3c19-wine-elf-preflight]
+    paths:
+      - '.github/workflows/carx-pc-r3c19-ubuntu-wine-elf-inventory.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  authentic-ubuntu-wine-elf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Install ELF analysis tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends binutils python3 file
+          mkdir -p dist
+      - name: Download source-verified actual Ubuntu x64 Wine guest archive
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: inputs
+      - name: Validate complete rootfs archive original provenance and inspect actual binaries
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          r=Path('inputs')
+          f=r/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          m=json.loads((r/'guest-provenance.json').read_text())
+          digest=hashlib.file_digest(f.open('rb'),'sha256').hexdigest()
+          assert digest==m['tar_sha256']=='86fafa2f5072aa2c47b7025ca591d945007584ecda37ae92eee208a95283f4b0'
+          print('CARX_R3C19_REAL_GUEST_ROOTFS_SHA256_VALID',digest)
+          PY
+          mkdir -p /tmp/carx-r3c19-x64-guest
+          tar -xzf inputs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C /tmp/carx-r3c19-x64-guest
+          ROOT=/tmp/carx-r3c19-x64-guest
+          for p in /usr/lib/wine/wine64 /usr/lib/wine/wineserver /lib64/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll /usr/share/wine/wine.inf /tmp/kernix-real-win32-smoke.exe; do
+            if test -e "$ROOT$p"; then
+              printf 'PROVENANCE_PATH_PRESENT %s\n' "$p"
+              file "$ROOT$p" | tee -a dist/file-identities.txt
+              sha256sum "$ROOT$p" | tee -a dist/original-component-sha256.txt
+              stat -c '%s %n' "$ROOT$p" | tee -a dist/guest-file-sizes.txt
+              if file -b "$ROOT$p" | grep -Fq ELF; then
+                echo "---- ELF_PROGRAM_HEADERS $p ----"
+                readelf -Wl "$ROOT$p" | tee "dist/$(basename "$p").program-headers.txt"
+                readelf -Wd "$ROOT$p" | tee "dist/$(basename "$p").dynamic.txt"
+              fi
+            else
+              printf 'PROVENANCE_PATH_MISSING %s\n' "$p"
+            fi
+          done
+          test -f "$ROOT/usr/lib/wine/wine64"
+          test -f "$ROOT/lib64/ld-linux-x86-64.so.2"
+          test -f "$ROOT/usr/share/wine/wine.inf"
+          test -f "$ROOT/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          echo CARX_R3C19_REAL_UBUNTU_X64_WINE_ELF_IMPORT_AND_PT_INTERP_LAYOUT_DOCUMENTED
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C19-Wine-RealGuest-ELF-Dependency-Inventory-NOT-Android-Execution
+          path: dist/
+          retention-days: 14
