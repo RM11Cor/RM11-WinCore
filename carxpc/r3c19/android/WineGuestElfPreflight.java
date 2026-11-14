@@ -38,7 +38,7 @@ public final class WineGuestElfPreflight {
     public static final String WINE64_SHA256=
         "f86e46a5fe46e92783ac42fcf03a84f0287c2fbc7d620a5521b3341b1a032e03";
     public static final String LDSO_SHA256=
-        "1d7133d7b9f94465978b2ae8d21ca3751c8dfaaec50e5c3a90";
+        "1d7133d7b9f94465978b2ae8d21ca3751c8dfaaecaa2d462aeaf1ec50e5c3a90";
     public static final String KERNEL32_SHA256=
         "b4d6464d6c56d08a939564adcafa59822a3957df5ab13de24edf29de4795f5e5";
     private static final String RECEIPT=".r4-rootfs-receipt";
