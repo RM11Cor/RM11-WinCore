@@ -1125,8 +1125,9 @@ jobs:
         run: |
           set -euo pipefail
           APK=/tmp/carxpc/app/build/outputs/apk/release/app-release.apk
-          unzip -p "$APK" classes.dex | strings | grep -Fq 'GuestRootfsInstaller'
-          unzip -p "$APK" classes.dex | strings | grep -Fq 'ARCHIVE_SHA256_MISMATCH'
+          unzip -p "$APK" classes.dex >/tmp/carx-r3c18-classes.dex
+          grep -aFq 'GuestRootfsInstaller' /tmp/carx-r3c18-classes.dex
+          grep -aFq 'ARCHIVE_SHA256_MISMATCH' /tmp/carx-r3c18-classes.dex
           echo 'CARX_R3C18_SIGNED_APK_ROOTFS_INSTALLER_BYTECODE_SOURCE_LOCK_PASS'
       - name: Publish prerelease APK on GitHub Releases
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
