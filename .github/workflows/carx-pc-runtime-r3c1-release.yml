@@ -55,9 +55,9 @@ jobs:
           import re
           p=Path('/tmp/carxpc/app/build.gradle')
           s=p.read_text()
-          s,n=re.subn(r'\\bversionCode\\s+7\\b','versionCode 8',s)
+          s,n=re.subn(r'\bversionCode\s+7\b','versionCode 8',s)
           assert n==1,('versionCode_patch_not_unique',n)
-          s,n=re.subn(r"\\bversionName\\s+'[^']+'","versionName '0.8-r3c1-cxx-loader-fix'",s)
+          s,n=re.subn(r"\bversionName\s+'[^']+'","versionName '0.8-r3c1-cxx-loader-fix'",s)
           assert n==1,('versionName_patch_not_unique',n)
           p.write_text(s)
           PY
@@ -264,14 +264,14 @@ jobs:
           RUNNER=/tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libkernix_g0_original_ldso_continuation.so
           readelf -d "$RUNNER" | grep -F 'Shared library: [libc++_shared.so]'
           readelf -d "$RUNNER" | grep -F 'Shared library: [libFEXCore.so]'
-          readelf -d "$RUNNER" | grep -F '\$ORIGIN'
+          readelf -d "$RUNNER" | grep -F '$ORIGIN'
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
           root=Path('/tmp/carxpc/app/src/main')
           src=root/'jniLibs/arm64-v8a/libc++_shared.so'
           sha=hashlib.sha256(src.read_bytes()).hexdigest()
-          (root/'assets/android-ndk-cxx-shared.sha256').write_text(sha+'\\n')
+          (root/'assets/android-ndk-cxx-shared.sha256').write_text(sha+'\n')
           print('CARX_R3C1_CXX_DEPENDENCY_BUNDLED',sha)
           PY
       - name: Regression — previously accepted CarX PE inspector
@@ -331,11 +331,11 @@ jobs:
               member='lib/arm64-v8a/libc++_shared.so'
               assert member in z.namelist(), ('CXX_LIBRARY_MISSING_FROM_APK',member)
               cxx=z.read(member)
-              assert cxx.startswith(b'\\x7fELF') and len(cxx)>10000
+              assert cxx.startswith(b'\x7fELF') and len(cxx)>10000
               required='lib/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
               assert required in z.namelist()
               runner=z.read(required)
-              assert runner.startswith(b'\\x7fELF')
+              assert runner.startswith(b'\x7fELF')
               assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
               print('CARX_R3C1_DEBUG_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
           PY
@@ -437,11 +437,11 @@ jobs:
               member='lib/arm64-v8a/libc++_shared.so'
               assert member in z.namelist(), ('CXX_LIBRARY_MISSING_FROM_APK',member)
               cxx=z.read(member)
-              assert cxx.startswith(b'\\x7fELF') and len(cxx)>10000
+              assert cxx.startswith(b'\x7fELF') and len(cxx)>10000
               required='lib/arm64-v8a/libkernix_g0_original_ldso_continuation.so'
               assert required in z.namelist()
               runner=z.read(required)
-              assert runner.startswith(b'\\x7fELF')
+              assert runner.startswith(b'\x7fELF')
               assert b'libc++_shared.so' in runner and b'libFEXCore.so' in runner
               print('CARX_R3C1_RELEASE_APK_DYNAMIC_CXX_DEPENDENCY_INCLUDED',len(cxx),'bytes')
           PY
