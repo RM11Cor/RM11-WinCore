@@ -1,0 +1,87 @@
+name: CarX R3C18 existing Android activity source compatibility audit
+on:
+  push:
+    branches: [carx-pc-runtime-r3c18-android-guest-rootfs]
+    paths:
+      - '.github/workflows/carx-pc-r3c18-app-source-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified CarX source stages R1 R2A R2B and R3A
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/carxpc
+          cat carxpc/r1.part{1,2,3}.b64 | base64 -d > /tmp/r1.tar.xz
+          echo 'cf820c3abc3bc61c9ff2b0209f65e2a39d58b52ebddb25f49f1ea92883eb6190  /tmp/r1.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r1.tar.xz -C /tmp/carxpc
+          cat carxpc/r2a.part{1,2,3}.b64 | base64 -d > /tmp/r2a.tar.xz
+          echo 'db55e37f87a073f332576161922b2f49f8eb103ef41faaf1e27e32cdad5fb5e8  /tmp/r2a.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r2a.tar.xz -C /tmp/carxpc
+          cat carxpc/r2b.part{1,2,3}.b64 | base64 -d > /tmp/r2b.tar.xz
+          echo 'af5acf423120fa5766f4ac8c50c4c5046553b2ceb925ef1fdef34c00d713bf33  /tmp/r2b.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r2b.tar.xz -C /tmp/carxpc
+          cat carxpc/r3a.part{1,2,3}.b64 | base64 -d > /tmp/r3a.tar.xz
+          echo 'd759d43be422b3f57d7c91ead73c65d028fc0886ba1835b11a6680b9a65903f1  /tmp/r3a.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/r3a.tar.xz -C /tmp/carxpc
+          test -s /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          test -s /tmp/carxpc/app/src/main/cpp/native_present.cpp
+          cat carxpc/r3b_patch.part{1,2}.b64 | base64 -d > /tmp/carx-r3b.patch.xz
+          echo 'b2491b4157d13112e3e2487c01065fa4ea8d330757c9c3b4133f96873f664b6c  /tmp/carx-r3b.patch.xz' | sha256sum -c -
+          xz -cd /tmp/carx-r3b.patch.xz >/tmp/carx-r3b.patch
+          patch --batch -p1 -d /tmp/carxpc < /tmp/carx-r3b.patch
+          grep -Fq 'keepDebugSymbols' /tmp/carxpc/app/build.gradle
+          grep -Fq 'versionCode 6' /tmp/carxpc/app/build.gradle
+          grep -Fq 'runLdsoRW' /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          grep -Fq 'beginLdsoProgress' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+          cat carxpc/r3c/app_delta.part{1,2}.b64 | base64 -d > /tmp/carx-r3c-app.patch.xz
+          echo 'e683dc78e02bc004d88da6eb1940706ea07eb7f357917cafef4a70d81e468d5c  /tmp/carx-r3c-app.patch.xz' | sha256sum -c -
+          xz -cd /tmp/carx-r3c-app.patch.xz >/tmp/carx-r3c-app.patch
+          patch --batch -p1 -d /tmp/carxpc < /tmp/carx-r3c-app.patch
+          grep -Fq 'versionCode 7' /tmp/carxpc/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/carxpc/app/build.gradle')
+          s=p.read_text()
+          s,n=re.subn(r'\bversionCode\s+7\b','versionCode 8',s)
+          assert n==1,('versionCode_patch_not_unique',n)
+          s,n=re.subn(r"\bversionName\s+'[^']+'","versionName '0.8-r3c1-cxx-loader-fix'",s)
+          assert n==1,('versionName_patch_not_unique',n)
+          p.write_text(s)
+          PY
+          grep -Fq 'versionCode 8' /tmp/carxpc/app/build.gradle
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/carxpc/app/build.gradle')
+          s=p.read_text()
+          s,n=re.subn(r'\bversionCode\s+8\b','versionCode 9',s)
+          assert n==1,('versionCode_R3C2_expected_one',n)
+          s,n=re.subn(r"\bversionName\s+'[^']+'","versionName '0.9-r3c2-sigbus-signed-delta'",s)
+          assert n==1
+          p.write_text(s)
+          PY
+          grep -Fq 'versionCode 9' /tmp/carxpc/app/build.gradle
+          grep -Fq 'runOriginalLdsoContinuation' /tmp/carxpc/app/src/main/java/com/r4/carxpc/FexIntegrationProbe.java
+          grep -Fq 'beginOriginalLdsoContinuation' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+      - name: Inspect the exact reconstructed app entry screen and manifest
+        run: |
+          set -euo pipefail
+          echo "CARX_R3C18_RECONSTRUCTED_APP_ENTRY_BEGIN"
+          sed -n '1,285p' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+          echo "CARX_R3C18_RECONSTRUCTED_APP_ENTRY_END"
+          echo "CARX_R3C18_RECONSTRUCTED_MANIFEST_BEGIN"
+          cat /tmp/carxpc/app/src/main/AndroidManifest.xml
+          echo "CARX_R3C18_RECONSTRUCTED_MANIFEST_END"
+          echo "CARX_R3C18_RECONSTRUCTED_GRADLE_BEGIN"
+          cat /tmp/carxpc/app/build.gradle
+          echo "CARX_R3C18_RECONSTRUCTED_GRADLE_END"
+          grep -Fq 'beginOriginalLdsoContinuation' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
+          echo "CARX_R3C18_SOURCE_RECONSTRUCTION_FULL_SHA_PINNED_ENTRY_AUDIT_PASS"
