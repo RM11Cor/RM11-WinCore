@@ -75,9 +75,13 @@ jobs:
           tar -xzf inputs/prefix/verified-native-wine-prefix.tar.gz -C /tmp/carx-r3c16-native-prefix-extract
           test -f /tmp/carx-r3c16-native-prefix-extract/.carx-r3c16-known-working-native-prefix/system.reg
           sudo mkdir -p "$ROOT/opt"
+          # Wine rejects WINEPREFIX parents owned by root, even when the
+          # prefix itself is user-writable. Change only guest /opt ownership.
+          sudo chown "$(id -u):$(id -g)" "$ROOT/opt"
           sudo cp -a /tmp/carx-r3c16-native-prefix-extract/.carx-r3c16-known-working-native-prefix "$ROOT/opt/carx-r3c16-wine-prefix"
           sudo cp "$ROOT/tmp/kernix-real-win32-smoke.exe" "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
           sudo chown -R "$(id -u):$(id -g)" "$ROOT/opt/carx-r3c16-wine-prefix"
+          test "$(stat -c '%u' "$ROOT/opt")" = "$(id -u)"
           test -f "$ROOT/opt/carx-r3c16-wine-prefix/system.reg"
           test -f "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
           cmp "$ROOT/tmp/kernix-real-win32-smoke.exe" "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
