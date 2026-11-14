@@ -267,7 +267,7 @@ Java_com_r4_carxpc_WineX86HostMappingProbe_nativeProbe(
     if(!src)return {};
     jsize n=env->GetArrayLength(src);
     if(n<=0 || size_t(n)>max)return {};
-    std::vector<uint8_t> b(size_t(n));
+    std::vector<uint8_t> b(static_cast<size_t>(n));
     env->GetByteArrayRegion(src,0,n,reinterpret_cast<jbyte*>(b.data()));
     if(env->ExceptionCheck())return {};
     return b;
