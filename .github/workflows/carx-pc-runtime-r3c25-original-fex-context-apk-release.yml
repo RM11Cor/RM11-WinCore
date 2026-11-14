@@ -424,6 +424,33 @@ jobs:
           git -C /tmp/carx-r3c25-fex-src submodule update --init --depth=1 External/fmt External/unordered_dense External/xxhash || true
           test -f /tmp/carx-r3c25-fex-src/FEXCore/include/FEXCore/Core/Context.h
           test -f /tmp/carx-r3c25-fex-src/FEXCore/include/FEXCore/HLE/SyscallHandler.h
+          # FEX source-controlled headers include two CMake-generated config
+          # tables. Reproduce the upstream config_generator.py exactly using
+          # the source-owned Config.json.in rather than inventing enum values.
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          src=Path('/tmp/carx-r3c25-fex-src')
+          dest=Path('/tmp/carx-r3c25-generated-include/FEXCore/Config')
+          dest.mkdir(parents=True,exist_ok=True)
+          data=(src/'FEXCore/Source/Interface/Config/Config.json.in').read_text()
+          data=data.replace('@CMAKE_INSTALL_FULL_LIBDIR@','/usr/lib64')
+          data=data.replace('@CMAKE_INSTALL_PREFIX@','/usr')
+          file=dest/'Config.json'
+          file.write_text(data)
+          subprocess.run(['python3',str(src/'FEXCore/Scripts/config_generator.py'),
+                str(file),str(dest/'ConfigValues.inl'),
+                str(dest/'FEX.1'),str(dest/'ConfigOptions.inl')],check=True)
+          assert (dest/'ConfigValues.inl').stat().st_size>1000
+          assert (dest/'ConfigOptions.inl').stat().st_size>1000
+          ir=Path('/tmp/carx-r3c25-generated-include/FEXCore/IR')
+          ir.mkdir(parents=True,exist_ok=True)
+          subprocess.run(['python3',str(src/'FEXCore/Scripts/json_ir_generator.py'),
+              str(src/'FEXCore/Source/Interface/IR/IR.json'),
+              str(ir/'IRDefines.inc'),str(ir/'IRDefines_Dispatch.inc')],check=True)
+          assert (ir/'IRDefines.inc').stat().st_size>1000
+          print('CARX_R3C25_PINNED_SOURCE_FEXCORE_CONFIG_IR_GENERATOR_HEADERS_RECREATED_PASS')
+          PY
           echo CARX_R3C25_ORIGINAL_UPSTREAM_FEXCORE_HEADER_COMMIT_SOURCE_LOCK_PASS
       - name: Cross compile R3C25 native ARM64 genuine pinned FEXCore x86 guest thread + real Wine64 ldlinux PTLOAD co-resident JNI
         shell: bash
@@ -436,6 +463,7 @@ jobs:
             -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter \
             -fPIC -fvisibility=hidden -fno-exceptions -fno-rtti \
             -shared -static-libstdc++ -Wl,--no-undefined,-z,relro,-z,now \
+            -isystem /tmp/carx-r3c25-generated-include \
             -isystem /tmp/carx-r3c25-fex-src/FEXCore/include \
             -isystem /tmp/carx-r3c25-fex-src/External/fmt/include \
             -isystem /tmp/carx-r3c25-fex-src/External/unordered_dense/include \
