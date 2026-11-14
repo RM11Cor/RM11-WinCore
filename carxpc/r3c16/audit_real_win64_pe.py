@@ -18,7 +18,8 @@ def analyze(path):
     assert machine==0x8664,"NOT_PE64_AMD64"
     assert 1<=section_count<=96 and size_opt>=128 and opt+size_opt<=len(b),"COFF_CORRUPT"
     assert u16(b,opt)==0x20b,"NOT_PE32_PLUS"
-    assert u16(b,pos+22)&0x0002==0,"DLL_NOT_EXE" # IMAGE_FILE_DLL
+    assert (u16(b,pos+22)&0x2000)==0,"DLL_NOT_EXE" # IMAGE_FILE_DLL
+    assert (u16(b,pos+22)&0x0002)!=0,"IMAGE_NOT_EXECUTABLE"
     subsys=u16(b,opt+68)
     assert subsys==3,"NOT_CONSOLE_WINDOWS_SUBSYSTEM"
     n_dirs=u32(b,opt+108)
