@@ -252,10 +252,9 @@ public final class WineLinuxProcessLaunchContract {
         st.pushPair(AT_PHDR,safe(MAIN_BIAS,main.programHeaderVaddr));
         st.push64(0);for(int i=envp.length-1;i>=0;i--)st.push64(envp[i]);
         st.push64(0);for(int i=argv.length-1;i>=0;i--)st.push64(argv[i]);
-        // Linux x86_64 process initial RSP must be 16-byte aligned;
-        // put argc at RSP, pad UNDER pointer/auxv data if needed.
-        int expectedTop=st.top-8;
-        if((st.guest(expectedTop)&15L)!=0)st.push64(0);
+        // Linux initial RSP must be 16-byte aligned. The pointer table
+        // is 8 words long and AUXV is a multiple of 16 bytes; no padding
+        // may be placed between argc and argv pointers.
         st.push64(argv.length);
         if((st.guest(st.top)&15L)!=0)
             throw reject("ORIGINAL_LINUX_STACK_INITIAL_RSP_NOT_16_ALIGNED");
