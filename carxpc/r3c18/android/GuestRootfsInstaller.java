@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystemException;
+import java.nio.file.AccessDeniedException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -55,9 +56,14 @@ public final class GuestRootfsInstaller {
         public final long regularBytes;
         public final int symlinks;
         public final int hardlinks;
+        /** Number of GNU TAR hardlinks stored as verified independent copies
+         * when Android/Bionic refuses a filesystem hard link. */
+        public final int hardlinksMaterializedAsCopies;
         public final Path root;
-        private Receipt(String hash,int count,long bytes,int links,int hard,Path p) {
-            sha256=hash;entries=count;regularBytes=bytes;symlinks=links;hardlinks=hard;root=p;
+        private Receipt(String hash,int count,long bytes,int links,int hard,
+                        int copies,Path p) {
+            sha256=hash;entries=count;regularBytes=bytes;
+            symlinks=links;hardlinks=hard;hardlinksMaterializedAsCopies=copies;root=p;
         }
     }
     private static final class Link {
@@ -66,7 +72,9 @@ public final class GuestRootfsInstaller {
         Link(String p,String t,boolean h) {path=p;target=t;hard=h;}
     }
     private static final class Counts {
-        int entries=0,symlinks=0,hardlinks=0;
+        int entries=0,symlinks=0,hardlinks=0,hardlinksMaterializedAsCopies=0;
+        final boolean forceAndroidHardlinkAccessDeniedFixture;
+        Counts(boolean force) {forceAndroidHardlinkAccessDeniedFixture=force;}
         long expanded=0;
         final List<Link> links=new ArrayList<>();
         final Set<String> seen=new HashSet<>();
@@ -79,17 +87,27 @@ public final class GuestRootfsInstaller {
      */
     public static Receipt install(InputStream archive, Path appFilesDir)
             throws IOException {
-        return installChecked(archive,appFilesDir,ARCHIVE_SHA256);
+        return installChecked(archive,appFilesDir,ARCHIVE_SHA256,false);
     }
 
     // Package-private fixture helper only: the Android app must use install()
     // above with the immutable upstream digest, never a caller supplied hash.
     static Receipt installFixtureForUnitTest(InputStream archive,Path appFilesDir,String fixtureHash)
             throws IOException {
-        return installChecked(archive,appFilesDir,fixtureHash);
+        return installChecked(archive,appFilesDir,fixtureHash,false);
     }
 
-    private static Receipt installChecked(InputStream archive, Path appFilesDir,String expectedHash)
+    // Package-private test hook: simulate the exact Android 16
+    // Files.createLink AccessDeniedException seen in R3C21 device report.
+    // Real app production entrypoints cannot enable this hook.
+    static Receipt installFixtureSimulateHardlinkDeniedForUnitTest(
+            InputStream archive, Path appFilesDir, String fixtureHash)
+            throws IOException {
+        return installChecked(archive,appFilesDir,fixtureHash,true);
+    }
+
+    private static Receipt installChecked(InputStream archive, Path appFilesDir,
+                                          String expectedHash,boolean simulatedHardlinkDenied)
             throws IOException {
         if(archive==null || appFilesDir==null) throw new IOException("NULL_ARGUMENT");
         if(expectedHash==null || !expectedHash.matches("[0-9a-f]{64}"))
@@ -104,7 +122,7 @@ public final class GuestRootfsInstaller {
         Files.createDirectory(stage);
         boolean oldMoved=false, committed=false;
         try {
-            Counts counts=new Counts();
+            Counts counts=new Counts(simulatedHardlinkDenied);
             MessageDigest sha256=digest();
             // Digest the compressed artifact bytes, not reconstructed TAR.
             DigestInputStream digestIn=new DigestInputStream(archive,sha256);
@@ -131,7 +149,9 @@ public final class GuestRootfsInstaller {
                 "entries="+counts.entries+"\n"+
                 "regular_bytes="+counts.expanded+"\n"+
                 "symlinks="+counts.symlinks+"\n"+
-                "hardlinks="+counts.hardlinks+"\n").getBytes(StandardCharsets.UTF_8));
+                "hardlinks="+counts.hardlinks+"\n"+
+                "hardlinks_materialized_as_copies="+counts.hardlinksMaterializedAsCopies+"\n"
+                ).getBytes(StandardCharsets.UTF_8));
 
             if(Files.exists(destination,LinkOption.NOFOLLOW_LINKS)) {
                 if(!Files.isDirectory(destination,LinkOption.NOFOLLOW_LINKS) ||
@@ -155,7 +175,8 @@ public final class GuestRootfsInstaller {
                 oldMoved=false;
             }
             return new Receipt(hash,counts.entries,counts.expanded,
-                               counts.symlinks,counts.hardlinks,destination);
+                               counts.symlinks,counts.hardlinks,
+                               counts.hardlinksMaterializedAsCopies,destination);
         } finally {
             if(!committed) {
                 deleteTree(stage);
@@ -286,7 +307,26 @@ public final class GuestRootfsInstaller {
             Files.createDirectories(link.getParent());
             if(Files.exists(link,LinkOption.NOFOLLOW_LINKS))
                 throw new IOException("HARDLINK_COLLISION");
-            Files.createLink(link,target);
+            try {
+                if(c.forceAndroidHardlinkAccessDeniedFixture)
+                    throw new AccessDeniedException(link.toString(),target.toString(),
+                        "R3C22_TEST_ONLY_ANDROID_DENIED_HARDLINK");
+                Files.createLink(link,target);
+            } catch(AccessDeniedException e) {
+                // Android 16 app-private filesystem may reject link(2), even
+                // between two verified files owned by this app. Preserve
+                // content for FEX guest data (NOT host ELF execve).
+                materializeVerifiedHardlinkCopy(stage,target,link,c);
+            } catch(UnsupportedOperationException e) {
+                materializeVerifiedHardlinkCopy(stage,target,link,c);
+            } catch(FileSystemException e) {
+                String reason=e.getReason()==null?"":e.getReason().toLowerCase(java.util.Locale.ROOT);
+                if(!(reason.contains("operation not permitted") ||
+                     reason.contains("not supported") ||
+                     reason.contains("function not implemented")))
+                    throw e;
+                materializeVerifiedHardlinkCopy(stage,target,link,c);
+            }
             c.files.add(l.path);
         }
         for(Link l:c.links)if(!l.hard) {
@@ -309,6 +349,33 @@ public final class GuestRootfsInstaller {
             Path guestRelative=link.getParent().relativize(target.normalize());
             Files.createSymbolicLink(link,guestRelative);
         }
+    }
+
+    /** Link-content fallback for Android EACCES/EPERM/EOPNOTSUPP only.
+     * Called after the root, target type, and destination collision checks.
+     * Never copy outside staging, never follow a source symlink, never overwrite.
+     */
+    private static void materializeVerifiedHardlinkCopy(
+            Path stage,Path target,Path destination,Counts counts) throws IOException {
+        Path root=stage.toAbsolutePath().normalize();
+        Path src=target.toAbsolutePath().normalize();
+        Path dst=destination.toAbsolutePath().normalize();
+        if(!src.startsWith(root)||!dst.startsWith(root)||src.equals(dst) ||
+           !Files.isRegularFile(src,LinkOption.NOFOLLOW_LINKS) ||
+           Files.isSymbolicLink(src) ||
+           Files.exists(dst,LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("HARDLINK_FALLBACK_UNSAFE_PATH_OR_TYPE");
+        // Linux TAR hardlinks are byte-equivalent. FEX reads these as guest
+        // data, so separate inodes are acceptable and do not change guest
+        // Wine64/ldso/kernel32 SHA-256 after extraction.
+        Files.copy(src,dst,LinkOption.NOFOLLOW_LINKS);
+        if(Files.size(src)!=Files.size(dst) ||
+           !Files.isRegularFile(dst,LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("HARDLINK_FALLBACK_COPY_INVALID");
+        // Best effort permission preservation (Android app storage is not
+        // a native executable staging area and never needs host execve).
+        if(src.toFile().canExecute())dst.toFile().setExecutable(true,true);
+        counts.hardlinksMaterializedAsCopies++;
     }
 
     private static String guestPath(String s) throws IOException {
