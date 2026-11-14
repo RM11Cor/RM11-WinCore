@@ -1,0 +1,44 @@
+name: CarX R3C17 Android Bionic Win64 Wine Evidence Gate Unit Tests Only
+on:
+  push:
+    branches: [carx-pc-runtime-r3c17-android-win64-gate]
+    paths:
+      - 'carxpc/r3c17/**'
+      - '.github/workflows/carx-pc-r3c17-android-win64-device-gate-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-win64-evidence-gate-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate syntax of Android native Wine device-only gate
+        run: |
+          set -euo pipefail
+          python3 -m py_compile carxpc/r3c17/accept_android_win64_wine_device.py
+      - name: Reject 16 forged or incomplete synthetic Android Win64 success reports
+        run: |
+          set -euo pipefail
+          python3 carxpc/r3c17/accept_android_win64_wine_device.py --synthetic-selftest | tee r3c17-gate-selftest.log
+          grep -Fxq 'CARX_R3C17_ANDROID_DEVICE_WIN64_GATE_16_SYNTHETIC_NEGATIVES_PASS_NO_ANDROID_EXECUTION_CLAIM' r3c17-gate-selftest.log
+      - name: Ensure R3C16 Linux ARM64 Win64 proof cannot be substituted for Android
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('carxpc/r3c17/accept_android_win64_wine_device.py').read_text()
+          for token in ['NOT_ANDROID_BIONIC_HOST','FEX_LINUX_HOST_NOT_ANDROID',
+                        'WINE_GUEST_ABI_INVALID','DEVICE_GATE_UNPROVEN_',
+                        'GUEST_PREFIX_PARENT_NOT_OWNED','WIN64_GUEST_PROCESS_NONZERO_EXIT',
+                        'CARX_R3C17_WIN64_PE_GUEST_EXIT0_ANDROID_BIONIC','GAME_BOOT_FALSE_POSITIVE']:
+              assert token in p,token
+          print('CARX_R3C17_LINUX_CONTROL_NOT_ACCEPTED_AS_ANDROID_DEVICE_PROOF')
+          PY
+      - name: Preserve gate test output only (not an Android APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C17-AndroidWin64-EvidenceGate-SyntheticTests-NOT-Device
+          path: r3c17-gate-selftest.log
+          retention-days: 14
