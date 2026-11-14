@@ -1,0 +1,165 @@
+name: CarX R3C16 Guest RootFS Wine Prefix and C Drive Windows PE Execution
+on:
+  push:
+    branches: [carx-pc-runtime-r3c16-windows-bridge]
+    paths:
+      - '.github/workflows/carx-pc-r3c16-guest-rootfs-prefix-win64.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  guest-rooted-prefix-and-windows-c-drive:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Install pinned ARM64 Linux FEX host requirements
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 file libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist
+      - name: Download verified FEX ARM64 Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Download signed Ubuntu Wine x86_64 complete rootfs
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-Ubuntu-Wine64-x64-Guest-Kernel32-Positive-Control
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43598239873
+          github-token: ${{ github.token }}
+          path: inputs/rootfs
+      - name: Download real Win64 PE-positive native x64 initialized Wine prefix
+        uses: actions/download-artifact@v4
+        with:
+          name: CarX-R3C16-NativeX64-Verified-WinePrefix-RealWin64API
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43600193099
+          github-token: ${{ github.token }}
+          path: inputs/prefix
+      - name: Verify all exact bytes and place prefix entirely INSIDE guest rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          a=Path('inputs/rootfs')
+          m=json.loads((a/'guest-provenance.json').read_text())
+          assert hashlib.file_digest((a/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz').open('rb'),'sha256').hexdigest()==m['tar_sha256']
+          f=Path('inputs/fex')
+          d=json.loads((f/'fex-elf-dependency-audit.json').read_text())
+          assert d['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          info=next(x for x in d['files'] if x['path']=='Bin/FEX')
+          assert hashlib.sha256((f/'fex-linux-elf/Bin/FEX').read_bytes()).hexdigest()==info['sha256']
+          p=Path('inputs/prefix')
+          i=json.loads((p/'native-prefix-source-provenance.json').read_text())
+          assert i['exact_real_win64_PE_executed'] is True
+          assert hashlib.file_digest((p/'verified-native-wine-prefix.tar.gz').open('rb'),'sha256').hexdigest()==i['prefix_tar_sha256']
+          print('CARX_R3C16_GUEST_ROOTFS_PREFIX_SHA256_CHAIN_VERIFIED')
+          PY
+          ROOT=/tmp/carx-r3c16-fullguest-rootfs
+          sudo mkdir -p "$ROOT"
+          sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C "$ROOT"
+          test -f "$ROOT/usr/share/wine/wine.inf"
+          test -f "$ROOT/tmp/kernix-real-win32-smoke.exe"
+          test -f "$ROOT/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          mkdir -p /tmp/carx-r3c16-native-prefix-extract
+          tar -xzf inputs/prefix/verified-native-wine-prefix.tar.gz -C /tmp/carx-r3c16-native-prefix-extract
+          test -f /tmp/carx-r3c16-native-prefix-extract/.carx-r3c16-known-working-native-prefix/system.reg
+          sudo mkdir -p "$ROOT/opt"
+          sudo cp -a /tmp/carx-r3c16-native-prefix-extract/.carx-r3c16-known-working-native-prefix "$ROOT/opt/carx-r3c16-wine-prefix"
+          sudo cp "$ROOT/tmp/kernix-real-win32-smoke.exe" "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
+          sudo chown -R "$(id -u):$(id -g)" "$ROOT/opt/carx-r3c16-wine-prefix"
+          test -f "$ROOT/opt/carx-r3c16-wine-prefix/system.reg"
+          test -f "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
+          cmp "$ROOT/tmp/kernix-real-win32-smoke.exe" "$ROOT/opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe"
+          for f in inputs/fex/fex-linux-elf/Bin/*; do test -f "$f" && chmod 755 "$f" || :; done
+          test -x inputs/fex/fex-linux-elf/Bin/FEX
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-fullguest-rootfs"}}' >"$HOME/.fex-emu/Config.json"
+      - name: Prove guest x86_64 can stat exact same prefix, Wine INF and PE
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-r3c16-fullguest-rootfs
+          FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          "$FEX" /usr/bin/stat /opt/carx-r3c16-wine-prefix/system.reg >dist/fex-guest-prefix-stat.log
+          "$FEX" /usr/bin/stat /usr/share/wine/wine.inf >dist/fex-guest-inf-stat.log
+          "$FEX" /usr/bin/stat /opt/carx-r3c16-wine-prefix/drive_c/CarX_R3C16_Win64_Smoke.exe >dist/fex-guest-pe-stat.log
+          echo CARX_R3C16_GUEST_PREFIX_INF_PE_THREE_FEX_STATS_PASS
+      - name: Execute same PE under Wine with all guest paths and native initialized prefix
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/carx-r3c16-fullguest-rootfs
+          export WINEPREFIX=/opt/carx-r3c16-wine-prefix
+          export WINEARCH=win64
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine
+          export WINEDEBUG=+module,+err
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          set +e
+          timeout 80s "$fex" /usr/lib/wine/wine64 /tmp/kernix-real-win32-smoke.exe >dist/wine-guest-rootfs-linux-path.log 2>&1
+          a=$?
+          timeout 80s "$fex" /usr/lib/wine/wine64 'C:\CarX_R3C16_Win64_Smoke.exe' >dist/wine-guest-rootfs-c-drive.log 2>&1
+          b=$?
+          set -e
+          export A="$a" B="$b"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          marker='CARX_R3C16_REAL_WIN64_PE_WINAPI_VMEM_TLS_STDOUT_PASS'
+          results={}
+          for label,code,filename in [
+              ('linux_guest_tmp',int(os.environ['A']),'wine-guest-rootfs-linux-path.log'),
+              ('windows_c_drive',int(os.environ['B']),'wine-guest-rootfs-c-drive.log')]:
+              s=Path('dist/'+filename).read_text(errors='replace')
+              results[label]={
+                  'exit_code':code,
+                  'windows_pe_guest_execution_proven':code==0 and marker in s,
+                  'kernel32_failed_to_load':'could not load kernel32.dll' in s,
+                  'wine_inf_unavailable':'wine.inf' in s and 'No such file or directory' in s,
+                  'last_errors':[x[:500] for x in s.splitlines() if ('wine:' in x or ':err:' in x or 'warn:module:load_dll' in x)][-20:],
+                  'runtime_marker_seen':marker in s}
+          d={'schema':'r4.carx.r3c16.fex-complete-rootfs-prefix-and-c-drive-execution.v1',
+             'source_pinned_original_fex':True,'native_Wine_PE_positive_control':True,
+             'complete_prefix_within_guest_rootfs':True,
+             'android_bionic_executed':False,'carx_game_executed':False,'results':results}
+          Path('dist/guest-rootfs-prefix-windows-pe-outcome.json').write_text(json.dumps(d,indent=2)+'\n')
+          print(json.dumps(d,indent=2))
+          PY
+          echo "Linux path errors:"; grep -E 'wine:|err:|kernel32|wine.inf' dist/wine-guest-rootfs-linux-path.log | tail -n 18 || :
+          echo "C drive errors:"; grep -E 'wine:|err:|kernel32|wine.inf' dist/wine-guest-rootfs-c-drive.log | tail -n 18 || :
+      - name: Upload evidence even if Windows PE still fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-R3C16-FEX-Wine-GuestRootfs-Prefix-CDrive-Actual-PE-Evidence
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Verify all three file probes and independent Windows proof if actually seen
+        if: always()
+        run: |
+          set -euo pipefail
+          test -s dist/fex-guest-prefix-stat.log
+          test -s dist/fex-guest-inf-stat.log
+          test -s dist/fex-guest-pe-stat.log
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/guest-rootfs-prefix-windows-pe-outcome.json'))
+          for name,step in d['results'].items():
+              print('CARX_R3C16_WIN64_PE_GUESTROOTFS_PATH_RESULT',name,step['exit_code'],step['windows_pe_guest_execution_proven'])
+          assert any(x['windows_pe_guest_execution_proven'] for x in d['results'].values()),'REAL_GUEST_WIN64_PE_EXECUTION_STILL_UNPROVEN'
+          print('CARX_R3C16_WINE_WIN64_PE_REAL_LINUX_ARM64_FEX_WITH_GUEST_ROOTFS_PASS')
+          PY
