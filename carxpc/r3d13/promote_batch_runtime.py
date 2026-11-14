@@ -61,7 +61,7 @@ batch= r'''    if (Mode==3) {
       const uint64_t arg0=state.gregs[FEXCore::X86State::REG_RDI];
       const uint64_t arg1=state.gregs[FEXCore::X86State::REG_RSI];
       const uint64_t arg2=state.gregs[FEXCore::X86State::REG_RDX];
-      std::snprintf(msg,sizeof(msg),"N21_BATCH_INDEX_%u",Seen);
+      std::snprintf(msg,sizeof(msg),"N21_BATCH_INDEX_%d",Seen);
       carx_r3d6::note(msg);
       std::snprintf(msg,sizeof(msg),"N21_BATCH_NR_%llu",
         static_cast<unsigned long long>(number));
