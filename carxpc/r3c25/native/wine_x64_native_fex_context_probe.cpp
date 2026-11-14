@@ -267,6 +267,8 @@ bool createFEXContextBoundToWine(uint64_t wineEntry,uint64_t loaderEntry,
   host.ProcessFeatures.Is64BitMode=1;
   host.ProcessPID=static_cast<uint32_t>(::getpid());
   host.CPUMIDRs.push_back(0);
+  // Ensure the live x86 GDT outlives FEX thread/context teardown.
+  FEXCore::Core::CPUState::gdt_segment gdt[32]{};
   auto context=FEXCore::Context::Context::CreateNewContext(host);
   if(!context){reason="FEX_CONTEXT_CREATE_RETURNED_NULL";return false;}
   FEXCore::SignalDelegator signals{};
@@ -280,7 +282,6 @@ bool createFEXContextBoundToWine(uint64_t wineEntry,uint64_t loaderEntry,
   if(!thread||!thread->CurrentFrame){
     reason="FEX_CONTEXT_X86_THREAD_FRAME_NOT_CREATED";return false;
   }
-  FEXCore::Core::CPUState::gdt_segment gdt[32]{};
   auto& state=thread->CurrentFrame->State;
   state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT]=gdt;
   state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_LDT]=gdt;
