@@ -81,6 +81,10 @@ jobs:
           sudo tar -xzf inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz -C /tmp/carx-r3c16-amd64-guest
           sudo cp inputs/pe/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe /tmp/carx-r3c16-amd64-guest/tmp/
           test -f /tmp/carx-r3c16-amd64-guest/opt/kernix-wine-linux-x64/bin/wine
+          find /tmp/carx-r3c16-amd64-guest/opt/kernix-wine-linux-x64 -type f -iname 'kernel32*' -print | tee dist/kernel32-builtin-paths.txt
+          find /tmp/carx-r3c16-amd64-guest/opt/kernix-wine-linux-x64 -type f -iname 'ntdll*' -print | tee dist/ntdll-builtin-paths.txt
+          test -s dist/kernel32-builtin-paths.txt
+          test -s dist/ntdll-builtin-paths.txt
           test -f /tmp/carx-r3c16-amd64-guest/tmp/CarX_R3C16_Win64_VMem_TLS_Console_Smoke.exe
           mkdir -p "$HOME/.fex-emu"
           printf '%s\n' '{"Config":{"RootFS":"/tmp/carx-r3c16-amd64-guest"}}' > "$HOME/.fex-emu/Config.json"
@@ -95,7 +99,10 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
           export FEX_ROOTFS=/tmp/carx-r3c16-amd64-guest
           export WINEPREFIX="$HOME/.carx-r3c16-real-win64-wine-prefix"
-          export WINEDEBUG=-all
+          export WINEDLLPATH=/opt/kernix-wine-linux-x64/lib/wine
+          export WINEARCH=win64
+          export WINEDEBUG=+loaddll,+module,+err
+          echo "R3C16 WINEDLLPATH=$WINEDLLPATH" >dist/wine-env.txt
           fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
           set +e
           timeout 40s "$fex" /usr/bin/true >dist/fex-x64-true.log 2>&1
@@ -123,6 +130,7 @@ jobs:
           print(json.dumps(outcome,indent=2))
           PY
           cat dist/wine-version.log || :
+          grep -E 'kernel32|ntdll|c0000135|failed to' dist/win64-real-pe.log | tail -n 50 || :
           tail -n 50 dist/win64-real-pe.log || :
       - name: Preserve real execution logs even when dependencies fail
         if: always()
