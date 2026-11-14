@@ -290,7 +290,9 @@ jobs:
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS' \
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS' \
             'KERNIX_G0_REAL_SOURCE_ORIGINAL_X86_GNU_MAIN_STDOUT45' \
-            'KERNIX_G0_REAL_ORIGINAL_LIBC_GETRANDOM8_NATIVE_KERNEL_BSS_REJECT'; do\n            grep -aFq "$marker" "$BIN" || { echo "::error::Missing compiled batch stage marker $marker"; exit 1; }\n          done
+            'KERNIX_G0_REAL_ORIGINAL_LIBC_GETRANDOM8_NATIVE_KERNEL_BSS_REJECT'; do
+            grep -aFq "$marker" "$BIN" || { echo "::error::Missing compiled batch stage marker $marker"; exit 1; }
+          done
           ! grep -aFq 'KERNIX_G0_DIAGNOSTIC_ONLY_FEX_TSO_DISABLED' "$BIN"
           sha256sum "$BIN" >dist/android-candidate/original-ldso-continuation.sha256
           cp /tmp/carx-fex/FEX-UPSTREAM-LICENSE.txt dist/android-candidate/FEX-UPSTREAM-LICENSE.txt
