@@ -22,7 +22,7 @@ s=once(s,
 #include "carxpc/r3d42/native/source_locked_faccessat2.hpp"''')
 s=once(s,
 '''        const auto misc=carx_r3d31::source_locked_dispatch(
-            number,arg0,arg1,arg2,writeOwnedGuest);''',
+           number,arg0,arg1,arg2,writeOwnedGuest);''',
 '''        // R3D42: Observed genuine FEX x86_64 glibc syscall 439 at index66
         // after Wine libunwind/liblzma ELF source loading. The 4th x86
         // argument FLAGS is R10=arg3, NOT the guest pointer or host FD.
@@ -71,7 +71,7 @@ s=once(s,
           return;
         }
         const auto misc=carx_r3d31::source_locked_dispatch(
-            number,arg0,arg1,arg2,writeOwnedGuest);''')
+           number,arg0,arg1,arg2,writeOwnedGuest);''')
 assert all(x in s for x in ("N66_R3D42_FACCESSAT2_FOK_GUEST_ROOTFS_EXISTS",
 "N22_BATCH_RETURN_R3D42_SOURCE_LOCKED_FACCESSAT2_F_OK",
 "N63_R3D41_CONFINED_GUEST_SYMLINK_FD_",
