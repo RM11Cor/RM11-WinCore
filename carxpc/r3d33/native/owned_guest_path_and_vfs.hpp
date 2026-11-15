@@ -14,6 +14,9 @@
 // strictly unimplemented for new fd sources (never synthesize ELF proof).
 #pragma once
 #include "carxpc/r3d19/native/unified_guest_libc_abi.hpp"
+#if defined(CARX_R3D41_CONFINED_GUEST_SYMLINKS)
+#include "carxpc/r3d41/native/confined_symlink_walker.hpp"
+#endif
 #include <array>
 #include <cstdint>
 #include <cstddef>
@@ -67,6 +70,7 @@ struct OpenResult {
  OpenState state{OpenState::UnsafePath};
  int64_t value{0};
  uint8_t reason{0}; // R3D39: meaningful only if state is UnsafePath
+  uint8_t symlinkCount{0}; // R3D41: source-verified guest-rootfs hops
 };
 class ReadOnlyFiles final {
  struct File {
@@ -119,6 +123,31 @@ class ReadOnlyFiles final {
    struct stat rootstat{};
    if(rootfd<0||::fstat(rootfd,&rootstat)!=0||!S_ISDIR(rootstat.st_mode))
      return {OpenState::UntrustedRoot,0};
+#if defined(CARX_R3D41_CONFINED_GUEST_SYMLINKS)
+   const auto resolved=carx_r3d41::open_guest_readonly(rootfd,path);
+   if(resolved.fd<0) {
+     if(resolved.status==carx_r3d41::Status::Unsafe)
+       return {OpenState::UnsafePath,0,resolved.reason,resolved.symlinks};
+     if(resolved.status==carx_r3d41::Status::UnresolvedSymlink)
+       return {OpenState::UnresolvedSymlink,0,resolved.reason,resolved.symlinks};
+     if(resolved.status==carx_r3d41::Status::NotRegular)
+       return {OpenState::NotRegular,0,resolved.reason,resolved.symlinks};
+     if(resolved.status==carx_r3d41::Status::HostError)
+       return {OpenState::HostError,0,resolved.reason,resolved.symlinks};
+     // ENOENT/ENOTDIR from the in-rootfs walker are legitimate Linux results.
+     return {OpenState::Resolved,resolved.negativeErrno,0,resolved.symlinks};
+   }
+   for(size_t slot=0;slot<files.size();++slot) {
+     if(files[slot].nativeFd<0) {
+       files[slot].nativeFd=resolved.fd;
+       files[slot].position=0;
+       return {OpenState::Resolved,
+          int64_t(kFirstGuestFd+static_cast<int>(slot)),0,resolved.symlinks};
+     }
+   }
+   ::close(resolved.fd);
+   return {OpenState::TableFull,0};
+#else
    struct OwnedDirFrames {
      std::array<int,64> fds{};
      size_t count{0};
@@ -203,6 +232,7 @@ class ReadOnlyFiles final {
      return {OpenState::TableFull,0};
    }
    return {OpenState::NotRegular,0};
+#endif
   }
   int64_t close_guest(uint64_t fd) noexcept {
    int slot=findFd(fd);if(slot<0)return -EBADF;
