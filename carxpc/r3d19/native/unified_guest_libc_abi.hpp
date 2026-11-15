@@ -107,6 +107,7 @@ class GuestMappings final {
    uint64_t base{0},length{0};
    bool used{false};
    std::unique_ptr<uint8_t[]> pageWritable{};
+   std::unique_ptr<uint8_t[]> pageReadable{};
  };
  std::array<Region,kMapSlots> regions{};
  uint64_t total{0};
@@ -117,15 +118,33 @@ class GuestMappings final {
         len<=r.length-(addr-r.base))return true;
    return false;
  }
- bool add(uint64_t addr,uint64_t len,bool writable) noexcept {
+ bool add(uint64_t addr,uint64_t len,bool readable,bool writable) noexcept {
    if(len>kMaxTotalMapBytes-total || len%kPage!=0)return false;
    const auto count=static_cast<size_t>(len/kPage);
    auto bits=std::unique_ptr<uint8_t[]>(new(std::nothrow) uint8_t[count]);
    if(!bits)return false;
    std::memset(bits.get(),writable?1:0,count);
+   auto reads=std::unique_ptr<uint8_t[]>(new(std::nothrow) uint8_t[count]);
+   if(!reads)return false;
+   std::memset(reads.get(),readable?1:0,count);
    for(auto &r:regions)if(!r.used){
      r.base=addr;r.length=len;r.used=true;
-     r.pageWritable=std::move(bits);total+=len;return true;
+     r.pageWritable=std::move(bits);
+     r.pageReadable=std::move(reads);total+=len;return true;
+   }
+   return false;
+ }
+ // Read permission is tracked separately from write. It is illegal to
+ // dereference paths in PROT_NONE or write-only guest pages even if allocated.
+ bool update_readable_pages(uint64_t addr,uint64_t rounded,bool read) noexcept {
+   if(!rounded || (addr%kPage) || (rounded%kPage))return false;
+   for(auto& r:regions)if(r.used && r.pageReadable &&
+      addr>=r.base && addr-r.base<=r.length &&
+      rounded<=r.length-(addr-r.base)){
+      const auto first=static_cast<size_t>((addr-r.base)/kPage);
+      const auto count=static_cast<size_t>(rounded/kPage);
+      std::memset(r.pageReadable.get()+first,read?1:0,count);
+      return true;
    }
    return false;
  }
@@ -158,6 +177,18 @@ public:
      const auto first=static_cast<size_t>((addr-r.base)/kPage);
      const auto last=static_cast<size_t>((addr-r.base+len-1)/kPage);
      for(auto p=first;p<=last;++p)if(r.pageWritable[p]==0)return false;
+     return true;
+   }
+   return false;
+ }
+ bool owned_readable_range(uint64_t addr,uint64_t len)const noexcept {
+   if(!len||addr>UINT64_MAX-len)return false;
+   for(const auto& r:regions)if(r.used&&r.pageReadable&&
+       addr>=r.base&&addr-r.base<=r.length&&
+       len<=r.length-(addr-r.base)){
+     const auto first=static_cast<size_t>((addr-r.base)/kPage);
+     const auto last=static_cast<size_t>((addr-r.base+len-1)/kPage);
+     for(auto p=first;p<=last;++p)if(r.pageReadable[p]==0)return false;
      return true;
    }
    return false;
@@ -230,12 +261,16 @@ public:
      if(!fixed)::munmap(result,rounded);
      return -e;
    }
-   if(!fixed && !add(base,rounded,(protection&PROT_WRITE)!=0)){
+   if(!fixed && !add(base,rounded,(protection&PROT_READ)!=0,
+                          (protection&PROT_WRITE)!=0)){
      ::munmap(result,rounded);
      return -ENOMEM;
    }
-   if(fixed && !update_writable_pages(
-        base,rounded,(protection&PROT_WRITE)!=0))return -EFAULT;
+   if(fixed){
+     const bool write=update_writable_pages(base,rounded,(protection&PROT_WRITE)!=0);
+     const bool read=update_readable_pages(base,rounded,(protection&PROT_READ)!=0);
+     if(!write||!read)return -EFAULT;
+   }
    return static_cast<int64_t>(base);
  }
  int64_t protect(uint64_t addr,uint64_t length,uint64_t prot) noexcept {
@@ -246,8 +281,9 @@ public:
    if(!owns(addr,rounded))return -EACCES;
    if(::mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
          rounded,int(prot))!=0)return -errno;
-   return update_writable_pages(addr,rounded,(prot&PROT_WRITE)!=0)
-      ? 0 : -EFAULT;
+   const bool write=update_writable_pages(addr,rounded,(prot&PROT_WRITE)!=0);
+   const bool read=update_readable_pages(addr,rounded,(prot&PROT_READ)!=0);
+   return write&&read ? 0 : -EFAULT;
  }
  int64_t unmap(uint64_t addr,uint64_t length) noexcept {
    uint64_t rounded=0;
@@ -256,7 +292,7 @@ public:
    for(auto &r:regions)if(r.used && addr==r.base && rounded==r.length){
      if(::munmap(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
                  rounded)!=0)return -errno;
-     r.used=false;r.pageWritable.reset();
+     r.used=false;r.pageWritable.reset();r.pageReadable.reset();
      r.base=0;r.length=0;total-=rounded;
      return 0;
    }
