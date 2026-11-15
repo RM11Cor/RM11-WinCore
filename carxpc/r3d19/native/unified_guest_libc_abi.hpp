@@ -196,7 +196,7 @@ public:
  // Real source-backed memory. Returns mmap address or negative *Linux* errno.
  int64_t map(int hostfd,bool fdOpen,uint64_t hint,uint64_t length,
              uint64_t protection,uint64_t guestFlags,uint64_t guestFd,
-             uint64_t offset) noexcept {
+             uint64_t offset,bool trustedRootfsFile=false) noexcept {
    uint64_t rounded=0;
    if(!checked_round_page(length,rounded) || (offset&(kPage-1)))return -EINVAL;
    if((protection&~uint64_t(PROT_READ|PROT_WRITE|PROT_EXEC))!=0 ||
@@ -209,9 +209,23 @@ public:
    if((fixed||noReplace) && ((hint&(kPage-1))!=0 || !hint))return -EINVAL;
    if(fixed && !owns(hint,rounded))return -EACCES;
    const bool anonymous=(guestFlags&kLinuxMapAnonymous)!=0;
-   if(!anonymous &&
-      (!fdOpen || guestFd!=uint64_t(carx_r3d17::kGuestLibcFd) ||
-       !carx_r3d17::verified_readonly_libc_fd(hostfd)))return -EBADF;
+   // Legacy FD100 remains source-pin authenticated. Guest FD101..116 may
+   // only enter through the caller-proved app-private RootFS FD duplicator;
+   // all unknown native/guest descriptors fail closed.
+   if(!anonymous) {
+     const bool libc=fdOpen &&
+       guestFd==uint64_t(carx_r3d17::kGuestLibcFd) &&
+       carx_r3d17::verified_readonly_libc_fd(hostfd);
+     struct stat trustedStat{};
+     const bool rootfs=trustedRootfsFile && fdOpen &&
+       guestFd>=101 && guestFd<=116 &&
+       hostfd>=0 && ::fstat(hostfd,&trustedStat)==0 &&
+       S_ISREG(trustedStat.st_mode) && trustedStat.st_size>0 &&
+       uint64_t(trustedStat.st_size)<=kMaxTotalMapBytes &&
+       (::fcntl(hostfd,F_GETFL)&O_ACCMODE)==O_RDONLY;
+     if(!libc&&!rootfs)return -EBADF;
+     if(offset>INT64_MAX)return -EINVAL;
+   }
    if(anonymous && offset!=0)return -EINVAL;
    if(!fixed && total>kMaxTotalMapBytes-rounded)return -ENOMEM;
    int hostFlags=MAP_PRIVATE|MAP_ANONYMOUS;
