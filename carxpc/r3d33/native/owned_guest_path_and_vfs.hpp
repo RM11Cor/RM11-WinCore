@@ -88,6 +88,23 @@ class ReadOnlyFiles final {
    for(auto& f:files)if(f.nativeFd>=0)::close(f.nativeFd);
   }
   bool owns(uint64_t fd)const noexcept {return findFd(fd)>=0;}
+  // R3D40: duplicate a file descriptor ONLY if it came from the protected
+  // app-private O_NOFOLLOW walker. Caller must close returned host fd.
+  // A source file mapping is never a direct guest->host syscall.
+  int dup_regular_guest_fd_for_mapping(uint64_t guestFd) const noexcept {
+    const int slot=findFd(guestFd);
+    if(slot<0)return -EBADF;
+    const int source=files[slot].nativeFd;
+    struct stat st{};
+    if(::fstat(source,&st)!=0)return -errno;
+    if(!S_ISREG(st.st_mode) || st.st_size<=0 ||
+       uint64_t(st.st_size)>carx_r3d19::kMaxTotalMapBytes)return -EACCES;
+    const int flags=::fcntl(source,F_GETFL);
+    if(flags<0 || (flags&O_ACCMODE)!=O_RDONLY)return -EACCES;
+    const int copied=::fcntl(source,F_DUPFD_CLOEXEC,3);
+    if(copied<0)return -errno;
+    return copied;
+  }
   // The rootfd is separately opened by Android from a source-verified,
   // app-private rootfs and passed into this isolated guest-worker JNI.
   // R3D38: follow actual directory components while keeping a stack of
