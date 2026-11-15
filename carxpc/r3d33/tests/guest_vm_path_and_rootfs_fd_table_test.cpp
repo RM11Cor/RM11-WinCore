@@ -33,12 +33,23 @@ int main(){
  ReadOnlyFiles files{};
  auto missing=files.open_guest_file(rootfd,"/no-file");
  assert(missing.state==OpenState::Resolved&&missing.value==-ENOENT);
- auto invalid=files.open_guest_file(rootfd,"/usr/../etc/passwd");
+ auto invalid=files.open_guest_file(rootfd,"/../../etc/passwd");
  assert(invalid.state==OpenState::UnsafePath);
+ auto missingIntermediate=files.open_guest_file(rootfd,
+   "/usr/lib/no-such-dir/../wine/wine64");
+ assert(missingIntermediate.state==OpenState::Resolved &&
+        missingIntermediate.value==-ENOENT);
+ auto sourceGuestPath=files.open_guest_file(rootfd,
+   "/usr/lib/wine/../x86_64-linux-gnu/wine/x86_64-unix/ntdll.so");
+ assert(sourceGuestPath.state==OpenState::Resolved &&
+        sourceGuestPath.value==-ENOENT);
  auto linked=files.open_guest_file(rootfd,"/lib/wine/wine64");
  assert(linked.state==OpenState::UnresolvedSymlink);
  auto opened=files.open_guest_file(rootfd,"/usr/lib/wine/wine64");
  assert(opened.state==OpenState::Resolved && opened.value==101);
+ auto dotdot=files.open_guest_file(rootfd,"/usr/lib/wine/../wine/wine64");
+ assert(dotdot.state==OpenState::Resolved && dotdot.value==102);
+ assert(files.close_guest(102)==0);
  char* const buffer=static_cast<char*>(::mmap(nullptr,4096,
    PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0));
  assert(buffer!=MAP_FAILED);
