@@ -1379,7 +1379,7 @@ jobs:
           grep -Fq 'BATCH_HALTED_PATH_CAPTURED_BEFORE_VFS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'R3D15_PATCHED_SOURCE_02e24ca_JIT_UNALIGNED_TSO_DIAGNOSTIC' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'BATCH_NATIVE_CRASH_AFTER_BOUNDED_RESPONSES' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'R3D39_RootfsTrace_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'J3B_CACHELESS_GUEST_OVERLAY_ENABLED' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
           grep -Fq 'N22_CACHELESS_GUEST_VFS_OVERLAY_ENOENT' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'r4.carx.r3d40.real-rootfs-file-mmap-elf-rx-fex512.v1' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
