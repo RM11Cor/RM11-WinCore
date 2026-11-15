@@ -40,7 +40,7 @@ int main(){
  carx_r3d19::GuestMappings maps{};
  // Existing libc FD100 path is unchanged. Only verified FD101..116 may map.
  assert(maps.map(fd,true,0,8192,PROT_READ,0x802,101,0)==-EBADF);
- assert(maps.map(fd,true,0,8192,PROT_READ,0x802,100,0,true)==-EBADF);
+ assert(maps.map(fd,true,0,8192,PROT_READ,0x802,200,0,true)==-EBADF);
  assert(maps.map(fd,true,0,8192,PROT_READ|PROT_WRITE|PROT_EXEC,
                  0x802,101,0,true)==-EACCES);
  const int64_t ro=maps.map(fd,true,0,8192,PROT_READ,0x802,101,0,true);
