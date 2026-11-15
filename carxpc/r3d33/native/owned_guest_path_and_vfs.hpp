@@ -91,6 +91,11 @@ class ReadOnlyFiles final {
   // app-private rootfs and passed into this isolated guest-worker JNI.
   OpenResult open_guest_file(int rootfd,const char* path)noexcept {
    if(!path||path[0]!='/')return {OpenState::UnsafePath,0};
+   // Preserve the original source-diagnostic guest cacheless policy:
+   // /etc/ld.so.cache physically exists in Android app rootfs but must
+   // NEVER be exposed to original GNU ld.so for this isolated boot probe.
+   if(std::strcmp(path,"/etc/ld.so.cache")==0)
+     return {OpenState::Resolved,-ENOENT};
    const size_t len=::strnlen(path,kMaxPath+2);
    if(len==0||len>kMaxPath)return {OpenState::UnsafePath,0};
    struct stat rootstat{};
