@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cerrno>
 #include <cstdio>
+#include <initializer_list>
 #include <cstring>
 #include <cstdint>
 #include <sys/mman.h>
