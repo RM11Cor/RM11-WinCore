@@ -66,6 +66,7 @@ enum class OpenState:uint8_t {
 struct OpenResult {
  OpenState state{OpenState::UnsafePath};
  int64_t value{0};
+ uint8_t reason{0}; // R3D39: meaningful only if state is UnsafePath
 };
 class ReadOnlyFiles final {
  struct File {
@@ -93,11 +94,11 @@ class ReadOnlyFiles final {
   // app-rootfs-owned directory FDs. ".." pops a trusted directory frame;
   // it never opens a host parent above the preopened guest root.
   OpenResult open_guest_file(int rootfd,const char* path) noexcept {
-   if(!path||path[0]!='/')return {OpenState::UnsafePath,0};
+   if(!path||path[0]!='/')return {OpenState::UnsafePath,0,1};
    if(std::strcmp(path,"/etc/ld.so.cache")==0)
      return {OpenState::Resolved,-ENOENT};
    const size_t len=::strnlen(path,kMaxPath+2);
-   if(len==0||len>kMaxPath)return {OpenState::UnsafePath,0};
+   if(len==0||len>kMaxPath)return {OpenState::UnsafePath,0,2};
    struct stat rootstat{};
    if(rootfd<0||::fstat(rootfd,&rootstat)!=0||!S_ISDIR(rootstat.st_mode))
      return {OpenState::UntrustedRoot,0};
@@ -128,7 +129,7 @@ class ReadOnlyFiles final {
      size_t end=start;
      while(end<len&&path[end]!='/')++end;
      const size_t count=end-start;
-     if(count==0||count>255)return {OpenState::UnsafePath,0};
+     if(count==0||count>255)return {OpenState::UnsafePath,0,3};
      char component[256]{};
      std::memcpy(component,path+start,count);
      const bool final=end==len;
@@ -137,7 +138,7 @@ class ReadOnlyFiles final {
        start=end+1;continue;
      }
      if(std::strcmp(component,"..")==0){
-       if(!dirs.pop())return {OpenState::UnsafePath,0};
+       if(!dirs.pop())return {OpenState::UnsafePath,0,4};
        if(final)return {OpenState::NotRegular,0};
        start=end+1;continue;
      }
@@ -150,7 +151,7 @@ class ReadOnlyFiles final {
                  OpenState::Resolved,-int64_t(e)};
        }
        if(!dirs.push(next)){
-         ::close(next);return {OpenState::UnsafePath,0};
+         ::close(next);return {OpenState::UnsafePath,0,5};
        }
        start=end+1;continue;
      }
