@@ -1655,7 +1655,7 @@ jobs:
           assert b'r3d27_guest_proc_self_exe_readlink_accepted' in dex
           assert b'r3d28_guest_proc_directory_readlink_negative_einval' in dex
           assert b'r3d29_usr_readlink_directory_einval_handled' in dex
-          assert b'r3d29_guest_wine_directory_component_einval' in dex
+          assert b'r3d29_verified_guest_wine_directory_component_einval' in dex
           assert b'r3d28_guest_proc_self_pid_link_handled' in dex
           assert b'r3d27_guest_unknown_readlink_path_recorded' in dex
           assert b'r3d26_multisource_journal_validation_enabled' in dex
