@@ -39,7 +39,7 @@ template<class Logger> Preflight24 run_preflight_24(Logger logger)noexcept{
  };
  auto validRandom=[](Result rr,uint64_t max){
     return rr.kind==Kind::Success&&
-          (rr.result>=0&&uint64_t(rr.result)<=max||
+          ((rr.result>=0&&uint64_t(rr.result)<=max)||
            rr.result==-EAGAIN||rr.result==-EINTR);
  };
  result(validRandom(call(318,ptr,8,1),8),318);      // 00
