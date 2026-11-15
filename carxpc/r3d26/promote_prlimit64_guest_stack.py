@@ -51,8 +51,9 @@ s=one(s,
 # Source is already independently verified and the 56-byte witness has
 # already been written in this SAME callback before reaching this handler.
 s=one(s,
-'''      std::snprintf(msg,sizeof(msg),"E_BATCH_UNSUPPORTED_NR_%llu",''',
-'''      if(Mode==4 && number==carx_r3d26::kX86_64Prlimit64) {
+'''      }
+      std::snprintf(msg,sizeof(msg),"E_BATCH_UNSUPPORTED_NR_%llu",''',
+'''        if(number==carx_r3d26::kX86_64Prlimit64) {
         const uint64_t lower=carx_r3d16::kStackTop -
                             carx_r3d16::kStackSize;
         const uint64_t upper=carx_r3d16::kStackTop;
@@ -78,6 +79,7 @@ s=one(s,
         carx_r3d6::note(limitmsg);
         accept(0,"N22_BATCH_RETURN_R3D26_PRLIMIT64_OWNED_GUEST_STACK");
         return;
+        }
       }
       std::snprintf(msg,sizeof(msg),"E_BATCH_UNSUPPORTED_NR_%llu",''')
 assert all(x in s for x in (
