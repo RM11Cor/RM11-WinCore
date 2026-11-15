@@ -1,7 +1,7 @@
-name: CarX R3D40 - real RootFS FD101 mmap and ELF RX source FEX512
+name: CarX R3D41 - safe original Wine rootfs symlink libunwind FEX512
 on:
   push:
-    branches: [carx-r3d40-rootfs-mmap-file-elf-gate]
+    branches: [carx-r3d41-confined-symlink-rootfs]
     paths:
       - '.github/workflows/carx-pc-runtime-r3d33-batch104-guest-vm-rootfs-apk-release.yml'
       - 'carxpc/r3d4/**'
@@ -35,6 +35,7 @@ on:
       - 'carxpc/r3d33/**'
       - 'carxpc/r3d39/**'
       - 'carxpc/r3d40/**'
+      - 'carxpc/r3d41/**'
       - 'carxpc/r3d19/native/unified_guest_libc_abi.hpp'
       - 'carxpc/r3d3/**'
       - 'carxpc/r3c25/**'
@@ -1329,6 +1330,16 @@ jobs:
           c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$GITHUB_WORKSPACE" \
             carxpc/r3d40/tests/rootfs_mmap_file_elf_test.cpp -o /tmp/carx-r3d40-rootfs-elf-test
           /tmp/carx-r3d40-rootfs-elf-test
+          python3 -m py_compile carxpc/r3d41/promote_r3d41_symlink.py
+          python3 carxpc/r3d41/promote_r3d41_symlink.py /tmp/carxpc
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$GITHUB_WORKSPACE" \
+            carxpc/r3d41/tests/confined_symlink_walker_test.cpp \
+            -o /tmp/carx-r3d41-symlink-test
+          /tmp/carx-r3d41-symlink-test
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$GITHUB_WORKSPACE" \
+            carxpc/r3d41/tests/guest_vfs_symlink_integration_test.cpp \
+            -o /tmp/carx-r3d41-vfs-symlink-test
+          /tmp/carx-r3d41-vfs-symlink-test
           grep -Fq 'N60_R3D39_REAL_FEX_OPENAT_REACHED_PATCHED_ROOTFS' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'r3d39_apk_runtime_identity' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$GITHUB_WORKSPACE" carxpc/r3d33/tests/guest_vm_path_and_rootfs_fd_table_test.cpp -o /tmp/carx-r3d33-guest-vm-path-test
@@ -1382,10 +1393,10 @@ jobs:
           grep -Fq 'R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'J3B_CACHELESS_GUEST_OVERLAY_ENABLED' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
           grep -Fq 'N22_CACHELESS_GUEST_VFS_OVERLAY_ENOENT' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
-          grep -Fq 'r4.carx.r3d40.real-rootfs-file-mmap-elf-rx-fex512.v1' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
+          grep -Fq 'r4.carx.r3d41.confined-guest-rootfs-symlink-wine-fex512.v1' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'runCacheless' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'HIDE_ETC_LD_SO_CACHE_FOR_DIAGNOSTIC_ONLY' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'E_BATCH_CACHE_ABSENCE_NOT_PROVEN' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
           grep -Fq 'N22_BATCH_RETURN_BRK0_GUEST_RESERVATION' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'N22_BATCH_RETURN_ACCESS_PRELOAD_ENOENT' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
@@ -1395,7 +1406,7 @@ jobs:
           grep -Fq 'batch_source_locked_syscalls' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'J3B_BATCH_CACHE_ABSENT_IN_GUEST_ROOTFS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
           grep -Fq 'runBatch' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'source_guest_path_equals(' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'N16_ACCESS_PRELOAD_SOURCE_MATCHED_ENOENT' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'N17_THIRD_X86_SYSCALL_CALLBACK' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
@@ -1403,7 +1414,7 @@ jobs:
           grep -Fq 'J3A_R3D12_PRELOAD_ABSENT_IN_GUEST_ROOTFS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
           grep -Fq 'run07f' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'OBSERVED_THIRD_SOURCE_LOCKED_X86_LDSO_SYSCALL_AFTER_ACCESS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           echo R3D12_ORIGINAL_LDSO_ACCESS_PRELOAD_SOURCE_GATED_EXACT_THIRD_WITNESS_PATCH_PASS
           grep -Fq 'N13_BRK_ZERO_QUERY_EMULATED' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'N14_SECOND_X86_SYSCALL_CALLBACK' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
@@ -1425,12 +1436,12 @@ jobs:
           grep -Fq 'getTraceInputStream()' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'MAX_TRACE_BYTES = 1024 * 1024' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'native_crash_tombstone' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           test -f /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D9NativeCrashTrace.java
           grep -Fq 'R3D8JsonReportStore.save' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'Intent.ACTION_CREATE_DOCUMENT' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'send.setType("application/json")' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
-          grep -Fq 'CarX_PC_R3D40_ElfMmap_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
+          grep -Fq 'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           test -f /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D8JsonReportStore.java
           grep -Fq 'E_WATCHDOG_FIRED_6000MS' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
@@ -1440,7 +1451,7 @@ jobs:
           grep -Fq 'N11_X86_SYSCALL_CALLBACK_ENTER' /tmp/carxpc/app/src/main/cpp/carx_r3d4_first_syscall.cpp
           grep -Fq 'phase_events' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeActivity.java
           grep -Fq 'PHASE_FILE' /tmp/carxpc/app/src/main/java/com/r4/carxpc/R3D4ProbeService.java
-          grep -Fq 'versionCode 64' /tmp/carxpc/app/build.gradle
+          grep -Fq 'versionCode 65' /tmp/carxpc/app/build.gradle
           grep -Fq 'android:process=":r3d3_probe"' /tmp/carxpc/app/src/main/AndroidManifest.xml
           grep -Fq 'فتح اختبار Wine 07D' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
           grep -Fq 'MainActivity.this,R3D4ProbeActivity.class' /tmp/carxpc/app/src/main/java/com/r4/carxpc/MainActivity.java
@@ -1553,6 +1564,7 @@ jobs:
           test -s /tmp/carxpc/app/src/main/jniLibs/arm64-v8a/libFEXCore.so
           "$BIN/aarch64-linux-android26-clang++" \
             -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter \
+            -DCARX_R3D41_CONFINED_GUEST_SYMLINKS=1 \
             -fPIC -fvisibility=hidden -fno-exceptions -fno-rtti \
             -shared -static-libstdc++ -Wl,--no-undefined,-z,relro,-z,now \
             -I "$GITHUB_WORKSPACE" \
@@ -1576,6 +1588,8 @@ jobs:
           strings "$OUT" | grep -Fq 'N62_R3D40_VERIFIED_ROOTFS_ELF_RX_OPCODE_SOURCE_REGISTERED'
           strings "$OUT" | grep -Fq 'N34_SOURCE_DOMAIN_ROOTFS_ELF_FD101_116'
           echo R3D40_VERIFIED_ARM64_ROOTFS_MMAP_ELF_RX_NATIVE_COMPILED
+          strings "$OUT" | grep -Fq 'N63_R3D41_CONFINED_GUEST_SYMLINK_FD_'
+          echo R3D41_AUTHENTIC_ARM64_GUEST_SYMLINK_ROOTFD_WALKER_COMPILED
           echo CARX_R3D4_REAL_FEXCORE_EXECUTION_PATH_AARCH64_BUILD_ONLY_NO_DEVICE_EXECUTION_CLAIM
       - name: Regression — previously accepted CarX PE inspector
         working-directory: /tmp/carxpc
@@ -1760,7 +1774,7 @@ jobs:
           assert b'N22_CACHELESS_GUEST_VFS_OVERLAY_ENOENT' in so
           assert b'J3B_CACHELESS_GUEST_OVERLAY_ENABLED' in dex
           assert b'BATCH_PREFLIGHT_OR_RUNTIME_REJECTED_' in dex
-          assert b'07H_R3D40_ROOTFS_ELF_MMAP_FEX512' in dex
+          assert b'07H_R3D41_SYMLINK_ELF_MMAP_FEX512' in dex
           assert b'BATCH_NATIVE_CRASH_AFTER_BOUNDED_RESPONSES' in dex
           assert b'batch_source_locked_syscalls' in dex
           assert b'J3B_BATCH_CACHE_ABSENT_IN_GUEST_ROOTFS' in dex
@@ -1778,7 +1792,7 @@ jobs:
           assert b'native_crash_tombstone' in dex
           assert b'getTraceInputStream' in dex
           assert b'RECOVERED_NATIVE_CRASH_RECORD_ONLY' in dex
-          assert b'CarX_PC_R3D40_ElfMmap_Diagnostics_' in dex
+          assert b'CarX_PC_R3D41_SymlinkRootfs_Diagnostics_' in dex
           assert 'فتح اختبار Wine 07D'.encode('utf-8') in dex
           assert b'Intent.ACTION_SEND' not in so
           assert b'getHistoricalProcessExitReasons' in dex
@@ -1834,7 +1848,7 @@ jobs:
           from pathlib import Path
           p=Path('/tmp/carxpc/app/build.gradle')
           s=p.read_text()
-          assert "applicationId 'com.r4.carxpc'" in s and 'versionCode 64' in s
+          assert "applicationId 'com.r4.carxpc'" in s and 'versionCode 65' in s
           old='buildTypes { release { minifyEnabled false } }'
           assert s.count(old)==1
           new="""signingConfigs { stable {
@@ -1909,10 +1923,10 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           SHA="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
           test "${SHA,,}" = 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e'
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='64'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='65'"
           mkdir -p /tmp/carx-release
-          cp "$APK" /tmp/carx-release/CarX_PC_Runtime_R3D40_ElfMmap_ARM64.apk
-          (cd /tmp/carx-release && sha256sum CarX_PC_Runtime_R3D40_ElfMmap_ARM64.apk > CarX_PC_Runtime_R3D40_ElfMmap_ARM64.apk.sha256)
+          cp "$APK" /tmp/carx-release/CarX_PC_Runtime_R3D41_SymlinkRootfs_ARM64.apk
+          (cd /tmp/carx-release && sha256sum CarX_PC_Runtime_R3D41_SymlinkRootfs_ARM64.apk > CarX_PC_Runtime_R3D41_SymlinkRootfs_ARM64.apk.sha256)
       - name: Verify signed Android v30 includes original FEXCore-linked JNI and authentic guest-context stage07C
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
         shell: bash
@@ -2015,7 +2029,7 @@ jobs:
               assert any(token in d for d in dex),('R3C22_SIGNED_DEX_MISSING_SOURCE_HARDLINK_EACCES_EVIDENCE',token)
           print('CARX_R3C22_SIGNED_ANDROID_V27_PERL_HARDLINK_EACCES_FALLBACK_BYTECODE_VERIFIED')
           PY
-          grep -Fq '0.64-r3d40-rootfs-mmap-elf-rx' /tmp/carxpc/app/build.gradle
+          grep -Fq '0.65-r3d41-guest-symlink-rootfd' /tmp/carxpc/app/build.gradle
       - name: Verify signed v26 includes real HTTPS source Wine data provisioner and report correction
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
         shell: bash
@@ -2059,7 +2073,7 @@ jobs:
               assert any(token in d for d in images),('MISSING_ONECLICK_CLASS_OR_MARKER',token,[len(x) for x in images])
           print('CARX_R3C20_MULTIDEX_ONECLICK_EXECUTION_AND_BLOCKED_GATES_VERIFIED',len(images))
           PY
-          grep -Fq '0.64-r3d40-rootfs-mmap-elf-rx' /tmp/carxpc/app/build.gradle
+          grep -Fq '0.65-r3d41-guest-symlink-rootfd' /tmp/carxpc/app/build.gradle
           echo CARX_R3C20_SIGNED_V25_ONECLICK_GENUINE_FEX_GNU_WINE_ELF_VULKAN_FAILCLOSED_APP_INCLUDED
       - name: Verify signed v24 APK includes original Wine x86_64 ELF preflight and explicitly no execution claims
         if: env.CARX_R3A_STABLE_SIGNING_READY == 'true'
@@ -2085,14 +2099,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG=carx-pc-v0064-r3d40-verified-rootfs-elf-mmap
+          TAG=carx-pc-v0065-r3d41-confined-rootfs-symlink
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo 'Release already exists — refuse to overwrite APK'; exit 1
           fi
           gh release create "$TAG" /tmp/carx-release/* \
-            --title "CarX PC Runtime R3D40 v64 — real Wine rootfs FD101 file mmap and ELF RX provenance" \
+            --title "CarX PC Runtime R3D41 v65 — confined symlink rootfs for original Wine libunwind" \
             --target "$GITHUB_SHA" --prerelease \
-            --notes "Signed Android ARM64 runtime v64. R3D39 phone proved real Wine ntdll.so guest openat as FD101, then read and fstat; stopped at syscall index37 mmap because legacy GuestMappings allowed only FD100. R3D40 adds O_NOFOLLOW source-pinned guest FD101-116 readonly regular file mmap, source-file ELF64 x86_64 ET_DYN and RX callback byte identity checks against original mapped file, tracked FEX executable VMAs, and fixes negative errno phase parsing while preserving nonce validation. 104 independent preflights and authentic source-locked FEX guest batch up to 512 remain. CI compilation/signature is not on-device Wine boot or game execution proof."
+            --notes "Experimental signed ARM64 v65. R3D40 on-device diagnostic: 45 genuine x86 syscall callbacks observed, 44 bounded replies; original Wine ntdll ELF mapped via FD101 and RX source registered. Stopped at x86 syscall 45 openat of /usr/lib/x86_64-linux-gnu/libunwind.so.8 because O_NOFOLLOW refused the symlink (-ELOOP). R3D41 preserves protected app-rootfd confinement while resolving actual intermediate and final guest symlinks via fstatat AT_SYMLINK_NOFOLLOW and readlinkat, bounds hops to 16, refuses guest parent escape and host absolute paths, maintains protected FD101..116 + ELF RX source gates, and emits N63 symlink hop proof. 104 preflights and 512 real-witness budget retained. Build success does not prove full Wine boot, PE, graphics, or CarX gameplay."
       - name: Remove original signing material from temporary runner
         if: always()
         shell: bash
