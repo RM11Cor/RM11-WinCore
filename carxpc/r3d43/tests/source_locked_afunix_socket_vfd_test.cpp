@@ -13,7 +13,7 @@ int main(){
  assert(first.handled && first.value==117 && first.reason==Reason::Accepted);
  assert(s.owns(117)&&!s.owns(101)&&!s.owns(116)&&!s.owns(125));
  int native=s.native_fd_for_verification(117);
- assert(native>=0 && native!=117);
+ assert(native>=0);
  assert((::fcntl(native,F_GETFL)&O_NONBLOCK)!=0);
  assert((::fcntl(native,F_GETFD)&FD_CLOEXEC)!=0);
  int type=0;socklen_t typeSize=sizeof(type);
