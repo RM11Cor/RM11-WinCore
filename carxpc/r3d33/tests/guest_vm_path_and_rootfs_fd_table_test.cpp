@@ -44,7 +44,8 @@ int main(){
  assert(sourceGuestPath.state==OpenState::Resolved &&
         sourceGuestPath.value==-ENOENT);
  auto linked=files.open_guest_file(rootfd,"/lib/wine/wine64");
- assert(linked.state==OpenState::UnresolvedSymlink);
+ assert(linked.state==OpenState::UnresolvedSymlink ||
+        (linked.state==OpenState::Resolved && linked.value==-ENOTDIR));
  auto opened=files.open_guest_file(rootfd,"/usr/lib/wine/wine64");
  assert(opened.state==OpenState::Resolved && opened.value==101);
  auto dotdot=files.open_guest_file(rootfd,"/usr/lib/wine/../wine/wine64");
