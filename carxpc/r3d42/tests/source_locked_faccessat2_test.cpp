@@ -48,7 +48,7 @@ int main() {
  assert(target.reason==Reason::Ok);
  char marker[144]{};
  path_hex_marker(target.path,marker);
- assert(std::strncmp(marker,"N65_R3D42_FACCESSAT2_GUEST_PATH_HEX_",37)==0);
+ assert(std::strncmp(marker,"N65_R3D42_FACCESSAT2_GUEST_PATH_HEX_",36)==0);
  assert(std::strstr(marker,"2F6C6962")!=nullptr);
  auto abs=probe("/usr/lib/x86_64-linux-gnu/libunwind.so.8");
  assert(abs.handled && abs.value==0 && abs.hops==1);
