@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <limits>
 namespace carx_r3d25 {
-enum class Source : uint8_t { None, GNU_LDSO, WINE_ELF, LIBC_FD100 };
+enum class Source : uint8_t { None, GNU_LDSO, WINE_ELF, LIBC_FD100, ROOTFS_ELF_FD101_116 };
 constexpr size_t kMaxLibcRXMappings=32;
 struct VerifiedLibcRX {
   uint64_t base{0},length{0},fileOffset{0};
