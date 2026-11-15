@@ -25,9 +25,12 @@ assert all(x in mapping for x in (
   "std::unique_ptr<uint8_t[]> pageWritable",
   "bool update_writable_pages",
   "r.pageWritable[p]==0",
-  "if(fixed && !update_writable_pages",
-  "return update_writable_pages(addr,rounded",
-  "r.pageWritable.reset()"))
+  "const bool write=update_writable_pages(base,rounded",
+  "const bool read=update_readable_pages(base,rounded",
+  "const bool write=update_writable_pages(addr,rounded",
+  "const bool read=update_readable_pages(addr,rounded",
+  "r.pageWritable.reset()",
+  "r.pageReadable.reset()"))
 assert "allPagesWritable" not in mapping
 def one(s,a,n):
  c=s.count(a)
