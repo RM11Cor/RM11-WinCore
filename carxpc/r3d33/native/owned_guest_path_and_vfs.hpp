@@ -89,11 +89,11 @@ class ReadOnlyFiles final {
   bool owns(uint64_t fd)const noexcept {return findFd(fd)>=0;}
   // The rootfd is separately opened by Android from a source-verified,
   // app-private rootfs and passed into this isolated guest-worker JNI.
-  OpenResult open_guest_file(int rootfd,const char* path)noexcept {
+  // R3D38: follow actual directory components while keeping a stack of
+  // app-rootfs-owned directory FDs. ".." pops a trusted directory frame;
+  // it never opens a host parent above the preopened guest root.
+  OpenResult open_guest_file(int rootfd,const char* path) noexcept {
    if(!path||path[0]!='/')return {OpenState::UnsafePath,0};
-   // Preserve the original source-diagnostic guest cacheless policy:
-   // /etc/ld.so.cache physically exists in Android app rootfs but must
-   // NEVER be exposed to original GNU ld.so for this isolated boot probe.
    if(std::strcmp(path,"/etc/ld.so.cache")==0)
      return {OpenState::Resolved,-ENOENT};
    const size_t len=::strnlen(path,kMaxPath+2);
@@ -101,73 +101,90 @@ class ReadOnlyFiles final {
    struct stat rootstat{};
    if(rootfd<0||::fstat(rootfd,&rootstat)!=0||!S_ISDIR(rootstat.st_mode))
      return {OpenState::UntrustedRoot,0};
-   if(len==1)return {OpenState::NotRegular,0};
-   int dir=::fcntl(rootfd,F_DUPFD_CLOEXEC,3);
-   if(dir<0)return {OpenState::HostError,0};
+   struct OwnedDirFrames {
+     std::array<int,64> fds{};
+     size_t count{0};
+     ~OwnedDirFrames(){
+       for(size_t i=0;i<count;++i)
+         if(fds[i]>=0)::close(fds[i]);
+     }
+     int top() const noexcept {return fds[count-1];}
+     bool push(int fd) noexcept {
+       if(count>=fds.size())return false;
+       fds[count++]=fd;return true;
+     }
+     bool pop() noexcept {
+       if(count<=1)return false;
+       ::close(fds[--count]);fds[count]=-1;return true;
+     }
+   } dirs;
+   const int rootCopy=::fcntl(rootfd,F_DUPFD_CLOEXEC,3);
+   if(rootCopy<0)return {OpenState::HostError,0};
+   dirs.push(rootCopy);
    size_t start=1;
    while(start<len){
+     while(start<len&&path[start]=='/')++start;
+     if(start>=len)break;
      size_t end=start;
      while(end<len&&path[end]!='/')++end;
-     const auto count=end-start;
-     if(count==0||count>255){
-       ::close(dir);return {OpenState::UnsafePath,0};
-     }
+     const size_t count=end-start;
+     if(count==0||count>255)return {OpenState::UnsafePath,0};
      char component[256]{};
      std::memcpy(component,path+start,count);
-     if(std::strcmp(component,".")==0||
-        std::strcmp(component,"..")==0){
-       ::close(dir);return {OpenState::UnsafePath,0};
-     }
      const bool final=end==len;
-     struct stat st{};
-     if(::fstatat(dir,component,&st,AT_SYMLINK_NOFOLLOW)!=0){
-       const int e=errno;::close(dir);
-       return {OpenState::Resolved,-int64_t(e)};
+     if(std::strcmp(component,".")==0){
+       if(final)return {OpenState::NotRegular,0};
+       start=end+1;continue;
      }
-     if(S_ISLNK(st.st_mode)){
-       ::close(dir);return {OpenState::UnresolvedSymlink,0};
+     if(std::strcmp(component,"..")==0){
+       if(!dirs.pop())return {OpenState::UnsafePath,0};
+       if(final)return {OpenState::NotRegular,0};
+       start=end+1;continue;
      }
      if(!final){
-       if(!S_ISDIR(st.st_mode)){
-         ::close(dir);return {OpenState::Resolved,-ENOTDIR};
-       }
-       int next=::openat(dir,component,
-            O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);
+       const int next=::openat(dirs.top(),component,
+                      O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);
        if(next<0){
-         const int e=errno;::close(dir);
-         return {OpenState::Resolved,-int64_t(e)};
+         const int e=errno;
+         return {e==ELOOP?OpenState::UnresolvedSymlink:
+                 OpenState::Resolved,-int64_t(e)};
        }
-       ::close(dir);dir=next;start=end+1;continue;
+       if(!dirs.push(next)){
+         ::close(next);return {OpenState::UnsafePath,0};
+       }
+       start=end+1;continue;
      }
-     if(!S_ISREG(st.st_mode)&&!S_ISDIR(st.st_mode)){
-       ::close(dir);return {OpenState::NotRegular,0};
+     const int nativeFd=::openat(dirs.top(),component,
+                       O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
+     if(nativeFd<0){
+       const int e=errno;
+       return {e==ELOOP?OpenState::UnresolvedSymlink:
+               OpenState::Resolved,-int64_t(e)};
      }
-     if(st.st_size<0||
-        (S_ISREG(st.st_mode)&&uint64_t(st.st_size) >
-             carx_r3d19::kMaxTotalMapBytes)){
-        ::close(dir);return {OpenState::NotRegular,0};
-     }
-     const int nativeFd=::openat(dir,component,
-         O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
-     const int savedErr=errno;
-     ::close(dir);
-     if(nativeFd<0)return {OpenState::Resolved,-int64_t(savedErr)};
-     struct stat after{};
-     if(::fstat(nativeFd,&after)!=0 ||
-        (S_ISREG(st.st_mode)&&!S_ISREG(after.st_mode)) ||
-        (S_ISDIR(st.st_mode)&&!S_ISDIR(after.st_mode)) ||
-        st.st_dev!=after.st_dev||st.st_ino!=after.st_ino){
+     struct stat st{};
+     if(::fstat(nativeFd,&st)!=0){
        ::close(nativeFd);return {OpenState::HostError,0};
      }
-     for(size_t slot=0;slot<files.size();++slot)
+     if(!S_ISREG(st.st_mode)&&!S_ISDIR(st.st_mode)){
+       ::close(nativeFd);return {OpenState::NotRegular,0};
+     }
+     if(st.st_size<0||
+        (S_ISREG(st.st_mode)&&uint64_t(st.st_size)>
+                              carx_r3d19::kMaxTotalMapBytes)){
+       ::close(nativeFd);return {OpenState::NotRegular,0};
+     }
+     for(size_t slot=0;slot<files.size();++slot){
        if(files[slot].nativeFd<0){
-         files[slot].nativeFd=nativeFd;files[slot].position=0;
+         files[slot].nativeFd=nativeFd;
+         files[slot].position=0;
          return {OpenState::Resolved,
-                     int64_t(kFirstGuestFd+static_cast<int>(slot))};
+                 int64_t(kFirstGuestFd+static_cast<int>(slot))};
        }
-     ::close(nativeFd);return {OpenState::TableFull,0};
+     }
+     ::close(nativeFd);
+     return {OpenState::TableFull,0};
    }
-   ::close(dir);return {OpenState::UnsafePath,0};
+   return {OpenState::NotRegular,0};
   }
   int64_t close_guest(uint64_t fd) noexcept {
    int slot=findFd(fd);if(slot<0)return -EBADF;
