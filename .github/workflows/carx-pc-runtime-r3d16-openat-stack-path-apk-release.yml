@@ -1524,7 +1524,7 @@ jobs:
           assert b'N22_CACHELESS_GUEST_VFS_OVERLAY_ENOENT' in so
           assert b'J3B_CACHELESS_GUEST_OVERLAY_ENABLED' in dex
           assert b'BATCH_PREFLIGHT_OR_RUNTIME_REJECTED_' in dex
-          assert b'07H_FEX_ALIGN_SAFE_DIAGNOSTIC_BATCH_32' in dex
+          assert b'07H_R3D16_GUEST_STACK_OPENAT_PATH_BATCH_32' in dex
           assert b'BATCH_NATIVE_CRASH_AFTER_BOUNDED_RESPONSES' in dex
           assert b'batch_source_locked_syscalls' in dex
           assert b'J3B_BATCH_CACHE_ABSENT_IN_GUEST_ROOTFS' in dex
