@@ -29,12 +29,12 @@ s=one(s,
 # untrusted host FD is forwarded to the kernel. Selection is exclusive across
 # GNU ldso, Wine, libc FD100, and installed original app-rootfs ELF FD101+.
 s=one(s,
-'''       verified=carx_r3d25::select_exactly_one(
-         sourceGNU,sourceWine,sourceLibc,owner,record);
-       if(!verified) {''',
-'''       verified=carx_r3d25::select_exactly_one(
-         sourceGNU,sourceWine,sourceLibc,owner,record);
-       carx_r3d3::Record rootfsRecord{};
+'''      verified=carx_r3d25::select_exactly_one(
+        sourceGNU,sourceWine,sourceLibc,owner,record);
+      if(!verified) {''',
+'''      verified=carx_r3d25::select_exactly_one(
+        sourceGNU,sourceWine,sourceLibc,owner,record);
+      carx_r3d3::Record rootfsRecord{};
        const bool rootfsHit=RootfsOpcodeSource.make_record(
          state.rip,state.gregs[FEXCore::X86State::REG_RAX],
          Nonce,executable,&rootfsRecord);
