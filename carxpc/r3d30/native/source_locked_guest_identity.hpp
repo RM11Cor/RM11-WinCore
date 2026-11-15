@@ -5,6 +5,8 @@
 // getegid=108, gettid=186. Return the SAME UID/GID used on guest stack.
 #pragma once
 #include <cstdint>
+#include <unistd.h>
+#include <sys/syscall.h>
 namespace carx_r3d30 {
 struct GuestIdentity{
  uint64_t pid{},tid{},uid{},gid{};
