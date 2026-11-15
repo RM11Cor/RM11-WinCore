@@ -62,9 +62,9 @@ int main(){
     return {};
  };
  assert(src.make_record(uint64_t(rx)+0x220,9,456,allowed,&record));
- assert(record.original_elf_file_offset==0x220);
- assert(record.callback_rip==uint64_t(rx)+0x220);
- assert(record.nonce==456);
+ assert(record.source_file_offset==0x220);
+ assert(record.callback_guest_rip==uint64_t(rx)+0x220);
+ assert(record.session_nonce==456);
  const int keep=::fcntl(fd,F_DUPFD_CLOEXEC,3);
  assert(keep>=0);
  assert(::close(fd)==0);
