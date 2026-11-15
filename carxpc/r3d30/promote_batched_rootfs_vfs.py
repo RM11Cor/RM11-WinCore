@@ -109,11 +109,7 @@ s=one(s,
 s,n=re.subn(
  r"(int traceFd,uint64_t nonce,int mode,int libcFd)(,\s*std::string\s*&\s*\w+\s*\)\s*\{)",
  r"\1,int guestRootfsDirFd\2",s)
-assert n==1,("R3D30_LAUNCH_WRAPPER_SIGNATURE",n)
-s,n=re.subn(
- r"(uint64_t rsp,int traceFd,uint64_t nonce,int mode,int libcFd)(,\s*std::string\s*&\s*\w+\s*\)\s*\{)",
- r"\1,int guestRootfsDirFd\2",s)
-assert n==1,("R3D30_RUN_WRAPPER_SIGNATURE",n)
+assert n==2,("R3D30_BOTH_SOURCE_LOCKED_NATIVE_RUN_WRAPPER_SIGNATURES",n)
 s=one(s,
 '''we,le,ldso,wine,traceFd,nonce,mode,libcFd,message)){''',
 '''we,le,ldso,wine,traceFd,nonce,mode,libcFd,
