@@ -27,8 +27,9 @@ assert all(x.is_file() for x in (cpp,act,main,gradle,store))
 # patch drift. Do not claim non-writable host memory is safe to overwrite.
 mapping=Path("carxpc/r3d19/native/unified_guest_libc_abi.hpp").read_text()
 assert "bool owned_writable_range" in mapping
-assert "allPagesWritable" in mapping
-assert "r.allPagesWritable=false;" in mapping
+assert "pageWritable" in mapping
+assert "update_writable_pages" in mapping
+assert "r.pageWritable[p]==0" in mapping
 def one(s,a,n):
  c=s.count(a)
  assert c==1,("R3D31_SOURCE_PINNED_ANCHOR_CHANGED",a[:130],c)
