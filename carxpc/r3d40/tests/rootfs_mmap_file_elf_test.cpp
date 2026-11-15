@@ -12,7 +12,6 @@ struct Vma {uint64_t base{0},length{0};};
 int main(){
  char path[]="/tmp/carx-r3d40-elfXXXXXX";
  int fd=::mkstemp(path);assert(fd>=0);
- assert(::unlink(path)==0);
  std::array<unsigned char,8192> data{};
  Elf64_Ehdr eh{};
  std::memcpy(eh.e_ident,ELFMAG,SELFMAG);
@@ -36,6 +35,10 @@ int main(){
  std::memcpy(data.data()+sizeof(eh),&ph,sizeof(ph));
  data[0x220]=0x0f;data[0x221]=0x05;
  assert(::write(fd,data.data(),data.size())==(ssize_t)data.size());
+ assert(::close(fd)==0);
+ fd=::open(path,O_RDONLY|O_CLOEXEC);
+ assert(fd>=0);
+ assert(::unlink(path)==0);
  assert(carx_r3d40::is_x86_64_elf_dso(fd));
  carx_r3d19::GuestMappings maps{};
  // Existing libc FD100 path is unchanged. Only verified FD101..116 may map.
