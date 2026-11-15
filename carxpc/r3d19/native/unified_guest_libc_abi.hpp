@@ -97,7 +97,7 @@ inline bool fstat_verified_libc_to_guest_stack(
 // Verify every changed mapping belongs to our isolated guest address space.
 // No host MAP_FIXED on an address not previously allocated by this manager.
 class GuestMappings final {
- struct Region {uint64_t base{0};uint64_t length{0};bool used{false};};
+ struct Region {uint64_t base{0};uint64_t length{0};bool used{false};bool allPagesWritable{false};};
  std::array<Region,kMapSlots> regions{};
  uint64_t total{0};
  bool owns(uint64_t addr,uint64_t len)const noexcept {
@@ -107,16 +107,28 @@ class GuestMappings final {
         len<=r.length-(addr-r.base))return true;
    return false;
  }
- bool add(uint64_t addr,uint64_t len) noexcept {
+ bool add(uint64_t addr,uint64_t len,bool writable) noexcept {
    if(len>kMaxTotalMapBytes-total)return false;
    for(auto &r:regions)if(!r.used){
-     r={addr,len,true};total+=len;return true;
+     r={addr,len,true,writable};total+=len;return true;
    }
    return false;
  }
 public:
  bool owned_range(uint64_t addr,uint64_t len)const noexcept {
    return owns(addr,len);
+ }
+ // Conservative write proof: true ONLY when every page of the original
+ // tracked region has remained write-enabled. A partial mprotect that
+ // revokes write marks the WHOLE region non-writable until a full-region
+ // writable mprotect restores it. This can reject a safe subrange, but it
+ // never approves writes into a read-only page or unowned host mapping.
+ bool owned_writable_range(uint64_t addr,uint64_t len)const noexcept {
+   if(!len||addr>UINT64_MAX-len)return false;
+   for(const auto& r:regions)if(r.used&&r.allPagesWritable&&
+       addr>=r.base&&addr-r.base<=r.length&&
+       len<=r.length-(addr-r.base))return true;
+   return false;
  }
  // Real source-backed memory. Returns mmap address or negative *Linux* errno.
  int64_t map(int hostfd,bool fdOpen,uint64_t hint,uint64_t length,
@@ -186,9 +198,21 @@ public:
      if(!fixed)::munmap(result,rounded);
      return -e;
    }
-   if(!fixed && !add(base,rounded)){
+   if(!fixed && !add(base,rounded,(protection&PROT_WRITE)!=0)){
      ::munmap(result,rounded);
      return -ENOMEM;
+   }
+   if(fixed){
+     for(auto& r:regions){
+       if(r.used && base>=r.base && base-r.base<=r.length &&
+          rounded<=r.length-(base-r.base)){
+         if(base==r.base && rounded==r.length)
+           r.allPagesWritable=(protection&PROT_WRITE)!=0;
+         else if((protection&PROT_WRITE)==0)
+           r.allPagesWritable=false;
+         break;
+       }
+     }
    }
    return static_cast<int64_t>(base);
  }
@@ -198,8 +222,19 @@ public:
    if((prot&~uint64_t(PROT_READ|PROT_WRITE|PROT_EXEC))!=0 ||
       ((prot&PROT_EXEC)&&(prot&PROT_WRITE)))return -EACCES;
    if(!owns(addr,rounded))return -EACCES;
-   return ::mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
-         rounded,int(prot))==0?0:-errno;
+   if(::mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
+         rounded,int(prot))!=0)return -errno;
+   for(auto& r:regions){
+     if(r.used && addr>=r.base && addr-r.base<=r.length &&
+        rounded<=r.length-(addr-r.base)){
+       if(addr==r.base && rounded==r.length)
+         r.allPagesWritable=(prot&PROT_WRITE)!=0;
+       else if((prot&PROT_WRITE)==0)
+         r.allPagesWritable=false;
+       break;
+     }
+   }
+   return 0;
  }
  int64_t unmap(uint64_t addr,uint64_t length) noexcept {
    uint64_t rounded=0;
