@@ -1,6 +1,7 @@
 #include "carxpc/r3d25/native/verified_multi_elf_syscall.hpp"
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cerrno>
 #include <vector>
 #include <array>
@@ -28,8 +29,6 @@ int main(){
  std::array<unsigned char,8192> source{};
  source[0x1080]=0x0F;source[0x1081]=0x05;
  assert(write(fd,source.data(),source.size())==ssize_t(source.size()));
- int ro=openat(fd,".",O_RDONLY); // unreliable for file, use /proc/self/fd
- (void)ro;
  void* p=mmap(nullptr,4096,PROT_READ|PROT_WRITE,
               MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
  assert(p!=MAP_FAILED);
