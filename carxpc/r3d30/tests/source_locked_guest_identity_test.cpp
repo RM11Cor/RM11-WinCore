@@ -1,6 +1,7 @@
 #include "carxpc/r3d30/native/source_locked_guest_identity.hpp"
 #include <cassert>
 #include <cstdio>
+#include <initializer_list>
 int main(){
  const carx_r3d30::GuestIdentity id{2744,2776,10234,10234};
  using carx_r3d30::handle_identity;
