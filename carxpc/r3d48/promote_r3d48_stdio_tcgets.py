@@ -40,7 +40,6 @@ s=one(s,'''        // R3D47: device verified libc x86 Linux fstat(5), guest fd1,
               number,arg0,arg1,arg2,
               [&](uint64_t p,uint64_t n)->bool{
                 return carx_r3d18::owned_stack_write_bounds(p,n) ||
-                  carx_r3d33::brk_readable(p,n,BRKBase,GuestBrkCurrent) ||
                   GuestMaps.owned_writable_range(p,n);
               });
           char marker[144]{};
