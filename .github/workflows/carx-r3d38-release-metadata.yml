@@ -1,0 +1,24 @@
+name: R3D38 release metadata correction
+on:
+  push:
+    branches: [carx-r3d38-real-rootfs-wine-openat]
+    paths:
+      - '.github/workflows/carx-r3d38-release-metadata.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  relabel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Correct R3D38 APK release title and public proof scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=carx-pc-v0062-r3d38-safe-wine-openat
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" \
+            --title "CarX PC Runtime R3D38 v62 — rootfd-confined Wine openat path correction ARM64" \
+            --notes "Signed ARM64 versionCode62 derived from the real R3D33 Wine/FEX engine. This release corrects source-verified x86 openat path traversal through wine/../ within an app-private rootfs, using a bounded stack of O_NOFOLLOW directory descriptors to prevent parent escape. Regression test preserves intermediate path existence and rejects root escape/symlinks; existing 104 preflights and FEX 512 upper bound remain in place. GitHub Actions cross-compilation, APK audit and stable signing PASSED. On-device R3D38 execution NOT YET VERIFIED. Last R3D33 phone report reached 35 actual original x86 callbacks, with 34 responses; Wine process startup, Win64 PE, graphics and CarX are not proven. APK is an experimental runtime diagnostic, not a complete playable game." \
+            --prerelease
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json tagName,name,assets
