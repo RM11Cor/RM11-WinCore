@@ -21,7 +21,8 @@
 #include <cerrno>
 #include <cstring>
 #include <ctime>
-#include <sys/random.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sched.h>
 #include <time.h>
@@ -51,8 +52,9 @@ inline Result source_locked_dispatch(uint64_t nr,uint64_t arg0,
    // Host syscall observes an exclusively LOCAL bounded temporary buffer.
    // Linux short reads and negative EAGAIN/EINTR are returned as-is.
    unsigned char entropy[kMaxReadEntropy]{};
-   const ssize_t n=::getrandom(entropy,static_cast<size_t>(arg1),
-                                static_cast<unsigned>(arg2));
+   const ssize_t n=static_cast<ssize_t>(
+       ::syscall(SYS_getrandom,entropy,static_cast<size_t>(arg1),
+                  static_cast<unsigned>(arg2)));
    if(n<0)return {Kind::Success,-int64_t(errno)};
    if(n>static_cast<ssize_t>(arg1))
      return {Kind::ShapeRejected,0};
