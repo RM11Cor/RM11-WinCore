@@ -16,6 +16,8 @@
 #include <cstring>
 #include <climits>
 #include <array>
+#include <memory>
+#include <new>
 #include <algorithm>
 #include <fcntl.h>
 #include <unistd.h>
@@ -97,7 +99,15 @@ inline bool fstat_verified_libc_to_guest_stack(
 // Verify every changed mapping belongs to our isolated guest address space.
 // No host MAP_FIXED on an address not previously allocated by this manager.
 class GuestMappings final {
- struct Region {uint64_t base{0};uint64_t length{0};bool used{false};bool allPagesWritable{false};};
+ // Per-4KiB guest-page write permissions within the original owned host
+ // reservation. Source-verified MAP_FIXED overlays and mprotect may change
+ // *part* of a larger read-only reservation: a single region bool is wrong.
+ // A per-page 1-byte bitmap costs at most 64 KiB at the 256 MiB cap.
+ struct Region {
+   uint64_t base{0},length{0};
+   bool used{false};
+   std::unique_ptr<uint8_t[]> pageWritable{};
+ };
  std::array<Region,kMapSlots> regions{};
  uint64_t total{0};
  bool owns(uint64_t addr,uint64_t len)const noexcept {
@@ -108,9 +118,28 @@ class GuestMappings final {
    return false;
  }
  bool add(uint64_t addr,uint64_t len,bool writable) noexcept {
-   if(len>kMaxTotalMapBytes-total)return false;
+   if(len>kMaxTotalMapBytes-total || len%kPage!=0)return false;
+   const auto count=static_cast<size_t>(len/kPage);
+   auto bits=std::unique_ptr<uint8_t[]>(new(std::nothrow) uint8_t[count]);
+   if(!bits)return false;
+   std::memset(bits.get(),writable?1:0,count);
    for(auto &r:regions)if(!r.used){
-     r={addr,len,true,writable};total+=len;return true;
+     r.base=addr;r.length=len;r.used=true;
+     r.pageWritable=std::move(bits);total+=len;return true;
+   }
+   return false;
+ }
+ // For a verified page-aligned fixed mmap or mprotect, set rights only for
+ // the covered pages. The untouched pages retain their real guest rights.
+ bool update_writable_pages(uint64_t addr,uint64_t rounded,bool write) noexcept{
+   if(!rounded || (addr%kPage) || (rounded%kPage))return false;
+   for(auto& r:regions)if(r.used && r.pageWritable &&
+      addr>=r.base && addr-r.base<=r.length &&
+      rounded<=r.length-(addr-r.base)){
+      const auto first=static_cast<size_t>((addr-r.base)/kPage);
+      const auto count=static_cast<size_t>(rounded/kPage);
+      std::memset(r.pageWritable.get()+first,write?1:0,count);
+      return true;
    }
    return false;
  }
@@ -118,16 +147,19 @@ public:
  bool owned_range(uint64_t addr,uint64_t len)const noexcept {
    return owns(addr,len);
  }
- // Conservative write proof: true ONLY when every page of the original
- // tracked region has remained write-enabled. A partial mprotect that
- // revokes write marks the WHOLE region non-writable until a full-region
- // writable mprotect restores it. This can reject a safe subrange, but it
- // never approves writes into a read-only page or unowned host mapping.
+ // Authorize only when EVERY touched guest 4KiB page is tracked writable
+ // by our original source-created host-mapping registry. Cross-page writes,
+ // partial fixed overlays and read-only mprotect are all accounted for.
  bool owned_writable_range(uint64_t addr,uint64_t len)const noexcept {
    if(!len||addr>UINT64_MAX-len)return false;
-   for(const auto& r:regions)if(r.used&&r.allPagesWritable&&
+   for(const auto& r:regions)if(r.used&&r.pageWritable&&
        addr>=r.base&&addr-r.base<=r.length&&
-       len<=r.length-(addr-r.base))return true;
+       len<=r.length-(addr-r.base)){
+     const auto first=static_cast<size_t>((addr-r.base)/kPage);
+     const auto last=static_cast<size_t>((addr-r.base+len-1)/kPage);
+     for(auto p=first;p<=last;++p)if(r.pageWritable[p]==0)return false;
+     return true;
+   }
    return false;
  }
  // Real source-backed memory. Returns mmap address or negative *Linux* errno.
@@ -202,18 +234,8 @@ public:
      ::munmap(result,rounded);
      return -ENOMEM;
    }
-   if(fixed){
-     for(auto& r:regions){
-       if(r.used && base>=r.base && base-r.base<=r.length &&
-          rounded<=r.length-(base-r.base)){
-         if(base==r.base && rounded==r.length)
-           r.allPagesWritable=(protection&PROT_WRITE)!=0;
-         else if((protection&PROT_WRITE)==0)
-           r.allPagesWritable=false;
-         break;
-       }
-     }
-   }
+   if(fixed && !update_writable_pages(
+        base,rounded,(protection&PROT_WRITE)!=0))return -EFAULT;
    return static_cast<int64_t>(base);
  }
  int64_t protect(uint64_t addr,uint64_t length,uint64_t prot) noexcept {
@@ -224,17 +246,8 @@ public:
    if(!owns(addr,rounded))return -EACCES;
    if(::mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
          rounded,int(prot))!=0)return -errno;
-   for(auto& r:regions){
-     if(r.used && addr>=r.base && addr-r.base<=r.length &&
-        rounded<=r.length-(addr-r.base)){
-       if(addr==r.base && rounded==r.length)
-         r.allPagesWritable=(prot&PROT_WRITE)!=0;
-       else if((prot&PROT_WRITE)==0)
-         r.allPagesWritable=false;
-       break;
-     }
-   }
-   return 0;
+   return update_writable_pages(addr,rounded,(prot&PROT_WRITE)!=0)
+      ? 0 : -EFAULT;
  }
  int64_t unmap(uint64_t addr,uint64_t length) noexcept {
    uint64_t rounded=0;
@@ -243,7 +256,8 @@ public:
    for(auto &r:regions)if(r.used && addr==r.base && rounded==r.length){
      if(::munmap(reinterpret_cast<void*>(static_cast<uintptr_t>(addr)),
                  rounded)!=0)return -errno;
-     r.used=false;total-=rounded;
+     r.used=false;r.pageWritable.reset();
+     r.base=0;r.length=0;total-=rounded;
      return 0;
    }
    return -EACCES;
