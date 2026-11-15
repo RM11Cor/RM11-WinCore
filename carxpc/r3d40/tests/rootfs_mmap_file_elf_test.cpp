@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cstdio>
+#include <cstdlib>
 #include <array>
 struct Vma {uint64_t base{0},length{0};};
 int main(){
@@ -49,7 +50,7 @@ int main(){
  carx_r3d40::GuestRootfsRxSource src{};
  assert(src.observe_mmap(fd,(uint64_t)ro,8192,false,0));
  carx_r3d3::Record record{};
- const auto find=[&](uint64_t ip)->Vma{return {uint64_t(ro),8192};};
+ const auto find=[&](uint64_t /*ip*/)->Vma{return {uint64_t(ro),8192};};
  assert(!src.make_record(uint64_t(ro)+0x220,9,123,find,&record));
  assert(maps.unmap((uint64_t)ro,8192)==0);
  const int64_t rx=maps.map(fd,true,0,8192,PROT_READ|PROT_EXEC,
