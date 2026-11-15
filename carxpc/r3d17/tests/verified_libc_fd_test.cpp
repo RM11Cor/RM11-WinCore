@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <fcntl.h>
 #include <cstring>
 int main() {
