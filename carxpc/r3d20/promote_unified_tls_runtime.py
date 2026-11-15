@@ -127,7 +127,8 @@ s=one(s,'''        report.put("r3d19_original_wine_loader_progress_only",true);'
         stages.put("original_wine_and_ldso_verified",phases.toString().contains(
           "J5_WINE_SHA256_VERIFIED") && phases.toString().contains(
           "J6_LDSO_SHA256_VERIFIED"));
-        stages.put("guest_libc_opened",bridgedLibc);
+        stages.put("guest_libc_opened",phases.toString().contains(
+          "N22_BATCH_RETURN_OPENAT_LIBC_FD100"));
         stages.put("guest_libc_first_read832",readLibcVerified);
         stages.put("libc_pread64_count",reads);
         stages.put("libc_mmap_count",maps);
