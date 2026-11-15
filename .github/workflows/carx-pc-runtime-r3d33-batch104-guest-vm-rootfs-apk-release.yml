@@ -1982,7 +1982,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           SHA="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
           test "${SHA,,}" = 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e'
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='70'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.r4.carxpc' versionCode='71'"
           mkdir -p /tmp/carx-release
           cp "$APK" /tmp/carx-release/CarX_PC_Runtime_R3D47_StdioFstat_ARM64.apk
           (cd /tmp/carx-release && sha256sum CarX_PC_Runtime_R3D47_StdioFstat_ARM64.apk > CarX_PC_Runtime_R3D47_StdioFstat_ARM64.apk.sha256)
