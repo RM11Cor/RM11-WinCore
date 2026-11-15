@@ -1,6 +1,7 @@
 #include "carxpc/r3d33/native/preflight24_guest_vm_paths.hpp"
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
