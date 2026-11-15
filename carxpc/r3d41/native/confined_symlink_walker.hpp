@@ -16,7 +16,7 @@
 namespace carx_r3d41 {
 constexpr size_t kMaxSymlinkExpansions=16;
 constexpr size_t kMaxExpandedPath=4096;
-enum class Status:uint8_t {Opened, Unsafe, UnresolvedSymlink, NotRegular, HostError};
+enum class Status:uint8_t {Opened, Unsafe, UnresolvedSymlink, NotRegular, HostError, Exists};
 struct Result {
  int fd{-1};
  Status status{Status::Unsafe};
@@ -42,7 +42,11 @@ struct Frames {
  void reset_to_root() noexcept {while(count>1)::close(fds[--count]);}
  int top()const noexcept {return fds[count-1];}
 };
-inline Result open_guest_readonly(int trustedRootFd,const char* guestPath) noexcept {
+// metadataOnly performs F_OK existence lookup without requiring READ on the
+// final inode. It does not open a host fd and must only be used with bounded
+// source-owned guest path memory and a source-authenticated private rootfd.
+inline Result open_guest_readonly(int trustedRootFd,const char* guestPath,
+                                  bool metadataOnly=false) noexcept {
  if(!guestPath || guestPath[0]!='/')return {-1,Status::Unsafe,-EINVAL,1,0};
  const size_t guestLen=::strnlen(guestPath,257);
  if(!guestLen || guestLen>255)
@@ -51,6 +55,8 @@ inline Result open_guest_readonly(int trustedRootFd,const char* guestPath) noexc
  if(trustedRootFd<0 || ::fstat(trustedRootFd,&rst)!=0 ||
     !S_ISDIR(rst.st_mode))
    return {-1,Status::HostError,-EBADF,3,0};
+ if(metadataOnly && guestLen==1 && guestPath[0]=='/')
+   return {-1,Status::Exists,0,0,0};
  const int rootCopy=::fcntl(trustedRootFd,F_DUPFD_CLOEXEC,3);
  if(rootCopy<0)return {-1,Status::HostError,-errno,4,0};
  Frames frames{};
@@ -108,6 +114,9 @@ inline Result open_guest_readonly(int trustedRootFd,const char* guestPath) noexc
      if(absolute)frames.reset_to_root();
      continue;
    }
+   // F_OK probes existence, not the ability to open/read the file itself.
+   // Do not create virtual FDs or open final objects for an access probe.
+   if(last && metadataOnly) return {-1,Status::Exists,0,0,hops};
    if(!last){
      if(!S_ISDIR(st.st_mode))
        return {-1,Status::Opened,-ENOTDIR,0,hops};
